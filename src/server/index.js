@@ -1,10 +1,9 @@
-import express from 'express';
-import appointmentRoutes from './routes/appointments.js';
-import { config } from './config/railway.js';
+const express = require('express');
+const appointmentRoutes = require('./routes/appointments');
+const { config } = require('./config/railway');
 
 const app = express();
 
-// Now we can use config.baseUrl and config.dbUrl
 const PORT = process.env.PORT || 3000;
 
 app.use('/api/appointments', appointmentRoutes);

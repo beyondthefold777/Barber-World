@@ -1,16 +1,43 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { Button } from 'react-native-paper';
+import { appointmentService } from '../services/api.js';
 
 const SchedulingScreen = () => {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const timeSlots = [
     '9:00 AM', '10:00 AM', '11:00 AM',
     '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM'
   ];
+
+  const handleBooking = async () => {
+    if (!selectedDate || !selectedTime) {
+      Alert.alert('Please select both date and time');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const appointmentData = {
+        date: selectedDate,
+        time: selectedTime,
+        // Add any other booking details you need
+      };
+
+      const result = await appointmentService.bookAppointment(appointmentData);
+      Alert.alert('Success', 'Appointment booked successfully!');
+      setSelectedDate('');
+      setSelectedTime('');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to book appointment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -43,9 +70,11 @@ const SchedulingScreen = () => {
       <Button
         mode="contained"
         style={styles.bookButton}
-        onPress={() => console.log('Booking:', selectedDate, selectedTime)}
+        onPress={handleBooking}
+        loading={loading}
+        disabled={loading || !selectedDate || !selectedTime}
       >
-        Book Appointment
+        {loading ? 'Booking...' : 'Book Appointment'}
       </Button>
     </ScrollView>
   );
