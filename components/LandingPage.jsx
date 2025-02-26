@@ -2,8 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 const LandingPage = () => {
+  const navigation = useNavigation();
+
   return (
     <LinearGradient
       colors={['#000000', '#333333']}
@@ -41,7 +44,10 @@ const LandingPage = () => {
           <Text style={styles.navText}>Home</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => navigation.navigate('SchedulingScreen')}
+        >
           <Feather name="calendar" size={24} color="white" />
           <Text style={styles.navText}>Appointments</Text>
         </TouchableOpacity>

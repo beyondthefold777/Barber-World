@@ -5,6 +5,7 @@ import { useState } from 'react';
 import AppLoading from 'expo-app-loading';
 import SplashScreen from './components/SplashScreen';
 import LandingPage from './components/LandingPage';
+import SchedulingScreen from './components/SchedulingScreen';
 
 const Stack = createStackNavigator();
 
@@ -26,6 +27,7 @@ const App = () => {
       <Stack.Navigator initialRouteName="Splash" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="LandingPage" component={LandingPage} />
+        <Stack.Screen name="SchedulingScreen" component={SchedulingScreen} />
       </Stack.Navigator>
       <StatusBar style="light" />
     </NavigationContainer>

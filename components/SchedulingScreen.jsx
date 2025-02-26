@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { Button } from 'react-native-paper';
@@ -8,11 +8,25 @@ const SchedulingScreen = () => {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const timeSlots = [
+  const [availableTimeSlots, setAvailableTimeSlots] = useState([
     '9:00 AM', '10:00 AM', '11:00 AM',
     '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM'
-  ];
+  ]);
+
+  useEffect(() => {
+    if (selectedDate) {
+      fetchAvailableSlots(selectedDate);
+    }
+  }, [selectedDate]);
+
+  const fetchAvailableSlots = async (date) => {
+    try {
+      const slots = await appointmentService.getTimeSlots(date);
+      setAvailableTimeSlots(slots);
+    } catch (error) {
+      console.log('Error fetching time slots:', error);
+    }
+  };
 
   const handleBooking = async () => {
     if (!selectedDate || !selectedTime) {
@@ -25,15 +39,15 @@ const SchedulingScreen = () => {
       const appointmentData = {
         date: selectedDate,
         time: selectedTime,
-        // Add any other booking details you need
+        service: 'Regular Haircut'
       };
 
       const result = await appointmentService.bookAppointment(appointmentData);
-      Alert.alert('Success', 'Appointment booked successfully!');
+      Alert.alert('Success! 💈', 'Your appointment has been booked!');
       setSelectedDate('');
       setSelectedTime('');
     } catch (error) {
-      Alert.alert('Error', 'Failed to book appointment. Please try again.');
+      Alert.alert('Booking Update', 'We could not process your booking at this time');
     } finally {
       setLoading(false);
     }
@@ -54,12 +68,13 @@ const SchedulingScreen = () => {
       <View style={styles.timeContainer}>
         <Text style={styles.subtitle}>Available Times</Text>
         <View style={styles.timeGrid}>
-          {timeSlots.map((time) => (
+          {availableTimeSlots.map((time) => (
             <Button
               key={time}
               mode={selectedTime === time ? 'contained' : 'outlined'}
               onPress={() => setSelectedTime(time)}
               style={styles.timeButton}
+              disabled={loading}
             >
               {time}
             </Button>

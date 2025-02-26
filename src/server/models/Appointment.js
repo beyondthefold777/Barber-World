@@ -29,4 +29,7 @@ const appointmentSchema = new mongoose.Schema({
   }
 });
 
+// Add index for querying appointments by date
+appointmentSchema.index({ date: 1, status: 1 });
+
 module.exports = mongoose.model('Appointment', appointmentSchema);
