@@ -1,27 +1,40 @@
 const API_URL = 'https://barber-world-production.up.railway.app';
 
 export const appointmentService = {
-  // Book an appointment
   bookAppointment: async (appointmentData) => {
     try {
+      console.log('Making request to:', `${API_URL}/api/appointments`);
+      
       const response = await fetch(`${API_URL}/api/appointments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
-        body: JSON.stringify(appointmentData),
+        body: JSON.stringify({
+          date: appointmentData.date,
+          timeSlot: appointmentData.time,
+          service: appointmentData.service,
+          status: 'confirmed'
+        })
       });
-      return await response.json();
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Server response:', data);
+      return data;
     } catch (error) {
-      console.error('Booking error:', error);
+      console.log('Network error:', error);
       throw error;
     }
   },
 
-  // Get available time slots
   getTimeSlots: async (date) => {
     try {
-      const response = await fetch(`${API_URL}/api/appointments/available?date=${date}`);
+      const response = await fetch(`${API_URL}/api/appointments/available-slots/${date}`);
       return await response.json();
     } catch (error) {
       console.error('Error fetching time slots:', error);
