@@ -3,9 +3,9 @@ const API_URL = 'https://barber-world-production.up.railway.app';
 export const appointmentService = {
   bookAppointment: async (appointmentData) => {
     try {
-      console.log('Making request to:', `${API_URL}/api/appointments`);
+      console.log('Making request to:', `${API_URL}/api/appointments/test`);
       
-      const response = await fetch(`${API_URL}/api/appointments`, {
+      const response = await fetch(`${API_URL}/api/appointments/test`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
