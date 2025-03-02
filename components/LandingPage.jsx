@@ -12,6 +12,14 @@ const LandingPage = () => {
       colors={['#000000', '#333333']}
       style={styles.container}
     >
+      {/* Login/Register Text */}
+      <TouchableOpacity 
+        style={styles.loginText}
+        onPress={() => navigation.navigate('AuthScreen')}
+      >
+        <Text style={styles.loginButtonText}>Login/Register</Text>
+      </TouchableOpacity>
+
       {/* Top Right Image */}
       <View style={styles.topRightImage}>
         <Image 
@@ -27,14 +35,21 @@ const LandingPage = () => {
           {/* Add scrollable featured barbershops here */}
         </View>
 
-        <View style={styles.quickBook}>
-          <Text style={styles.sectionTitle}>Quick Book</Text>
-          {/* Add quick booking options */}
-        </View>
-
         <TouchableOpacity style={styles.barberSignup}>
           <Text style={styles.signupText}>Barbershop? List Your Shop</Text>
         </TouchableOpacity>
+
+        <View style={styles.promoSection}>
+          <Text style={styles.promoTitle}>Special Offer!</Text>
+          <Text style={styles.promoText}>Get 25% Off Your First Cut</Text>
+          <Text style={styles.promoSubtext}>When you sign up and book today</Text>
+          <TouchableOpacity 
+            style={styles.promoButton}
+            onPress={() => navigation.navigate('AuthScreen')}
+          >
+            <Text style={styles.promoButtonText}>Claim Offer</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Bottom Navigation Bar */}
@@ -79,21 +94,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  loginText: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
   topRightImage: {
     position: 'absolute',
-    top: 20,
+    top: 80,
     right: 20,
     zIndex: 1,
   },
   content: {
     flex: 1,
     padding: 20,
+    paddingTop: 150,
   },
   featuredSection: {
-    marginTop: 20,
-  },
-  quickBook: {
-    marginTop: 30,
+    marginBottom: 30,
   },
   sectionTitle: {
     color: 'white',
@@ -106,11 +130,46 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 30,
+    marginBottom: 30,
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
   signupText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  promoSection: {
+    padding: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+  },
+  promoTitle: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  promoText: {
+    color: '#FF0000',
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  promoSubtext: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginBottom: 15,
+  },
+  promoButton: {
+    backgroundColor: '#FF0000',
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+  },
+  promoButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',

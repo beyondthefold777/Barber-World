@@ -2,11 +2,6 @@ const express = require('express');
 const router = express.Router();
 const Appointment = require('../models/Appointment');
 
-// Test endpoint to check if route is working
-router.get('/test', (req, res) => {
-  res.json({ message: 'Appointments route is working!' });
-});
-
 // Get available time slots
 router.get('/available-slots/:date', async (req, res) => {
   try {
@@ -38,7 +33,7 @@ router.post('/', async (req, res) => {
   const appointment = new Appointment({
     clientId: req.body.clientId || '64f5e3c2e4b1234567890123',
     date: new Date(req.body.date),
-    timeSlot: req.body.time,
+    timeSlot: req.body.timeSlot,
     service: req.body.service || 'Regular Haircut',
     status: 'confirmed'
   });
