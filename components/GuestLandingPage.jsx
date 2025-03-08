@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-const LandingPage = () => {
+const GuestLandingPage = () => {
   const navigation = useNavigation();
   const [isOpen, setIsOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(-300)).current;
@@ -73,7 +73,7 @@ const LandingPage = () => {
           </TouchableOpacity>
 
           <View style={styles.sidebarHeader}>
-            <Text style={styles.sidebarTitle}>Business Center</Text>
+            <Text style={styles.sidebarTitle}>Guest Menu</Text>
             <View style={styles.titleUnderline} />
           </View>
 
@@ -82,58 +82,83 @@ const LandingPage = () => {
               showsVerticalScrollIndicator={true}
               indicatorStyle="white"
             >
-              {/* Authentication Links */}
-              <TouchableOpacity 
-                style={styles.authLink}
-                onPress={() => {
-                  toggleMenu();
-                  navigation.navigate('Login');
-                }}
-              >
-                <MaterialIcons name="login" size={24} color="white" />
-                <Text style={styles.authLinkText}>Login</Text>
+              {/* Profile Section */}
+              <Text style={styles.sidebarSection}>Profile</Text>
+              <TouchableOpacity style={styles.sidebarItem}>
+                <Feather name="user" size={20} color="white" />
+                <Text style={styles.sidebarItemText}>My Account</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sidebarItem}>
+                <Feather name="settings" size={20} color="white" />
+                <Text style={styles.sidebarItemText}>Preferences</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={styles.authLink}
-                onPress={() => {
-                  toggleMenu();
-                  navigation.navigate('Register');
-                }}
-              >
-                <MaterialIcons name="person-add" size={24} color="white" />
-                <Text style={styles.authLinkText}>Register</Text>
+              {/* Appointments Section */}
+              <Text style={styles.sidebarSection}>Appointments</Text>
+              <TouchableOpacity style={styles.sidebarItem}>
+                <Feather name="calendar" size={20} color="white" />
+                <Text style={styles.sidebarItemText}>Book Now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sidebarItem}>
+                <Feather name="clock" size={20} color="white" />
+                <Text style={styles.sidebarItemText}>Upcoming</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sidebarItem}>
+                <Feather name="archive" size={20} color="white" />
+                <Text style={styles.sidebarItemText}>History</Text>
               </TouchableOpacity>
 
-              {/* Section Titles */}
-              <Text style={styles.sidebarSection}>Account</Text>
-              <Text style={styles.sidebarSection}>Financial</Text>
-              <Text style={styles.sidebarSection}>Marketing & Promotions</Text>
-              <Text style={styles.sidebarSection}>Communication Hub</Text>
-              <Text style={styles.sidebarSection}>Analytics & Reports</Text>
-              <Text style={styles.sidebarSection}>Settings</Text>
-              <Text style={styles.sidebarSection}>Support & Resources</Text>
+              {/* Favorites Section */}
+              <Text style={styles.sidebarSection}>Favorites</Text>
+              <TouchableOpacity style={styles.sidebarItem}>
+                <Feather name="heart" size={20} color="white" />
+                <Text style={styles.sidebarItemText}>Saved Barbers</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sidebarItem}>
+                <Feather name="bookmark" size={20} color="white" />
+                <Text style={styles.sidebarItemText}>Saved Styles</Text>
+              </TouchableOpacity>
+
+              {/* Payments Section */}
+              <Text style={styles.sidebarSection}>Payments</Text>
+              <TouchableOpacity style={styles.sidebarItem}>
+                <Feather name="credit-card" size={20} color="white" />
+                <Text style={styles.sidebarItemText}>Payment Methods</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sidebarItem}>
+                <Feather name="file-text" size={20} color="white" />
+                <Text style={styles.sidebarItemText}>Transaction History</Text>
+              </TouchableOpacity>
+
+              {/* Support Section */}
+              <Text style={styles.sidebarSection}>Support</Text>
+              <TouchableOpacity style={styles.sidebarItem}>
+                <Feather name="help-circle" size={20} color="white" />
+                <Text style={styles.sidebarItemText}>Help Center</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sidebarItem}>
+                <Feather name="message-circle" size={20} color="white" />
+                <Text style={styles.sidebarItemText}>Contact Support</Text>
+              </TouchableOpacity>
+                            {/* Footer Links */}
+                            <View style={styles.sidebarFooter}>
+                <TouchableOpacity style={styles.footerLink}>
+                  <Text style={styles.footerText}>Terms of Service</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.footerLink}>
+                  <Text style={styles.footerText}>Privacy Policy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.footerLink}>
+                  <Text style={styles.footerText}>About Us</Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
-          </View>
-
-          <View style={styles.sidebarFooter}>
-            <TouchableOpacity style={styles.footerLink}>
-              <Text style={styles.footerText}>Terms of Service</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.footerLink}>
-              <Text style={styles.footerText}>Privacy Policy</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.footerLink}>
-              <Text style={styles.footerText}>Contact Us</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.footerLink}>
-              <Text style={styles.footerText}>Help Center</Text>
-            </TouchableOpacity>
           </View>
         </LinearGradient>
       </Animated.View>
-  {/* Top Right Image */}
-  <View style={styles.topRightImage}>
+
+      {/* Top Right Image */}
+      <View style={styles.topRightImage}>
         <Image 
           source={require('../assets/clippers1.png')}
           style={{width: 50, height: 50}}
@@ -146,22 +171,15 @@ const LandingPage = () => {
           <Text style={styles.sectionTitle}>Featured Barbershops</Text>
         </View>
 
-        <TouchableOpacity 
-          style={styles.barberSignup}
-          onPress={() => navigation.navigate('Register')}
-        >
-          <Text style={styles.signupText}>Barbershop? List Your Shop</Text>
-        </TouchableOpacity>
-
         <View style={styles.promoSection}>
           <Text style={styles.promoTitle}>Special Offer!</Text>
           <Text style={styles.promoText}>Get 25% Off Your First Cut</Text>
-          <Text style={styles.promoSubtext}>When you sign up and book today</Text>
+          <Text style={styles.promoSubtext}>When you book today</Text>
           <TouchableOpacity 
             style={styles.promoButton}
-            onPress={() => navigation.navigate('Register')}
+            onPress={() => navigation.navigate('BookingScreen')}
           >
-            <Text style={styles.promoButtonText}>Claim Offer</Text>
+            <Text style={styles.promoButtonText}>Book Now</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -178,12 +196,12 @@ const LandingPage = () => {
           onPress={() => navigation.navigate('SchedulingScreen')}
         >
           <Feather name="calendar" size={24} color="white" />
-          <Text style={styles.navText}>Appointments</Text>
+          <Text style={styles.navText}>Book</Text>
         </TouchableOpacity>
 
         <TouchableOpacity>
           <LinearGradient
-            colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
+            colors={['#FF0000', '#FFFFFF', '#0000FF']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.clipperButton}
@@ -252,30 +270,27 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 10,
   },
-  authLink: {
+  sidebarItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  authLinkText: {
+  sidebarItemText: {
     color: 'white',
-    marginLeft: 8,
+    marginLeft: 12,
     fontSize: 16,
-  },
-  sidebarContent: {
-    flex: 1,
-    paddingTop: 10,
   },
   sidebarSection: {
     color: '#FF0000',
     fontSize: 18,
     fontWeight: 'bold',
-    marginTop: 15,
+    marginTop: 20,
     marginBottom: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 16,
   },
   sidebarFooter: {
+    marginTop: 30,
     borderTopWidth: 1,
     borderTopColor: '#444',
     paddingTop: 20,
@@ -306,20 +321,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 15,
-  },
-  barberSignup: {
-    backgroundColor: '#000000',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 30,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  signupText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   promoSection: {
     padding: 20,
@@ -384,4 +385,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LandingPage;
+export default GuestLandingPage;
+

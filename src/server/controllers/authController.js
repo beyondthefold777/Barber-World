@@ -2,171 +2,189 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
-// Client Controllers
-exports.registerClient = async (req, res) => {
+// Unified login handler
+exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 12);
+    console.log('Login attempt for:', email);
+
+    const user = await User.findOne({ email });
     
-    const client = new User({
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      console.log('Invalid login attempt for:', email);
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    console.log('Login successful for:', email);
+
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        businessName: user.businessName,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Login failed', error: error.message });
+  }
+};
+
+// Client registration
+exports.registerClient = async (req, res) => {
+  try {
+    const { email, password, username, phoneNumber } = req.body;
+    console.log('Starting client registration process for:', email);
+    
+    const hashedPassword = await bcrypt.hash(password, 12);
+    console.log('Password hashed successfully');
+
+    const user = new User({
       email,
       password: hashedPassword,
+      username,
+      phoneNumber,
       role: 'client'
     });
 
-    await client.save();
-    
+    await user.save();
+    console.log('Client user saved successfully');
+
     const token = jwt.sign(
-      { userId: client._id, role: 'client' },
+      { userId: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
+    console.log('JWT token generated for client');
 
-    res.status(201).json({ token, userId: client._id });
+    res.status(201).json({
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        role: user.role
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Detailed client registration error:', error);
+    res.status(500).json({ message: 'Registration failed', error: error.message });
   }
 };
 
-exports.loginClient = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const client = await User.findOne({ email, role: 'client' });
-    
-    if (!client) {
-      return res.status(404).json({ message: 'Client not found' });
-    }
-
-    const isValidPassword = await bcrypt.compare(password, client.password);
-    
-    if (!isValidPassword) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    const token = jwt.sign(
-      { userId: client._id, role: 'client' },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.json({ token, userId: client._id });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Barbershop Controllers
+// Barbershop registration
 exports.registerBarbershop = async (req, res) => {
   try {
     const { email, password, businessName } = req.body;
+    console.log('Starting barbershop registration for:', email);
+
     const hashedPassword = await bcrypt.hash(password, 12);
+    console.log('Password hashed successfully');
     
-    const barbershop = new User({
+    const user = new User({
       email,
       password: hashedPassword,
-      role: 'barbershop',
       businessName,
-      subscriptionStatus: 'pending'
+      role: 'barbershop'
     });
 
-    await barbershop.save();
-    
+    await user.save();
+    console.log('Barbershop user saved successfully');
+
     const token = jwt.sign(
-      { userId: barbershop._id, role: 'barbershop' },
+      { userId: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
+    console.log('JWT token generated for barbershop');
 
-    res.status(201).json({ token, userId: barbershop._id });
+    res.status(201).json({
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        businessName: user.businessName,
+        role: user.role
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Detailed barbershop registration error:', error);
+    res.status(500).json({ message: 'Registration failed', error: error.message });
   }
 };
 
-exports.loginBarbershop = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const barbershop = await User.findOne({ email, role: 'barbershop' });
-    
-    if (!barbershop) {
-      return res.status(404).json({ message: 'Barbershop not found' });
-    }
-
-    const isValidPassword = await bcrypt.compare(password, barbershop.password);
-    
-    if (!isValidPassword) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    const token = jwt.sign(
-      { userId: barbershop._id, role: 'barbershop' },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.json({ token, userId: barbershop._id });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Main Barbershop Controllers
+// Main Barbershop registration
 exports.registerMainBarbershop = async (req, res) => {
   try {
     const { email, password, businessName, adminCode } = req.body;
+    console.log('Starting main barbershop registration for:', email);
     
-    // Verify admin code
-    if (adminCode !== process.env.MAIN_BARBERSHOP_ADMIN_CODE) {
-      return res.status(401).json({ message: 'Invalid admin code' });
+    if (adminCode !== process.env.ADMIN_CODE) {
+      console.log('Invalid admin code attempted');
+      return res.status(403).json({ message: 'Invalid admin code' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
+    console.log('Password hashed successfully');
     
-    const mainBarbershop = new User({
+    const user = new User({
       email,
       password: hashedPassword,
-      role: 'mainBarbershop',
       businessName,
-      subscriptionStatus: 'active'
+      role: 'mainBarbershop'
     });
 
-    await mainBarbershop.save();
-    
+    await user.save();
+    console.log('Main barbershop user saved successfully');
+
     const token = jwt.sign(
-      { userId: mainBarbershop._id, role: 'mainBarbershop' },
+      { userId: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
+    console.log('JWT token generated for main barbershop');
 
-    res.status(201).json({ token, userId: mainBarbershop._id });
+    res.status(201).json({
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        businessName: user.businessName,
+        role: user.role
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Detailed main barbershop registration error:', error);
+    res.status(500).json({ message: 'Registration failed', error: error.message });
   }
 };
 
-exports.loginMainBarbershop = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const mainBarbershop = await User.findOne({ email, role: 'mainBarbershop' });
-    
-    if (!mainBarbershop) {
-      return res.status(404).json({ message: 'Main barbershop not found' });
-    }
+// Password reset handlers
+exports.forgotPassword = async (req, res) => {
+  console.log('Password reset requested');
+  res.status(501).json({ message: 'Password reset functionality coming soon' });
+};
 
-    const isValidPassword = await bcrypt.compare(password, mainBarbershop.password);
-    
-    if (!isValidPassword) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
+exports.resetPassword = async (req, res) => {
+  console.log('Password reset attempt');
+  res.status(501).json({ message: 'Password reset functionality coming soon' });
+};
 
-    const token = jwt.sign(
-      { userId: mainBarbershop._id, role: 'mainBarbershop' },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+// Email verification handlers
+exports.verifyEmail = async (req, res) => {
+  console.log('Email verification requested');
+  res.status(501).json({ message: 'Email verification functionality coming soon' });
+};
 
-    res.json({ token, userId: mainBarbershop._id });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+exports.resendVerification = async (req, res) => {
+  console.log('Verification resend requested');
+  res.status(501).json({ message: 'Verification resend functionality coming soon' });
 };

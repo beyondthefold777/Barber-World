@@ -3,12 +3,15 @@ primary_region = 'iad'
 
 [build]
 
+[env]
+  JWT_SECRET = "24943e05eaa2c93a2bb516562c4093a1d254613726418e70a4420cc65594aded6e811151ea55b1b4ae3ee0f5023658162460135e4685328b4ca82695b4cc1059"
+
 [http_service]
   internal_port = 3000
   force_https = true
-  auto_stop_machines = 'stop'
+  auto_stop_machines = false
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ['app']
 
 [[services]]

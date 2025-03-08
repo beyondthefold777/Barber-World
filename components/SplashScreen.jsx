@@ -7,7 +7,7 @@ const SplashScreen = () => {
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      navigation.replace('LandingPage');
+      navigation.replace('Register');
     }, 3000);
 
     return () => clearTimeout(timeout);

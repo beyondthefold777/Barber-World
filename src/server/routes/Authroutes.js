@@ -1,20 +1,28 @@
 const express = require('express');
 const router = express.Router();
-
-// Import controllers (we'll create these next)
 const authController = require('../controllers/authController');
+const { validateRegistration } = require('../middleware/validation');
+
+// Unified login route
+router.post('/login', authController.login);
 
 // Client Routes
-router.post('/client/register', authController.registerClient);
-router.post('/client/login', authController.loginClient);
+router.post('/client/register', 
+  validateRegistration(['email', 'password', 'username', 'phoneNumber']), 
+  authController.registerClient
+);
 
 // Barbershop Routes
-router.post('/barbershop/register', authController.registerBarbershop);
-router.post('/barbershop/login', authController.loginBarbershop);
+router.post('/barbershop/register', 
+  validateRegistration(['email', 'password', 'businessName']), 
+  authController.registerBarbershop
+);
 
 // Main Barbershop Routes
-router.post('/main-barbershop/register', authController.registerMainBarbershop);
-router.post('/main-barbershop/login', authController.loginMainBarbershop);
+router.post('/main-barbershop/register', 
+  validateRegistration(['email', 'password', 'businessName', 'adminCode']), 
+  authController.registerMainBarbershop
+);
 
 // Password Reset Routes
 router.post('/forgot-password', authController.forgotPassword);

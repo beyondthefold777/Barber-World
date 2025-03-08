@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { authService } from '../services/authService';
+import { authService } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const RegisterScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    username: '',
+    phoneNumber: '',
     businessName: '',
     role: '',
     adminCode: ''
@@ -17,6 +19,11 @@ const RegisterScreen = ({ navigation }) => {
   const handleRegister = async () => {
     if (!formData.email || !formData.password || !formData.role) {
       Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    if (formData.role === 'newGuests' && (!formData.username || !formData.phoneNumber)) {
+      Alert.alert('Error', 'Username and phone number are required for guests');
       return;
     }
 
@@ -38,14 +45,14 @@ const RegisterScreen = ({ navigation }) => {
       await AsyncStorage.setItem('userRole', response.user.role);
 
       switch (response.user.role) {
-        case 'client':
-          navigation.replace('ClientHome');
+        case 'newGuests':
+          navigation.replace('GuestLandingPage');
           break;
         case 'barbershop':
           navigation.replace('BarbershopDashboard');
           break;
         case 'mainBarbershop':
-          navigation.replace('MainBarbershopDashboard');
+          navigation.replace('LandingPage');
           break;
         default:
           navigation.replace('Home');
@@ -67,10 +74,10 @@ const RegisterScreen = ({ navigation }) => {
       style={styles.container}
     >
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Create Account</Text>
+        <Text style={styles.title}>Create an Account</Text>
 
         <View style={styles.roleContainer}>
-          {['client', 'barbershop', 'mainBarbershop'].map((role) => (
+          {['newGuests', 'barbershop', 'mainBarbershop'].map((role) => (
             <TouchableOpacity 
               key={role}
               style={[
@@ -80,7 +87,8 @@ const RegisterScreen = ({ navigation }) => {
               onPress={() => updateFormData('role', role)}
             >
               <Text style={styles.roleText}>
-                {role === 'mainBarbershop' ? 'Main Barbershop' : 
+                {role === 'mainBarbershop' ? 'Admin' : 
+                 role === 'newGuests' ? 'New Guests' :
                  role.charAt(0).toUpperCase() + role.slice(1)}
               </Text>
             </TouchableOpacity>
@@ -88,6 +96,27 @@ const RegisterScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.inputContainer}>
+          {formData.role === 'newGuests' && (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="Username"
+                placeholderTextColor="#999"
+                value={formData.username}
+                onChangeText={(value) => updateFormData('username', value)}
+                autoCapitalize="none"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Phone Number"
+                placeholderTextColor="#999"
+                value={formData.phoneNumber}
+                onChangeText={(value) => updateFormData('phoneNumber', value)}
+                keyboardType="phone-pad"
+              />
+            </>
+          )}
+
           <TextInput
             style={styles.input}
             placeholder="Email"
