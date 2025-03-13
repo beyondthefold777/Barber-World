@@ -48,7 +48,7 @@ const LoginScreen = ({ navigation }) => {
           navigation.replace('BarbershopDashboard');
           break;
         default:
-          navigation.replace('Home');
+          navigation.replace('GuestLandingPage');
       }
     } catch (error) {
       console.log('Login error:', error);

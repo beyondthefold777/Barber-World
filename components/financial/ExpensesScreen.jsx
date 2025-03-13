@@ -11,6 +11,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ExpensesScreen = () => {
   const [expense, setExpense] = useState({
@@ -35,16 +36,21 @@ const ExpensesScreen = () => {
 
   const handleSubmit = async () => {
     try {
-      // Here we'll add the API call to your backend
-      const response = await fetch('YOUR_API_ENDPOINT/expenses', {
+      const userToken = await AsyncStorage.getItem('userToken');
+      
+      const response = await fetch('https://barber-world.fly.dev/api/expenses', {
         method: 'POST',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userToken}`
         },
         body: JSON.stringify(expense),
       });
 
-      if (response.ok) {
+      const data = await response.json();
+
+      if (data.success) {
         Alert.alert('Success', 'Expense recorded successfully!');
         setExpense({
           description: '',
@@ -53,14 +59,12 @@ const ExpensesScreen = () => {
           date: new Date(),
           notes: ''
         });
-      } else {
-        throw new Error('Failed to record expense');
       }
     } catch (error) {
+      console.log('Error details:', error);
       Alert.alert('Error', 'Failed to record expense. Please try again.');
     }
-  };
-
+};
   return (
     <LinearGradient
       colors={['#000000', '#333333']}

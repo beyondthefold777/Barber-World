@@ -236,10 +236,13 @@ const BarbershopDashboard = () => {
           <Text style={styles.navText}>Alerts</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.navItem}>
-          <Feather name="calendar" size={24} color="white" />
-          <Text style={styles.navText}>Schedule</Text>
-        </TouchableOpacity>
+        <TouchableOpacity 
+  style={styles.navItem}
+  onPress={() => navigation.navigate('AppointmentList')}
+>
+  <Feather name="calendar" size={24} color="white" />
+  <Text style={styles.navText}>Appointments</Text>
+</TouchableOpacity>
 
         <TouchableOpacity>
           <LinearGradient

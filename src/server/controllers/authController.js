@@ -83,7 +83,7 @@ exports.registerClient = async (req, res) => {
 // Barbershop registration
 exports.registerBarbershop = async (req, res) => {
   try {
-    const { email, password, businessName } = req.body;
+    const { email, password, businessName, address, city, state, zipCode } = req.body;
     console.log('Starting barbershop registration for:', email);
 
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -93,7 +93,11 @@ exports.registerBarbershop = async (req, res) => {
       email,
       password: hashedPassword,
       businessName,
-      role: 'barbershop'
+      role: 'barbershop',
+      address,
+      city,
+      state,
+      zipCode
     });
 
     await user.save();
@@ -112,7 +116,11 @@ exports.registerBarbershop = async (req, res) => {
         id: user._id,
         email: user.email,
         businessName: user.businessName,
-        role: user.role
+        role: user.role,
+        address,
+        city,
+        state,
+        zipCode
       }
     });
   } catch (error) {
@@ -124,7 +132,7 @@ exports.registerBarbershop = async (req, res) => {
 // Main Barbershop registration
 exports.registerMainBarbershop = async (req, res) => {
   try {
-    const { email, password, businessName, adminCode } = req.body;
+    const { email, password, businessName, adminCode, address, city, state, zipCode } = req.body;
     console.log('Starting main barbershop registration for:', email);
     
     if (adminCode !== process.env.ADMIN_CODE) {
@@ -139,7 +147,11 @@ exports.registerMainBarbershop = async (req, res) => {
       email,
       password: hashedPassword,
       businessName,
-      role: 'mainBarbershop'
+      role: 'mainBarbershop',
+      address,
+      city,
+      state,
+      zipCode
     });
 
     await user.save();
@@ -158,12 +170,40 @@ exports.registerMainBarbershop = async (req, res) => {
         id: user._id,
         email: user.email,
         businessName: user.businessName,
-        role: user.role
+        role: user.role,
+        address,
+        city,
+        state,
+        zipCode
       }
     });
   } catch (error) {
     console.error('Detailed main barbershop registration error:', error);
     res.status(500).json({ message: 'Registration failed', error: error.message });
+  }
+};
+
+// Barbershop Search
+exports.searchBarbershops = async (req, res) => {
+  try {
+    const { city, state, zipCode } = req.body;
+    let query = { role: 'barbershop' };
+
+    if (zipCode) {
+      query.zipCode = zipCode;
+    } else if (city && state) {
+      query.city = new RegExp(city, 'i');
+      query.state = new RegExp(state, 'i');
+    }
+
+    const barbershops = await User.find(query)
+      .select('businessName address city state zipCode')
+      .lean();
+
+    res.json(barbershops);
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ message: 'Search failed', error: error.message });
   }
 };
 

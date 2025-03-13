@@ -24,6 +24,9 @@ router.post('/main-barbershop/register',
   authController.registerMainBarbershop
 );
 
+// Barbershop Search Route
+router.post('/barbershops/search', authController.searchBarbershops);
+
 // Password Reset Routes
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);

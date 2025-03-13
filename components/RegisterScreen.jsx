@@ -11,6 +11,10 @@ const RegisterScreen = ({ navigation }) => {
     username: '',
     phoneNumber: '',
     businessName: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
     role: '',
     adminCode: ''
   });
@@ -22,13 +26,14 @@ const RegisterScreen = ({ navigation }) => {
       return;
     }
 
-    if (formData.role === 'newGuests' && (!formData.username || !formData.phoneNumber)) {
+    if (formData.role === 'client' && (!formData.username || !formData.phoneNumber)) {
       Alert.alert('Error', 'Username and phone number are required for guests');
       return;
     }
 
-    if ((formData.role === 'barbershop' || formData.role === 'mainBarbershop') && !formData.businessName) {
-      Alert.alert('Error', 'Business name is required for barbershops');
+    if ((formData.role === 'barbershop' || formData.role === 'mainBarbershop') && 
+        (!formData.businessName || !formData.address || !formData.city || !formData.state || !formData.zipCode)) {
+      Alert.alert('Error', 'All business information is required for barbershops');
       return;
     }
 
@@ -45,7 +50,7 @@ const RegisterScreen = ({ navigation }) => {
       await AsyncStorage.setItem('userRole', response.user.role);
 
       switch (response.user.role) {
-        case 'newGuests':
+        case 'client':
           navigation.replace('GuestLandingPage');
           break;
         case 'barbershop':
@@ -77,7 +82,7 @@ const RegisterScreen = ({ navigation }) => {
         <Text style={styles.title}>Create an Account</Text>
 
         <View style={styles.roleContainer}>
-          {['newGuests', 'barbershop', 'mainBarbershop'].map((role) => (
+          {['client', 'barbershop', 'mainBarbershop'].map((role) => (
             <TouchableOpacity 
               key={role}
               style={[
@@ -88,7 +93,7 @@ const RegisterScreen = ({ navigation }) => {
             >
               <Text style={styles.roleText}>
                 {role === 'mainBarbershop' ? 'Admin' : 
-                 role === 'newGuests' ? 'New Guests' :
+                 role === 'client' ? 'New Guests' :
                  role.charAt(0).toUpperCase() + role.slice(1)}
               </Text>
             </TouchableOpacity>
@@ -96,7 +101,7 @@ const RegisterScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.inputContainer}>
-          {formData.role === 'newGuests' && (
+          {formData.role === 'client' && (
             <>
               <TextInput
                 style={styles.input}
@@ -136,13 +141,44 @@ const RegisterScreen = ({ navigation }) => {
           />
 
           {(formData.role === 'barbershop' || formData.role === 'mainBarbershop') && (
-            <TextInput
-              style={styles.input}
-              placeholder="Business Name"
-              placeholderTextColor="#999"
-              value={formData.businessName}
-              onChangeText={(value) => updateFormData('businessName', value)}
-            />
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="Business Name"
+                placeholderTextColor="#999"
+                value={formData.businessName}
+                onChangeText={(value) => updateFormData('businessName', value)}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Street Address"
+                placeholderTextColor="#999"
+                value={formData.address}
+                onChangeText={(value) => updateFormData('address', value)}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="City"
+                placeholderTextColor="#999"
+                value={formData.city}
+                onChangeText={(value) => updateFormData('city', value)}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="State"
+                placeholderTextColor="#999"
+                value={formData.state}
+                onChangeText={(value) => updateFormData('state', value)}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="ZIP Code"
+                placeholderTextColor="#999"
+                value={formData.zipCode}
+                onChangeText={(value) => updateFormData('zipCode', value)}
+                keyboardType="numeric"
+              />
+            </>
           )}
 
           {formData.role === 'mainBarbershop' && (

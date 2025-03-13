@@ -14,6 +14,7 @@ import LoginScreen from './components/LoginScreen';
 import RegisterScreen from './components/RegisterScreen';
 import BarbershopDashboard from './components/BarbershopDashboard';
 import TrialSignup from './components/TrialSignup';
+import AppointmentList from './components/AppointmentList';
 
 // Financial Hub Screens
 import TaxFormsScreen from './components/financial/TaxFormsScreen';
@@ -71,6 +72,14 @@ const App = () => {
           <Stack.Screen name="SchedulingScreen" component={SchedulingScreen} />
           <Stack.Screen name="BarbershopDashboard" component={BarbershopDashboard} />
           <Stack.Screen name="TrialSignup" component={TrialSignup} />
+          <Stack.Screen 
+            name="AppointmentList" 
+            component={AppointmentList} 
+            options={{ 
+              headerShown: true,
+              title: 'Appointments'
+            }} 
+          />
 
           {/* Financial Hub Screens */}
           <Stack.Screen name="TaxForms" component={TaxFormsScreen} options={{ headerShown: true }} />

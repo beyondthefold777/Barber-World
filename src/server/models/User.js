@@ -28,6 +28,27 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: function() { return this.role === 'barbershop' || this.role === 'mainBarbershop'; }
   },
+  // New location fields
+  address: {
+    type: String,
+    required: function() { return this.role === 'barbershop' || this.role === 'mainBarbershop'; }
+  },
+  city: {
+    type: String,
+    required: function() { return this.role === 'barbershop' || this.role === 'mainBarbershop'; }
+  },
+  state: {
+    type: String,
+    required: function() { return this.role === 'barbershop' || this.role === 'mainBarbershop'; }
+  },
+  zipCode: {
+    type: String,
+    required: function() { return this.role === 'barbershop' || this.role === 'mainBarbershop'; }
+  },
+  coordinates: {
+    latitude: Number,
+    longitude: Number
+  },
   subscriptionStatus: {
     type: String,
     enum: ['active', 'inactive', 'pending'],

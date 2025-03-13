@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
 
 const TaxFormsScreen = () => {
-  const [userInfo, setUserInfo] = useState(null);
   const [documents, setDocuments] = useState([
     {
       id: '1',
@@ -36,51 +34,49 @@ const TaxFormsScreen = () => {
     }
   ]);
 
-  useEffect(() => {
-    getUserInfo();
-  }, []);
-
-  const getUserInfo = async () => {
-    const userToken = await AsyncStorage.getItem('userToken');
-    const userEmail = await AsyncStorage.getItem('userEmail');
-    setUserInfo({ token: userToken, email: userEmail });
-  };
-
   const pickDocument = async () => {
     try {
+      const userToken = await AsyncStorage.getItem('userToken');
+      console.log('Starting document upload process...');
+      
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/*'],
-        copyToCacheDirectory: false,
+        type: '*/*',
+        copyToCacheDirectory: true
       });
-
+      
       if (result.type === 'success') {
         const formData = new FormData();
         formData.append('document', {
-          uri: result.uri,
-          name: result.name,
-          type: result.mimeType
+          uri: result.assets[0].uri,
+          type: result.assets[0].mimeType,
+          name: result.assets[0].name
         });
-        formData.append('userEmail', userInfo.email);
-
-        const response = await axios.post('https://barber-world.fly.dev', formData, {
+  
+        const response = await fetch('https://barber-world.fly.dev/api/test.documents', {
+          method: 'POST',
           headers: {
+            'Accept': 'application/json',
             'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${userInfo.token}`
-          }
+            'Authorization': `Bearer ${userToken}`
+          },
+          body: formData
         });
-
-        setDocuments(prevDocs => [...prevDocs, {
-          id: response.data.documentId,
-          name: result.name,
-          status: 'pending',
-          dueDate: 'Just uploaded'
-        }]);
-
-        Alert.alert('Success', 'Document uploaded successfully!');
+  
+        const data = await response.json();
+  
+        if (data.success) {
+          Alert.alert('Success', 'Document uploaded successfully!');
+          setDocuments(current => [...current, {
+            id: Date.now().toString(),
+            name: result.assets[0].name,
+            status: 'pending',
+            dueDate: new Date().toLocaleDateString()
+          }]);
+        }
       }
-    } catch (err) {
-      Alert.alert('Error', 'Failed to upload document');
-      console.error(err);
+    } catch (error) {
+      console.log('Error details:', error);
+      Alert.alert('Error', 'Failed to upload document. Please try again.');
     }
   };
 
