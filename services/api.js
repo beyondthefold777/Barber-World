@@ -273,3 +273,204 @@ export const taxService = {
     }
   }
 };
+
+export const shopService = {
+  getShopData: async (userToken) => {
+    try {
+      const response = await fetch(`${API_URL}/api/shop`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching shop data:', error);
+      throw error;
+    }
+  },
+
+  createShop: async (shopData, userToken) => {
+    try {
+      const response = await fetch(`${API_URL}/api/shop`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(shopData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Shop creation error:', error);
+      throw error;
+    }
+  },
+
+  updateShop: async (updateData, userToken) => {
+    try {
+      const response = await fetch(`${API_URL}/api/shop/update`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Shop update error:', error);
+      throw error;
+    }
+  },
+
+  uploadImage: async (imageData, userToken) => {
+    try {
+      // Use the update endpoint instead of upload-image
+      const response = await fetch(`${API_URL}/api/shop/update`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ images: imageData })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Image upload error:', error);
+      throw error;
+    }
+  },
+
+  deleteImage: async (imageIndex, userToken) => {
+    try {
+      const response = await fetch(`${API_URL}/api/shop/images/${imageIndex}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Image delete error:', error);
+      throw error;
+    }
+  },
+
+  addService: async (serviceData, userToken) => {
+    try {
+      const response = await fetch(`${API_URL}/api/shop/services`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(serviceData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Service add error:', error);
+      throw error;
+    }
+  },
+
+  removeService: async (serviceId, userToken) => {
+    try {
+      const response = await fetch(`${API_URL}/api/shop/services/${serviceId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Service remove error:', error);
+      throw error;
+    }
+  },
+
+  getShopImages: async (userToken) => {
+    try {
+      const response = await fetch(`${API_URL}/api/shop/images`, {
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching shop images:', error);
+      throw error;
+    }
+  },
+
+  addReview: async (shopId, reviewData, userToken) => {
+    try {
+      const response = await fetch(`${API_URL}/api/shop/${shopId}/reviews`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(reviewData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Review add error:', error);
+      throw error;
+    }
+  }
+};

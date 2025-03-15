@@ -84,7 +84,10 @@ const BarbershopDashboard = () => {
     {
       title: "Shop Settings",
       items: [
-        "Customize Shop",
+        {
+          label: "Customize Shop",
+          screen: "CustomizeShop"  
+        },
         "Cancellation Fees",
         "Reminder Settings",
         "Client Allergies",
