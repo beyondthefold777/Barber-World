@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
 import { Button, TextInput } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { shopService } from '../../services/shopservice';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigation } from '@react-navigation/native';
+import TokenDebugger from '../../components/TokenDebugger';
 
 const CustomizeShopScreen = () => {
-  const { token } = useAuth();
+  const { token, loading: authLoading, logout } = useAuth();
+  const navigation = useNavigation();
   const [loading, setLoading] = useState(false);
   const [shopData, setShopData] = useState(null);
   const [images, setImages] = useState([]);
@@ -17,9 +20,58 @@ const CustomizeShopScreen = () => {
   const [description, setDescription] = useState('');
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  // No useEffect to fetch data on load - we'll only fetch when the button is clicked
+  // Check if token exists when component mounts
+  useEffect(() => {
+    if (!token && !authLoading) {
+      Alert.alert(
+        'Authentication Required',
+        'You need to be logged in to access shop settings.',
+        [
+          { 
+            text: 'Go to Login', 
+            onPress: () => navigation.navigate('Login') 
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          }
+        ]
+      );
+    }
+  }, [token, authLoading, navigation]);
+
+  // Handle API errors related to authentication
+  const handleAuthError = async (error) => {
+    console.log("Handling potential auth error:", error);
+    
+    // Check if error is due to token expiration
+    if (error.tokenExpired || 
+        (error.status === 401) || 
+        (error.message && (
+          error.message.includes('expired') || 
+          error.message.includes('authenticate') || 
+          error.message.includes('authentication')
+        ))
+    ) {
+      console.log("Auth error detected, logging out...");
+      await logout();
+      Alert.alert(
+        'Session Expired', 
+        'Your session has expired. Please log in again.',
+        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+      );
+      return true;
+    }
+    return false;
+  };
 
   const fetchShopData = async () => {
+    if (!token) {
+      Alert.alert('Authentication Required', 'You need to be logged in to access shop data.');
+      navigation.navigate('Login');
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await shopService.getShopData(token);
@@ -42,12 +94,25 @@ const CustomizeShopScreen = () => {
       setLoading(false);
     } catch (error) {
       console.error('Error fetching shop:', error);
-      Alert.alert('Error', 'Failed to load shop data: ' + (error.message || 'Unknown error'));
+      
+      // Check if error is due to authentication
+      const isAuthError = await handleAuthError(error);
+      
+      if (!isAuthError) {
+        Alert.alert('Error', 'Failed to load shop data: ' + (error.message || 'Unknown error'));
+      }
+      
       setLoading(false);
     }
   };
 
   const pickImage = async () => {
+    if (!token) {
+      Alert.alert('Authentication Required', 'You need to be logged in to upload images.');
+      navigation.navigate('Login');
+      return;
+    }
+
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -68,6 +133,12 @@ const CustomizeShopScreen = () => {
   };
 
   const uploadImage = async (base64Image) => {
+    if (!token) {
+      Alert.alert('Authentication Required', 'You need to be logged in to upload images.');
+      navigation.navigate('Login');
+      return;
+    }
+
     try {
       setLoading(true);
       console.log('Uploading image to server...');
@@ -90,10 +161,45 @@ const CustomizeShopScreen = () => {
       setLoading(false);
     } catch (error) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload image: ' + (error.message || 'Unknown error'));
+      
+      // Check if error is due to authentication
+      const isAuthError = await handleAuthError(error);
+      
+      if (!isAuthError) {
+        Alert.alert('Error', 'Failed to upload image: ' + (error.message || 'Unknown error'));
+      }
+      
       setLoading(false);
     }
   };
+
+  // Show loading indicator if auth is still loading
+  if (authLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text>Checking authentication...</Text>
+      </View>
+    );
+  }
+
+  // Show message if not logged in
+  if (!token) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Authentication Required</Text>
+        <Text style={styles.noDataText}>You need to be logged in to access shop settings.</Text>
+        <Button 
+          mode="contained" 
+          onPress={() => navigation.navigate('Login')}
+          style={styles.button}
+          icon="login"
+        >
+          Go to Login
+        </Button>
+      </View>
+    );
+  }
 
   if (loading) {
     return (
@@ -103,9 +209,9 @@ const CustomizeShopScreen = () => {
       </View>
     );
   }
-
   return (
     <ScrollView style={styles.container}>
+      {/* Rest of your component remains the same */}
       <Text style={styles.title}>Customize Your Shop</Text>
       
       {/* Button to fetch shop data */}

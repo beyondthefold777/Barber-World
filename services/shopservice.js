@@ -9,6 +9,7 @@ const logRequest = (method, url, token) => {
   console.log(`${method} request to: ${url}`);
   if (token) {
     console.log(`Using token (first 10 chars): ${token.substring(0, 10)}...`);
+    console.log(`Token length: ${token.length}`);
   }
 };
 
@@ -17,81 +18,79 @@ const handleError = (method, error) => {
   if (error.response) {
     console.error(`API Error - ${method} status:`, error.response.status);
     console.error(`API Error - ${method} data:`, error.response.data);
-    console.error(`API Error - ${method} headers:`, error.response.headers);
+    
+    // Return a more structured error that includes status code
+    return {
+      status: error.response.status,
+      message: error.response.data.error || error.response.data.message || 'An error occurred',
+      data: error.response.data
+    };
   } else {
     console.error(`API Error - ${method}:`, error.message);
+    
+    // Return a generic error
+    return {
+      status: 500,
+      message: error.message || 'Network error occurred',
+    };
   }
-  throw error;
+};
+
+// Check if token exists before making authenticated requests
+const validateToken = (token, methodName) => {
+  if (!token) {
+    console.error(`${methodName}: No authentication token provided`);
+    throw {
+      status: 401,
+      message: 'Authentication token is required'
+    };
+  }
+  
+  // Log token details for debugging
+  console.log(`Token validation for ${methodName}:`, {
+    length: token.length,
+    start: token.substring(0, 10),
+    end: token.substring(token.length - 10)
+  });
 };
 
 export const shopService = {
-  // Get shop data
-  getShopData: async (token) => {
-    try {
-      // Try the /api/shop/data endpoint first
-      const url = `${API_URL}/api/shop/data`;
-      logRequest('GET', url, token);
-      
-      try {
-        const response = await axios.get(
-          url,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        return response.data;
-      } catch (error) {
-        // If the /data endpoint fails, try the fallback endpoint
-        console.log('First endpoint failed, trying fallback...');
-        const fallbackUrl = `${API_URL}/api/shop`;
-        logRequest('GET', fallbackUrl, token);
-        
-        const fallbackResponse = await axios.get(
-          fallbackUrl,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        return fallbackResponse.data;
-      }
-    } catch (error) {
-      handleError('getShopData', error);
-    }
-  },
-  
   // Upload image
   uploadImage: async (imageBase64, token) => {
+    validateToken(token, 'uploadImage');
+    
     try {
       const url = `${API_URL}/api/shop/upload-image`;
       logRequest('POST', url, token);
       console.log('Image data length:', imageBase64.length);
       
+      // Ensure token is properly formatted in the Authorization header
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      console.log('Request headers:', headers);
+      
       const response = await axios.post(
         url,
-        { image: imageBase64 }, // Use 'image' as the key to match the server
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
+        { image: imageBase64 },
+        { headers }
       );
       
       console.log('Image upload response status:', response.status);
       return response.data;
     } catch (error) {
-      handleError('uploadImage', error);
+      throw handleError('uploadImage', error);
     }
   },
   
+  
+  
   // Delete image
   deleteImage: async (imageIndex, token) => {
+    validateToken(token, 'deleteImage');
+    
     try {
       const url = `${API_URL}/api/shop/images/${imageIndex}`;
       logRequest('DELETE', url, token);
@@ -108,12 +107,14 @@ export const shopService = {
       
       return response.data;
     } catch (error) {
-      handleError('deleteImage', error);
+      throw handleError('deleteImage', error);
     }
   },
   
   // Add service
   addService: async (serviceData, token) => {
+    validateToken(token, 'addService');
+    
     try {
       const url = `${API_URL}/api/shop/services`;
       logRequest('POST', url, token);
@@ -131,12 +132,14 @@ export const shopService = {
       
       return response.data;
     } catch (error) {
-      handleError('addService', error);
+      throw handleError('addService', error);
     }
   },
   
   // Remove service
   removeService: async (serviceId, token) => {
+    validateToken(token, 'removeService');
+    
     try {
       const url = `${API_URL}/api/shop/services/${serviceId}`;
       logRequest('DELETE', url, token);
@@ -153,12 +156,14 @@ export const shopService = {
       
       return response.data;
     } catch (error) {
-      handleError('removeService', error);
+      throw handleError('removeService', error);
     }
   },
   
   // Update shop details
   updateShopDetails: async (shopData, token) => {
+    validateToken(token, 'updateShopDetails');
+    
     try {
       const url = `${API_URL}/api/shop/update`;
       logRequest('PUT', url, token);
@@ -176,12 +181,14 @@ export const shopService = {
       
       return response.data;
     } catch (error) {
-      handleError('updateShopDetails', error);
+      throw handleError('updateShopDetails', error);
     }
   },
   
   // Get shop images
   getShopImages: async (token) => {
+    validateToken(token, 'getShopImages');
+    
     try {
       const url = `${API_URL}/api/shop/images`;
       logRequest('GET', url, token);
@@ -198,7 +205,7 @@ export const shopService = {
       
       return response.data;
     } catch (error) {
-      handleError('getShopImages', error);
+      throw handleError('getShopImages', error);
     }
   },
   
@@ -211,7 +218,7 @@ export const shopService = {
       const response = await axios.get(url);
       return response.data;
     } catch (error) {
-      handleError('getShopById', error);
+      throw handleError('getShopById', error);
     }
   },
   
@@ -244,12 +251,14 @@ export const shopService = {
       const response = await axios.get(url);
       return response.data;
     } catch (error) {
-      handleError('getAllShops', error);
+      throw handleError('getAllShops', error);
     }
   },
   
   // Add a review to a shop
   addReview: async (shopId, reviewData, token) => {
+    validateToken(token, 'addReview');
+    
     try {
       const url = `${API_URL}/api/shop/${shopId}/reviews`;
       logRequest('POST', url, token);
@@ -267,12 +276,14 @@ export const shopService = {
       
       return response.data;
     } catch (error) {
-      handleError('addReview', error);
+      throw handleError('addReview', error);
     }
   },
   
   // Create a new shop
   createShop: async (shopData, token) => {
+    validateToken(token, 'createShop');
+    
     try {
       const url = `${API_URL}/api/shop/create`;
       logRequest('POST', url, token);
@@ -290,7 +301,7 @@ export const shopService = {
       
       return response.data;
     } catch (error) {
-      handleError('createShop', error);
+      throw handleError('createShop', error);
     }
   }
 };

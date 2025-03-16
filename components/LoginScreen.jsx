@@ -10,11 +10,13 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { authService } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../context/AuthContext';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -33,22 +35,41 @@ const LoginScreen = ({ navigation }) => {
 
       const response = await authService.loginBarbershop(credentials);
       console.log('Login response received:', response);
+      
+      if (!response || !response.token) {
+        throw new Error('Invalid response from server');
+      }
 
+      // Store the complete token in AsyncStorage
       await AsyncStorage.setItem('userToken', response.token);
-      await AsyncStorage.setItem('userRole', response.user.role);
-
-      switch (response.user.role) {
-        case 'newGuests':
-          navigation.replace('GuestLandingPage');
-          break;
-        case 'barbershop':
-          navigation.replace('BarbershopDashboard');
-          break;
-        case 'mainBarbershop':
-          navigation.replace('BarbershopDashboard');
-          break;
-        default:
-          navigation.replace('GuestLandingPage');
+      
+      // Also store user data if needed
+      if (response.user) {
+        await AsyncStorage.setItem('userData', JSON.stringify(response.user));
+        await AsyncStorage.setItem('userRole', response.user.role || 'guest');
+      }
+      
+      // Update the AuthContext
+      const loginSuccess = await login(response.token);
+      
+      if (loginSuccess) {
+        // Navigate based on role
+        const role = response.user?.role || 'guest';
+        switch (role) {
+          case 'newGuests':
+            navigation.replace('GuestLandingPage');
+            break;
+          case 'barbershop':
+            navigation.replace('BarbershopDashboard');
+            break;
+          case 'mainBarbershop':
+            navigation.replace('BarbershopDashboard');
+            break;
+          default:
+            navigation.replace('GuestLandingPage');
+        }
+      } else {
+        Alert.alert('Login Failed', 'Failed to save authentication data');
       }
     } catch (error) {
       console.log('Login error:', error);
@@ -57,7 +78,6 @@ const LoginScreen = ({ navigation }) => {
       setLoading(false);
     }
   };
-
   return (
     <LinearGradient
       colors={['#000000', '#333333']}
