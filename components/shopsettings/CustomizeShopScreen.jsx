@@ -1,360 +1,593 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
-import { Button, TextInput } from 'react-native-paper';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  ScrollView, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Image, 
+  Alert,
+  ActivityIndicator
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { shopService } from '../../services/shopservice';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigation } from '@react-navigation/native';
-import TokenDebugger from '../../components/TokenDebugger';
+import { shopService } from '../../services/shopservice';
 
 const CustomizeShopScreen = () => {
-  const { token, loading: authLoading, logout } = useAuth();
-  const navigation = useNavigation();
-  const [loading, setLoading] = useState(false);
-  const [shopData, setShopData] = useState(null);
+  // Use the useAuth hook instead of directly accessing the context
+  const { token } = useAuth();
+  
+  // Shop data state
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [zip, setZip] = useState('');
+  
+  // Images and services
   const [images, setImages] = useState([]);
   const [services, setServices] = useState([]);
-  const [businessName, setBusinessName] = useState('');
-  const [address, setAddress] = useState('');
-  const [phone, setPhone] = useState('');
-  const [description, setDescription] = useState('');
+  
+  // UI state
+  const [loading, setLoading] = useState(true);
   const [dataLoaded, setDataLoaded] = useState(false);
-
-  // Check if token exists when component mounts
+  const [isCreatingShop, setIsCreatingShop] = useState(true);
+  
   useEffect(() => {
-    if (!token && !authLoading) {
-      Alert.alert(
-        'Authentication Required',
-        'You need to be logged in to access shop settings.',
-        [
-          { 
-            text: 'Go to Login', 
-            onPress: () => navigation.navigate('Login') 
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          }
-        ]
-      );
+    if (token) {
+      loadShopData();
+    } else {
+      setLoading(false);
+      Alert.alert('Authentication Error', 'You need to be logged in to access this feature.');
     }
-  }, [token, authLoading, navigation]);
-
-  // Handle API errors related to authentication
-  const handleAuthError = async (error) => {
-    console.log("Handling potential auth error:", error);
-    
-    // Check if error is due to token expiration
-    if (error.tokenExpired || 
-        (error.status === 401) || 
-        (error.message && (
-          error.message.includes('expired') || 
-          error.message.includes('authenticate') || 
-          error.message.includes('authentication')
-        ))
-    ) {
-      console.log("Auth error detected, logging out...");
-      await logout();
-      Alert.alert(
-        'Session Expired', 
-        'Your session has expired. Please log in again.',
-        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-      );
-      return true;
-    }
-    return false;
-  };
-
-  const fetchShopData = async () => {
+  }, [token]);
+  
+  const loadShopData = async () => {
     if (!token) {
-      Alert.alert('Authentication Required', 'You need to be logged in to access shop data.');
-      navigation.navigate('Login');
+      Alert.alert('Authentication Error', 'No valid token found. Please log in again.');
+      setLoading(false);
       return;
     }
-
+    
     try {
       setLoading(true);
       const response = await shopService.getShopData(token);
-      console.log('Shop data fetched:', response);
       
-      if (response && response.shop) {
-        const data = response.shop;
-        setShopData(data);
-        setImages(data.images || []);
-        setServices(data.services || []);
-        setBusinessName(data.name || '');
-        setAddress(data.location?.address || '');
-        setPhone(data.phone || '');
-        setDescription(data.description || '');
+      if (response.shop) {
+        // Shop exists, load its data
+        const shop = response.shop;
+        setName(shop.name || '');
+        setDescription(shop.description || '');
+        setPhone(shop.phone || '');
+        
+        // Set location data if available
+        if (shop.location) {
+          setAddress(shop.location.address || '');
+          setCity(shop.location.city || '');
+          setState(shop.location.state || '');
+          setZip(shop.location.zip || '');
+        }
+        
+        // Load images if available
+        if (shop.images && shop.images.length > 0) {
+          setImages(shop.images);
+        }
+        
+        // Load services if available
+        if (shop.services && shop.services.length > 0) {
+          setServices(shop.services);
+        }
+        
+        setIsCreatingShop(false);
         setDataLoaded(true);
       } else {
-        Alert.alert('Info', 'No shop data found. You can create your shop details now.');
+        // No shop exists yet
+        setIsCreatingShop(true);
+        setDataLoaded(false);
       }
-      
-      setLoading(false);
     } catch (error) {
-      console.error('Error fetching shop:', error);
-      
-      // Check if error is due to authentication
-      const isAuthError = await handleAuthError(error);
-      
-      if (!isAuthError) {
-        Alert.alert('Error', 'Failed to load shop data: ' + (error.message || 'Unknown error'));
+      console.error('Error loading shop data:', error);
+      // If error is 404, it means shop doesn't exist yet
+      if (error.status === 404) {
+        setIsCreatingShop(true);
+        setDataLoaded(false);
+      } else {
+        Alert.alert('Error', 'Failed to load shop data. Please try again.');
       }
-      
+    } finally {
       setLoading(false);
     }
   };
-
-  const pickImage = async () => {
+  
+  const createShop = async () => {
     if (!token) {
-      Alert.alert('Authentication Required', 'You need to be logged in to upload images.');
-      navigation.navigate('Login');
+      Alert.alert('Authentication Error', 'No valid token found. Please log in again.');
       return;
     }
-
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-        base64: true,
-      });
-
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
-        uploadImage(base64Image);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
-    }
-  };
-
-  const uploadImage = async (base64Image) => {
-    if (!token) {
-      Alert.alert('Authentication Required', 'You need to be logged in to upload images.');
-      navigation.navigate('Login');
+    
+    if (!name.trim()) {
+      Alert.alert('Required Field', 'Please enter a shop name');
       return;
     }
-
+    
     try {
       setLoading(true);
-      console.log('Uploading image to server...');
       
-      const response = await shopService.uploadImage(base64Image, token);
-      console.log('Image upload response:', response);
-      
-      if (response && response.success) {
-        // Add the new image to the images array
-        if (response.images && response.images.length > 0) {
-          setImages(response.images);
-          Alert.alert('Success', 'Image uploaded successfully');
-        } else {
-          Alert.alert('Warning', 'Image uploaded but no images returned');
+      const shopData = {
+        name,
+        description,
+        phone,
+        location: {
+          address,
+          city,
+          state,
+          zip
         }
+      };
+      
+      const response = await shopService.createShop(shopData, token);
+      
+      if (response.success) {
+        Alert.alert('Success', 'Shop created successfully!');
+        setIsCreatingShop(false);
+        setDataLoaded(true);
+        loadShopData(); // Reload data to get the created shop
       } else {
-        Alert.alert('Error', response?.message || 'Failed to upload image');
+        Alert.alert('Error', response.message || 'Failed to create shop');
       }
-      
-      setLoading(false);
     } catch (error) {
-      console.error('Error uploading image:', error);
-      
-      // Check if error is due to authentication
-      const isAuthError = await handleAuthError(error);
-      
-      if (!isAuthError) {
-        Alert.alert('Error', 'Failed to upload image: ' + (error.message || 'Unknown error'));
-      }
-      
+      console.error('Error creating shop:', error);
+      Alert.alert('Error', error.message || 'Failed to create shop');
+    } finally {
       setLoading(false);
     }
   };
-
-  // Show loading indicator if auth is still loading
-  if (authLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text>Checking authentication...</Text>
-      </View>
-    );
-  }
-
-  // Show message if not logged in
-  if (!token) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Authentication Required</Text>
-        <Text style={styles.noDataText}>You need to be logged in to access shop settings.</Text>
-        <Button 
-          mode="contained" 
-          onPress={() => navigation.navigate('Login')}
-          style={styles.button}
-          icon="login"
-        >
-          Go to Login
-        </Button>
-      </View>
-    );
-  }
-
+  
+  const updateShop = async () => {
+    if (!token) {
+      Alert.alert('Authentication Error', 'No valid token found. Please log in again.');
+      return;
+    }
+    
+    if (!name.trim()) {
+      Alert.alert('Required Field', 'Please enter a shop name');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      const shopData = {
+        name,
+        description,
+        phone,
+        location: {
+          address,
+          city,
+          state,
+          zip
+        }
+      };
+      
+      const response = await shopService.updateShopDetails(shopData, token);
+      
+      if (response.success) {
+        Alert.alert('Success', 'Shop updated successfully!');
+        loadShopData(); // Reload data to get the updated shop
+      } else {
+        Alert.alert('Error', response.message || 'Failed to update shop');
+      }
+    } catch (error) {
+      console.error('Error updating shop:', error);
+      Alert.alert('Error', error.message || 'Failed to update shop');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const pickImage = async () => {
+    if (!token) {
+      Alert.alert('Authentication Error', 'No valid token found. Please log in again.');
+      return;
+    }
+    
+    if (!dataLoaded) {
+      Alert.alert('Create Shop First', 'Please create your shop before adding images.');
+      return;
+    }
+    
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (permissionResult.granted === false) {
+      Alert.alert('Permission Required', 'You need to grant permission to access your photos');
+      return;
+    }
+    
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+      base64: true,
+    });
+    
+    if (!result.canceled && result.assets && result.assets[0]) {
+      const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      
+      try {
+        setLoading(true);
+        const response = await shopService.uploadImage(base64Image, token);
+        
+        if (response.success) {
+          // Add the new image to the images array
+          setImages([...images, base64Image]);
+          Alert.alert('Success', 'Image uploaded successfully!');
+        } else {
+          Alert.alert('Error', response.message || 'Failed to upload image');
+        }
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        Alert.alert('Error', error.message || 'Failed to upload image');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+  
+  const deleteImage = async (index) => {
+    if (!token) {
+      Alert.alert('Authentication Error', 'No valid token found. Please log in again.');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const response = await shopService.deleteImage(index, token);
+      
+      if (response.success) {
+        // Remove the image from the images array
+        const updatedImages = [...images];
+        updatedImages.splice(index, 1);
+        setImages(updatedImages);
+        Alert.alert('Success', 'Image deleted successfully!');
+      } else {
+        Alert.alert('Error', response.message || 'Failed to delete image');
+      }
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      Alert.alert('Error', error.message || 'Failed to delete image');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text>Loading...</Text>
-      </View>
+      <LinearGradient
+        colors={['#1E1E1E', '#121212']}
+        style={styles.container}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF0000" />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </LinearGradient>
     );
   }
-  return (
-    <ScrollView style={styles.container}>
-      {/* Rest of your component remains the same */}
-      <Text style={styles.title}>Customize Your Shop</Text>
-      
-      {/* Button to fetch shop data */}
-      <Button 
-        mode="contained" 
-        onPress={fetchShopData}
-        style={styles.button}
-        icon="refresh"
+  
+  if (!token) {
+    return (
+      <LinearGradient
+        colors={['#1E1E1E', '#121212']}
+        style={styles.container}
       >
-        {dataLoaded ? 'Refresh Shop Data' : 'Load Shop Data'}
-      </Button>
-      
-      {/* Images Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Shop Images</Text>
-        
-        <Button 
-          mode="contained" 
-          onPress={pickImage}
-          style={styles.button}
-          icon="camera"
-        >
-          Add Image
-        </Button>
-        
-        <View style={styles.imagesContainer}>
-          {images && images.length > 0 ? (
-            images.map((image, index) => (
-              <View key={index} style={styles.imageContainer}>
-                <Image 
-                  source={{ uri: image }} 
-                  style={styles.image} 
-                />
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noDataText}>No images added yet</Text>
-          )}
+        <View style={styles.loadingContainer}>
+          <Text style={styles.errorText}>Authentication Error</Text>
+          <Text style={styles.loadingText}>Please log in to access this feature.</Text>
         </View>
-      </View>
-      
-      {/* Shop Details Section - Only show if data is loaded */}
-      {dataLoaded && (
+      </LinearGradient>
+    );
+  }
+  
+  return (
+    <LinearGradient
+      colors={['#1E1E1E', '#121212']}
+      style={styles.container}
+    >
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.header}>
+          <Text style={styles.title}>
+            {isCreatingShop ? 'Create Your Shop' : 'Customize Your Shop'}
+          </Text>
+        </View>
+        
+        {/* Shop Details Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Shop Details</Text>
           
-          <TextInput
-            label="Business Name"
-            value={businessName}
-            onChangeText={setBusinessName}
-            style={styles.input}
-          />
-          
-          <TextInput
-            label="Address"
-            value={address}
-            onChangeText={setAddress}
-            style={styles.input}
-          />
-          
-          <TextInput
-            label="Phone"
-            value={phone}
-            onChangeText={setPhone}
-            style={styles.input}
-            keyboardType="phone-pad"
-          />
-          
-          <TextInput
-            label="Description"
-            value={description}
-            onChangeText={setDescription}
-            style={styles.input}
-            multiline
-            numberOfLines={4}
-          />
-        </View>
-      )}
-      
-      {/* Services Section - Only show if data is loaded */}
-      {dataLoaded && services && services.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Services</Text>
-          
-          <View style={styles.servicesList}>
-            {services.map((service, index) => (
-              <View key={index} style={styles.serviceItem}>
-                <View style={styles.serviceInfo}>
-                  <Text style={styles.serviceName}>{service.name}</Text>
-                  <Text style={styles.serviceDetails}>
-                    ${service.price} • {service.duration} min
-                  </Text>
-                </View>
-              </View>
-            ))}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Shop Name</Text>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              style={styles.input}
+              placeholder="Enter shop name"
+              placeholderTextColor="#666"
+            />
           </View>
+          
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Description</Text>
+            <TextInput
+              value={description}
+              onChangeText={setDescription}
+              style={[styles.input, styles.textArea]}
+              placeholder="Describe your shop"
+              placeholderTextColor="#666"
+              multiline
+              numberOfLines={4}
+            />
+          </View>
+          
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Phone</Text>
+            <TextInput
+              value={phone}
+              onChangeText={setPhone}
+              style={styles.input}
+              placeholder="Phone number"
+              placeholderTextColor="#666"
+              keyboardType="phone-pad"
+            />
+          </View>
+          
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Address</Text>
+            <TextInput
+              value={address}
+              onChangeText={setAddress}
+              style={styles.input}
+              placeholder="Street address"
+              placeholderTextColor="#666"
+            />
+          </View>
+          
+          <View style={styles.locationRow}>
+            <View style={[styles.inputContainer, { flex: 2, marginRight: 10 }]}>
+              <Text style={styles.inputLabel}>City</Text>
+              <TextInput
+                value={city}
+                onChangeText={setCity}
+                style={styles.input}
+                placeholder="City"
+                placeholderTextColor="#666"
+              />
+            </View>
+            
+            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+              <Text style={styles.inputLabel}>State</Text>
+              <TextInput
+                value={state}
+                onChangeText={setState}
+                style={styles.input}
+                placeholder="State"
+                placeholderTextColor="#666"
+              />
+            </View>
+            
+            <View style={[styles.inputContainer, { flex: 1 }]}>
+              <Text style={styles.inputLabel}>ZIP</Text>
+              <TextInput
+                value={zip}
+                onChangeText={setZip}
+                style={styles.input}
+                placeholder="ZIP"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={isCreatingShop ? createShop : updateShop}
+          >
+            <Feather name={isCreatingShop ? "save" : "edit-2"} size={20} color="#FFFFFF" />
+            <Text style={styles.actionButtonText}>
+              {isCreatingShop ? 'Create Shop' : 'Update Shop Details'}
+            </Text>
+          </TouchableOpacity>
         </View>
-      )}
-    </ScrollView>
+        
+        {/* Only show images section if shop exists */}
+        {dataLoaded && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Shop Images</Text>
+            
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={pickImage}
+            >
+              <Feather name="camera" size={20} color="#FFFFFF" />
+              <Text style={styles.actionButtonText}>Add Image</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.imagesContainer}>
+              {images && images.length > 0 ? (
+                images.map((image, index) => (
+                  <View key={index} style={styles.imageContainer}>
+                    <Image 
+                      source={{ uri: image }} 
+                      style={styles.image} 
+                    />
+                    <TouchableOpacity 
+                      style={styles.deleteImageButton}
+                      onPress={() => deleteImage(index)}
+                    >
+                      <Feather name="trash-2" size={18} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noDataText}>No images added yet</Text>
+              )}
+            </View>
+          </View>
+        )}
+        
+        {/* Only show services section if shop exists */}
+        {dataLoaded && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Services</Text>
+            
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => Alert.alert('Coming Soon', 'Service management will be available soon!')}
+            >
+              <Feather name="plus" size={20} color="#FFFFFF" />
+              <Text style={styles.actionButtonText}>Add Service</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.servicesList}>
+              {services && services.length > 0 ? (
+                services.map((service, index) => (
+                  <View key={index} style={styles.serviceItem}>
+                    <View style={styles.serviceInfo}>
+                      <Text style={styles.serviceName}>{service.name}</Text>
+                      <Text style={styles.serviceDetails}>
+                        ${service.price} • {service.duration} min
+                      </Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.serviceAction}
+                      onPress={() => Alert.alert('Coming Soon', 'Service management will be available soon!')}
+                    >
+                      <Feather name="edit" size={18} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.serviceAction, { marginLeft: 10 }]}
+                      onPress={() => Alert.alert('Coming Soon', 'Service management will be available soon!')}
+                    >
+                      <Feather name="trash-2" size={18} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noDataText}>No services added yet</Text>
+              )}
+            </View>
+          </View>
+        )}
+        
+        {/* Help Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Need Help?</Text>
+          <TouchableOpacity 
+            style={styles.helpButton}
+            onPress={() => Alert.alert('Support', 'Contact our support team for assistance with your shop setup.')}
+          >
+            <Feather name="help-circle" size={20} color="#FFFFFF" />
+            <Text style={styles.helpButtonText}>Contact Support</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#f5f5f5',
+  },
+  scrollView: {
+    padding: 20,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingText: {
+    color: '#FFFFFF',
+    marginTop: 10,
+  },
+  errorText: {
+    color: '#FF0000',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  contentContainer: {
+    padding: 20,
+  },
+  header: {
+    marginBottom: 20,
+  },
   title: {
     fontSize: 24,
+    color: '#FFFFFF',
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
   },
   section: {
-    backgroundColor: 'white',
+    backgroundColor: '#333333',
     borderRadius: 8,
     padding: 16,
     marginBottom: 20,
-    elevation: 2,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
+    color: '#FFFFFF',
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 15,
+  },
+  inputContainer: {
+    marginBottom: 15,
+  },
+  inputLabel: {
+    color: '#FFFFFF',
+    marginBottom: 5,
+    fontSize: 16,
   },
   input: {
-    marginBottom: 12,
-    backgroundColor: 'white',
+    backgroundColor: '#444444',
+    color: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
   },
-  button: {
-    marginVertical: 8,
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    marginBottom: 15,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF0000',
+    padding: 15,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   imagesContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginTop: 15,
   },
   imageContainer: {
     width: '48%',
@@ -366,13 +599,25 @@ const styles = StyleSheet.create({
     height: 150,
     borderRadius: 8,
   },
+  deleteImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 0, 0, 0.8)',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   noDataText: {
     textAlign: 'center',
     marginTop: 20,
+    marginBottom: 10,
     color: '#888',
   },
   servicesList: {
-    marginTop: 8,
+    marginTop: 15,
   },
   serviceItem: {
     flexDirection: 'row',
@@ -380,7 +625,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#444444',
   },
   serviceInfo: {
     flex: 1,
@@ -388,11 +633,34 @@ const styles = StyleSheet.create({
   serviceName: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   serviceDetails: {
-    color: '#666',
+    color: '#888',
     marginTop: 4,
-  }
+  },
+  serviceAction: {
+    backgroundColor: '#444444',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  helpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#444444',
+    padding: 15,
+    borderRadius: 8,
+  },
+  helpButtonText: {
+    color: '#FFFFFF',
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });
 
 export default CustomizeShopScreen;

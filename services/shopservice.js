@@ -55,6 +55,30 @@ const validateToken = (token, methodName) => {
 };
 
 export const shopService = {
+  // Get shop data for the authenticated user
+  getShopData: async (token) => {
+    validateToken(token, 'getShopData');
+    
+    try {
+      const url = `${API_URL}/api/shop`;
+      logRequest('GET', url, token);
+      
+      const response = await axios.get(
+        url,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      return response.data;
+    } catch (error) {
+      throw handleError('getShopData', error);
+    }
+  },
+
   // Upload image
   uploadImage: async (imageBase64, token) => {
     validateToken(token, 'uploadImage');
@@ -72,9 +96,10 @@ export const shopService = {
       
       console.log('Request headers:', headers);
       
+      // Change 'image' to 'imageData' to match what the controller expects
       const response = await axios.post(
         url,
-        { image: imageBase64 },
+        { imageData: imageBase64 },
         { headers }
       );
       
@@ -84,8 +109,6 @@ export const shopService = {
       throw handleError('uploadImage', error);
     }
   },
-  
-  
   
   // Delete image
   deleteImage: async (imageIndex, token) => {

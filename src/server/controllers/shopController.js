@@ -1,303 +1,286 @@
 const Shop = require('../models/shop.model');
+const User = require('../models/User');
+const mongoose = require('mongoose');
 
-// Log when the controller is loaded
-console.log('Shop controller loaded successfully');
-console.log('Shop model imported:', typeof Shop === 'function');
+
+// Helper function to check if ID is valid
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id);
+};
 
 const shopController = {
-  createShop: async (req, res) => {
-    console.log('createShop method called');
+  // Get shop data for the authenticated user
+  getShop: async (req, res, next) => {
     try {
-      const { name, description, location, services } = req.body;
-      console.log('Creating shop for user:', req.user.id);
+      const userId = req.user.userId;
+      console.log('Getting shop for user ID:', userId);
+
+      const shop = await Shop.findOne({ userId: userId });
       
+      // Return null if no shop found (client will handle this)
+      res.json({ shop });
+    } catch (error) {
+      console.error('Error getting shop:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  },
+
+  // Create a new shop
+  createShop: async (req, res, next) => {
+    try {
+      const userId = req.user.userId;
+      const { name, description, location } = req.body;
+
+      // Check if shop already exists for this user
+      const existingShop = await Shop.findOne({ userId: userId });
+      if (existingShop) {
+        return res.status(400).json({ success: false, message: 'Shop already exists for this user' });
+      }
+
+      // Create new shop
       const shop = new Shop({
-        userId: req.user.id,
+        userId: userId,
         name,
         description,
         location,
-        services,
-        images: [] // Initialize with empty images array
+        images: [],
+        services: [],
+        reviews: [],
+        rating: 0
       });
 
       await shop.save();
-      console.log('Shop created successfully');
-      res.json({ success: true, shop });
+      res.status(201).json({ success: true, shop });
     } catch (error) {
-      console.error('Shop creation error:', error);
-      res.status(500).json({ error: 'Failed to create shop' });
+      console.error('Error creating shop:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
     }
   },
 
-  getShop: async (req, res) => {
-    console.log('getShop method called');
+  // Update shop details
+  updateShop: async (req, res, next) => {
     try {
-      console.log('Fetching shop for user:', req.user.id);
-      const shop = await Shop.findOne({ userId: req.user.id });
-      console.log('Shop found:', !!shop);
-      res.json({ shop });
-    } catch (error) {
-      console.error('Shop fetch error:', error);
-      res.status(500).json({ error: 'Failed to fetch shop' });
-    }
-  },
+      const userId = req.user.userId;
+      const { name, description, location } = req.body;
 
-  updateShop: async (req, res) => {
-    console.log('updateShop method called');
-    try {
-      const updateData = { ...req.body };
-      console.log('Updating shop for user:', req.user.id);
-      
-      // If an image is being uploaded
-      if (updateData.images) {
-        console.log('Image upload detected in update');
-        // Find the shop first
-        const existingShop = await Shop.findOne({ userId: req.user.id });
-        
-        if (!existingShop) {
-          console.log('Shop not found for image upload');
-          return res.status(404).json({ error: 'Shop not found' });
-        }
-        
-        // Add the new image to the existing images array
-        const updatedImages = [...(existingShop.images || []), updateData.images];
-        updateData.images = updatedImages;
-        
-        console.log(`Adding new image. Total images: ${updatedImages.length}`);
-      }
-      
+      // Find and update shop
       const shop = await Shop.findOneAndUpdate(
-        { userId: req.user.id },
-        updateData,
+        { userId: userId },
+        { name, description, location },
         { new: true }
       );
-      
+
       if (!shop) {
-        console.log('Shop not found for update');
-        return res.status(404).json({ error: 'Shop not found' });
+        return res.status(404).json({ success: false, message: 'Shop not found' });
       }
-      
-      console.log('Shop updated successfully');
+
       res.json({ success: true, shop });
     } catch (error) {
-      console.error('Shop update error:', error);
-      res.status(500).json({ error: 'Failed to update shop', message: error.message });
+      console.error('Error updating shop:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
     }
   },
 
-  uploadImage: async (req, res) => {
-    console.log('uploadImage method called');
+  // Upload image to shop
+  uploadImage: async (req, res, next) => {
     try {
-      // Check if user is authenticated
-      if (!req.user || !req.user.id) {
-        console.log('User not authenticated or user ID missing');
-        return res.status(401).json({ success: false, message: 'User not authenticated' });
-      }
+      const userId = req.user.userId;
+      console.log('Upload image for user ID:', userId);
       
-      // Get the image data from the request body
-      // Check for both possible property names
-      const imageData = req.body.imageData || req.body.image;
-      console.log('Image data received, length:', imageData ? imageData.length : 'no image data');
-      console.log('User ID:', req.user.id);
+      const { imageData } = req.body;
       
       if (!imageData) {
         return res.status(400).json({ success: false, message: 'No image data provided' });
       }
       
-      // First check if the shop exists
-      const shopExists = await Shop.findOne({ userId: req.user.id });
+      console.log('Image data received, length:', imageData.length);
       
-      if (!shopExists) {
-        console.log('Shop not found for user:', req.user.id);
-        return res.status(404).json({ 
-          success: false, 
-          message: 'Shop not found. Please create a shop first.' 
-        });
-      }
+      // Find the shop associated with this user
+      let shop = await Shop.findOne({ userId: userId });
       
-      // Find and update the shop with the new image
-      const shop = await Shop.findOneAndUpdate(
-        { userId: req.user.id },
-        { $push: { images: imageData } },
-        { new: true }
-      );
-      
-      console.log('Shop found and updated:', !!shop);
-      console.log('Image uploaded successfully');
-      console.log('Total images after update:', shop.images.length);
-      
-      res.json({
-        success: true,
-        message: 'Image uploaded successfully',
-        images: shop.images
-      });
-    } catch (error) {
-      console.error('Upload error:', error);
-      res.status(500).json({ error: 'Image upload failed', message: error.message });
-    }
-  },
-
-  getShopImages: async (req, res) => {
-    console.log('getShopImages method called');
-    try {
-      console.log('Fetching images for user:', req.user.id);
-      const shop = await Shop.findOne({ userId: req.user.id });
-      console.log('Shop found:', !!shop);
-      console.log('Images count:', shop ? shop.images.length : 0);
-      res.json({ images: shop ? shop.images : [] });
-    } catch (error) {
-      console.error('Image fetch error:', error);
-      res.status(500).json({ error: 'Failed to fetch images' });
-    }
-  },
-
-  deleteImage: async (req, res) => {
-    console.log('deleteImage method called');
-    try {
-      console.log('Deleting image for user:', req.user.id);
-      console.log('Image index to delete:', req.params.imageId);
-      
-      // First get the shop to access the images
-      const shop = await Shop.findOne({ userId: req.user.id });
-      
+      // If no shop exists, create one automatically
       if (!shop) {
-        return res.status(404).json({ error: 'Shop not found' });
+        console.log('No shop found for user, creating one automatically');
+        
+        // Get user details to use for shop creation
+        const user = await User.findById(userId);
+        if (!user) {
+          console.log('User not found with ID:', userId);
+          return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        
+        console.log('User found:', user.email);
+        
+        // Create a new shop with basic details from user
+        shop = new Shop({
+          userId: userId,
+          name: user.businessName || `${user.firstName || 'New'}'s Barbershop`,
+          description: '',
+          location: {
+            address: user.address || '',
+            city: user.city || '',
+            state: user.state || '',
+            zip: user.zipCode || ''
+          },
+          images: [],
+          services: [],
+          reviews: [],
+          rating: 0
+        });
+        
+        await shop.save();
+        console.log('New shop created with ID:', shop._id);
+      } else {
+        console.log('Existing shop found with ID:', shop._id);
       }
       
-      // Remove the image at the specified index
-      const imageIndex = parseInt(req.params.imageId);
-      if (isNaN(imageIndex) || imageIndex < 0 || imageIndex >= shop.images.length) {
-        return res.status(400).json({ error: 'Invalid image index' });
-      }
-      
-      shop.images.splice(imageIndex, 1);
+      // Add the image to the shop's images array
+      shop.images.push(imageData);
       await shop.save();
       
-      console.log('Image deleted successfully');
+      console.log(`Image added to shop ${shop._id}, total images: ${shop.images.length}`);
+      
+      res.json({ 
+        success: true, 
+        message: 'Image uploaded successfully',
+        shop: {
+          id: shop._id,
+          name: shop.name,
+          imagesCount: shop.images.length
+        }
+      });
+    } catch (error) {
+      console.error('Upload image error:', error);
+      res.status(500).json({ success: false, message: 'Failed to upload image', error: error.message });
+    }
+  },
+
+  // Get shop images
+  getShopImages: async (req, res, next) => {
+    try {
+      const userId = req.user.userId;
+      
+      const shop = await Shop.findOne({ userId: userId });
+      if (!shop) {
+        return res.status(404).json({ success: false, message: 'Shop not found' });
+      }
+      
       res.json({ success: true, images: shop.images });
     } catch (error) {
-      console.error('Image delete error:', error);
-      res.status(500).json({ error: 'Failed to delete image' });
+      console.error('Error getting shop images:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
     }
   },
 
-  addService: async (req, res) => {
-    console.log('addService method called');
+  // Delete image from shop
+  deleteImage: async (req, res, next) => {
     try {
-      console.log('Adding service for user:', req.user.id);
-      console.log('Service data:', req.body);
-      const shop = await Shop.findOneAndUpdate(
-        { userId: req.user.id },
-        { $push: { services: req.body } },
-        { new: true }
-      );
+      const userId = req.user.userId;
+      const { imageId } = req.params;
       
+      const shop = await Shop.findOne({ userId: userId });
       if (!shop) {
-        return res.status(404).json({ error: 'Shop not found' });
+        return res.status(404).json({ success: false, message: 'Shop not found' });
       }
       
-      console.log('Service added successfully');
-      res.json({ success: true, services: shop.services });
+      // Remove image at the specified index
+      const index = parseInt(imageId);
+      if (index >= 0 && index < shop.images.length) {
+        shop.images.splice(index, 1);
+        await shop.save();
+        res.json({ success: true, message: 'Image deleted successfully' });
+      } else {
+        res.status(400).json({ success: false, message: 'Invalid image index' });
+      }
     } catch (error) {
-      console.error('Service add error:', error);
-      res.status(500).json({ error: 'Failed to add service' });
+      console.error('Error deleting image:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
     }
   },
 
-  removeService: async (req, res) => {
-    console.log('removeService method called');
+  // Add service to shop
+  addService: async (req, res, next) => {
     try {
-      console.log('Removing service for user:', req.user.id);
-      console.log('Service ID to remove:', req.params.serviceId);
-      const shop = await Shop.findOneAndUpdate(
-        { userId: req.user.id },
-        { $pull: { services: { _id: req.params.serviceId } } },
-        { new: true }
-      );
+      const userId = req.user.userId;
+      const { name, price, duration } = req.body;
       
+      if (!name || !price || !duration) {
+        return res.status(400).json({ success: false, message: 'Missing required service fields' });
+      }
+      
+      const shop = await Shop.findOne({ userId: userId });
       if (!shop) {
-        return res.status(404).json({ error: 'Shop not found' });
+        return res.status(404).json({ success: false, message: 'Shop not found' });
       }
       
-      console.log('Service removed successfully');
-      res.json({ success: true, services: shop.services });
+      shop.services.push({ name, price, duration });
+      await shop.save();
+      
+      res.json({ success: true, service: shop.services[shop.services.length - 1] });
     } catch (error) {
-      console.error('Service remove error:', error);
-      res.status(500).json({ error: 'Failed to remove service' });
+      console.error('Error adding service:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
     }
   },
 
-  addReview: async (req, res) => {
-    console.log('addReview method called');
+  // Remove service from shop
+  removeService: async (req, res, next) => {
     try {
-      const { rating, comment } = req.body;
-      console.log('Adding review for shop:', req.params.shopId);
-      console.log('Review data:', { rating, comment });
+      const userId = req.user.userId;
+      const { serviceId } = req.params;
       
-      const review = {
-        userId: req.user.id,
-        rating,
-        comment
-      };
-
-      // First find the shop to get current rating
-      const shopToUpdate = await Shop.findById(req.params.shopId);
-      if (!shopToUpdate) {
-        console.log('Shop not found');
-        return res.status(404).json({ error: 'Shop not found' });
+      const shop = await Shop.findOne({ userId: userId });
+      if (!shop) {
+        return res.status(404).json({ success: false, message: 'Shop not found' });
       }
       
-      // Calculate new rating
-      const newRating = (shopToUpdate.rating * shopToUpdate.reviews.length + rating) / (shopToUpdate.reviews.length + 1);
-      console.log('New calculated rating:', newRating);
-
-      const shop = await Shop.findOneAndUpdate(
-        { _id: req.params.shopId },
-        { 
-          $push: { reviews: review },
-          $set: { rating: newRating }
-        },
-        { new: true }
+      // Find and remove the service
+      const serviceIndex = shop.services.findIndex(service => 
+        service._id.toString() === serviceId
       );
       
-      console.log('Review added successfully');
-      res.json({ success: true, reviews: shop.reviews });
+      if (serviceIndex === -1) {
+        return res.status(404).json({ success: false, message: 'Service not found' });
+      }
+      
+      shop.services.splice(serviceIndex, 1);
+      await shop.save();
+      
+      res.json({ success: true, message: 'Service removed successfully' });
     } catch (error) {
-      console.error('Review add error:', error);
-      res.status(500).json({ error: 'Failed to add review' });
+      console.error('Error removing service:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
     }
   },
-  
+
   // Get shop by ID (for public viewing)
-  getShopById: async (req, res) => {
-    console.log('getShopById method called');
+  getShopById: async (req, res, next) => {
     try {
-      const { shopId } = req.params;
-      console.log('Fetching shop by ID:', shopId);
+      const { id } = req.params;
       
-      const shop = await Shop.findById(shopId);
-      
-      if (!shop) {
-        console.log('Shop not found');
-        return res.status(404).json({ error: 'Shop not found' });
+      if (!isValidObjectId(id)) {
+        return res.status(400).json({ success: false, message: 'Invalid shop ID' });
       }
       
-      console.log('Shop found successfully');
+      const shop = await Shop.findById(id).populate('userId', 'firstName lastName email');
+      if (!shop) {
+        return res.status(404).json({ success: false, message: 'Shop not found' });
+      }
+      
       res.json({ success: true, shop });
     } catch (error) {
-      console.error('Shop fetch by ID error:', error);
-      res.status(500).json({ error: 'Failed to fetch shop' });
+      console.error('Error getting shop by ID:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
     }
   },
-  
+
   // Get all shops (for marketplace/search)
-  getAllShops: async (req, res) => {
-    console.log('getAllShops method called');
+  getAllShops: async (req, res, next) => {
     try {
       const { search, location, service } = req.query;
       let query = {};
       
-      // Build search query
+      // Add search filters if provided
       if (search) {
         query.$or = [
           { name: { $regex: search, $options: 'i' } },
@@ -313,20 +296,66 @@ const shopController = {
         query['services.name'] = { $regex: service, $options: 'i' };
       }
       
-      console.log('Search query:', JSON.stringify(query));
-      
-      const shops = await Shop.find(query).sort({ rating: -1 });
-      console.log(`Found ${shops.length} shops`);
-      
+      const shops = await Shop.find(query).populate('userId', 'firstName lastName email');
       res.json({ success: true, shops });
     } catch (error) {
-      console.error('Get all shops error:', error);
-      res.status(500).json({ error: 'Failed to fetch shops' });
+      console.error('Error getting all shops:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  },
+
+  // Add a review to a shop
+  addReview: async (req, res, next) => {
+    try {
+      const userId = req.user.userId;
+      const { shopId } = req.params;
+      const { rating, comment } = req.body;
+      
+      if (!rating) {
+        return res.status(400).json({ success: false, message: 'Rating is required' });
+      }
+      
+      if (!isValidObjectId(shopId)) {
+        return res.status(400).json({ success: false, message: 'Invalid shop ID' });
+      }
+      
+      const shop = await Shop.findById(shopId);
+      if (!shop) {
+        return res.status(404).json({ success: false, message: 'Shop not found' });
+      }
+      
+      // Check if user already reviewed this shop
+      const existingReviewIndex = shop.reviews.findIndex(review => 
+        review.userId.toString() === userId
+      );
+      
+      if (existingReviewIndex !== -1) {
+        // Update existing review
+        shop.reviews[existingReviewIndex].rating = rating;
+        shop.reviews[existingReviewIndex].comment = comment;
+        shop.reviews[existingReviewIndex].date = Date.now();
+      } else {
+        // Add new review
+        shop.reviews.push({
+          userId: userId,
+          rating,
+          comment,
+          date: Date.now()
+        });
+      }
+      
+      // Update shop's overall rating
+      const totalRating = shop.reviews.reduce((sum, review) => sum + review.rating, 0);
+      shop.rating = totalRating / shop.reviews.length;
+      
+      await shop.save();
+      
+      res.json({ success: true, message: 'Review added successfully', rating: shop.rating });
+    } catch (error) {
+      console.error('Error adding review:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
     }
   }
 };
-
-// Log all available methods
-console.log('Controller methods:', Object.keys(shopController));
 
 module.exports = shopController;
