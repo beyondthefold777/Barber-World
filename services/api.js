@@ -472,5 +472,30 @@ export const shopService = {
       console.error('Review add error:', error);
       throw error;
     }
+  },
+
+  // NEW METHOD: Get shop by ID (for public viewing)
+  getShopById: async (shopId) => {
+    try {
+      console.log(`Fetching shop details for ID: ${shopId}`);
+      
+      const response = await fetch(`${API_URL}/api/shop/${shopId}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Shop details response:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching shop details:', error);
+      throw error;
+    }
   }
 };

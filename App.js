@@ -19,6 +19,9 @@ import BarbershopDashboard from './components/BarbershopDashboard';
 import TrialSignup from './components/TrialSignup';
 import AppointmentList from './components/AppointmentList';
 
+// Import the BarbershopDetail screen from shopsettings directory
+import BarbershopDetail from './components/shopsettings/BarbershopDetail';
+
 // Financial Hub Screens
 import TaxFormsScreen from './components/financial/TaxFormsScreen';
 import WriteOffsScreen from './components/financial/WriteOffsScreen';
@@ -86,6 +89,13 @@ const App = () => {
                 headerShown: true,
                 title: 'Appointments'
               }} 
+            />
+            
+            {/* Add BarbershopDetail Screen */}
+            <Stack.Screen 
+              name="BarbershopDetail" 
+              component={BarbershopDetail} 
+              options={{ headerShown: false }}
             />
 
             {/* Financial Hub Screens */}
