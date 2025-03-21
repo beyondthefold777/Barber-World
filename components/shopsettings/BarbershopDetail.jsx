@@ -6,369 +6,180 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  Dimensions,
   ActivityIndicator,
-  FlatList,
-  Linking,
-  Share,
-  StatusBar
+  Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather, MaterialIcons, FontAwesome } from '@expo/vector-icons';
-import { shopService } from '../../services/shopservice';
-
-const { width } = Dimensions.get('window');
-const imageWidth = width;
-const imageHeight = width * 0.6;
+import { Feather, FontAwesome } from '@expo/vector-icons';
+import { shopService } from '../../services/api';
 
 const BarbershopDetail = ({ route, navigation }) => {
-  const { barbershop } = route.params;
+  const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [shopDetails, setShopDetails] = useState(null);
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [error, setError] = useState(null);
-
+  
+  // Extract shopId from route params with safety check
+  const shopId = route.params?.shopId;
+  
   useEffect(() => {
-    fetchShopDetails();
-  }, []);
-
-  const fetchShopDetails = async () => {
-    try {
-      setLoading(true);
-      console.log(`Fetching details for shop ID: ${barbershop._id}`);
-      
-      // Use the existing shopService.getShopById method
-      const response = await shopService.getShopById(barbershop._id);
-      
-      if (response && response.shop) {
-        console.log('Shop details fetched successfully');
-        setShopDetails(response.shop);
-      } else {
-        console.error('Invalid response format:', response);
-        setError('Could not load shop details');
+    const fetchShopDetails = async () => {
+      if (!shopId) {
+        console.error('No shop ID provided in navigation params');
+        setError('Shop ID is missing');
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      console.error('Error fetching shop details:', err);
-      setError(err.message || 'Failed to load shop details. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCall = () => {
-    if (shopDetails && shopDetails.phone) {
-      Linking.openURL(`tel:${shopDetails.phone}`);
-    }
-  };
-
-  const handleDirections = () => {
-    if (shopDetails) {
-      // Use location data from either shopDetails or barbershop
-      const address = shopDetails.address || barbershop.address;
-      const city = shopDetails.city || barbershop.city;
-      const state = shopDetails.state || barbershop.state;
-      const zipCode = shopDetails.zipCode || barbershop.zipCode;
       
-      const destination = `${address}, ${city}, ${state} ${zipCode}`;
-      const url = `https://maps.google.com/?q=${encodeURIComponent(destination)}`;
-      Linking.openURL(url);
-    }
-  };
-
-  const handleShare = async () => {
-    if (shopDetails) {
       try {
-        const shopName = shopDetails.businessName || barbershop.businessName;
-        const address = shopDetails.address || barbershop.address;
-        const city = shopDetails.city || barbershop.city;
-        const state = shopDetails.state || barbershop.state;
-        
-        await Share.share({
-          message: `Check out ${shopName} on Barber World! ${address}, ${city}, ${state}`,
-          title: shopName,
-        });
+        console.log('Fetching shop details for ID:', shopId);
+        const shopData = await shopService.getShopById(shopId);
+        console.log('Shop data received:', shopData);
+        setShop(shopData);
       } catch (error) {
-        console.error('Error sharing:', error);
+        console.error('Error fetching shop details:', error);
+        setError('Failed to load barbershop details');
+      } finally {
+        setLoading(false);
       }
-    }
-  };
+    };
+
+    fetchShopDetails();
+  }, [shopId]);
 
   const handleBookAppointment = () => {
-    navigation.navigate('SchedulingScreen', { shopId: barbershop._id, shopName: shopDetails?.businessName || barbershop.businessName });
+    if (!shop) return;
+    
+    navigation.navigate('SchedulingScreen', { 
+      shopId: shop._id,
+      shopName: shop.businessName || shop.name
+    });
   };
-
-  const renderImageItem = ({ item, index }) => (
-    <TouchableOpacity 
-      activeOpacity={0.9}
-      onPress={() => setActiveImageIndex(index)}
-    >
-      <Image 
-        source={{ uri: item }} 
-        style={[
-          styles.carouselImage,
-          activeImageIndex === index && styles.activeCarouselImage
-        ]} 
-      />
-    </TouchableOpacity>
-  );
 
   if (loading) {
     return (
-      <LinearGradient
-        colors={['#000000', '#333333']}
-        style={styles.loadingContainer}
-      >
+      <LinearGradient colors={['#000000', '#333333']} style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FF0000" />
-        <Text style={styles.loadingText}>Loading shop details...</Text>
+        <Text style={styles.loadingText}>Loading barbershop details...</Text>
       </LinearGradient>
     );
   }
 
-  if (error) {
+  if (error || !shop) {
     return (
-      <LinearGradient
-        colors={['#000000', '#333333']}
-        style={styles.loadingContainer}
-      >
-        <MaterialIcons name="error-outline" size={50} color="#FF0000" />
-        <Text style={styles.errorText}>{error}</Text>
+      <LinearGradient colors={['#000000', '#333333']} style={styles.errorContainer}>
+        <FontAwesome name="exclamation-triangle" size={50} color="#FF0000" />
+        <Text style={styles.errorText}>{error || 'Failed to load barbershop'}</Text>
         <TouchableOpacity 
-          style={styles.retryButton}
-          onPress={fetchShopDetails}
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
         >
-          <Text style={styles.retryButtonText}>Retry</Text>
+          <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
       </LinearGradient>
     );
   }
 
   return (
-    <LinearGradient
-      colors={['#000000', '#333333']}
-      style={styles.container}
-    >
-      <StatusBar barStyle="light-content" translucent={true} backgroundColor="transparent" />
-      
-      {/* Back Button */}
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Feather name="arrow-left" size={24} color="white" />
-      </TouchableOpacity>
-      
-      <ScrollView style={styles.scrollView}>
-        {/* Main Image */}
-        {shopDetails?.images && shopDetails.images.length > 0 ? (
-          <View style={styles.imageContainer}>
-            <Image 
-              source={{ uri: shopDetails.images[activeImageIndex] }} 
-              style={styles.mainImage} 
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.8)']}
-              style={styles.imageGradient}
-            />
-          </View>
-        ) : (
-          <View style={styles.noImageContainer}>
-            <Feather name="image" size={50} color="#666" />
-            <Text style={styles.noImageText}>No images available</Text>
-          </View>
-        )}
+    <LinearGradient colors={['#000000', '#333333']} style={styles.container}>
+      <ScrollView>
+        {/* Header with back button */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Feather name="arrow-left" size={24} color="white" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Barbershop Details</Text>
+        </View>
         
-        {/* Image Carousel */}
-        {shopDetails?.images && shopDetails.images.length > 1 && (
-          <FlatList
-            data={shopDetails.images}
-            renderItem={renderImageItem}
-            keyExtractor={(item, index) => `image-${index}`}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.carouselContainer}
+        {/* Shop Image */}
+        <View style={styles.imageContainer}>
+          <Image 
+            source={shop.images && shop.images.length > 0 
+              ? { uri: shop.images[0] } 
+              : require('../../assets/barbershop.png')}
+            style={styles.shopImage}
+            resizeMode="cover"
           />
-        )}
+        </View>
         
         {/* Shop Info */}
         <View style={styles.infoContainer}>
-          <Text style={styles.shopName}>{shopDetails?.businessName || barbershop.businessName}</Text>
-          
-          {shopDetails?.description && (
-            <Text style={styles.description}>{shopDetails.description}</Text>
-          )}
-          
-          <View style={styles.locationContainer}>
-            <Feather name="map-pin" size={18} color="#FF0000" />
-            <Text style={styles.locationText}>
-              {shopDetails?.address || barbershop.address}, 
-              {shopDetails?.city || barbershop.city}, 
-              {shopDetails?.state || barbershop.state} 
-              {shopDetails?.zipCode || barbershop.zipCode}
+          <Text style={styles.shopName}>{shop.businessName || shop.name}</Text>
+          <View style={styles.ratingContainer}>
+            <FontAwesome name="star" size={16} color="#FFD700" />
+            <Text style={styles.ratingText}>
+              {shop.rating ? `${shop.rating.toFixed(1)} (${shop.reviewCount || 0} reviews)` : 'No ratings yet'}
             </Text>
           </View>
           
-          {shopDetails?.phone && (
-            <View style={styles.locationContainer}>
-              <Feather name="phone" size={18} color="#FF0000" />
-              <Text style={styles.locationText}>{shopDetails.phone}</Text>
+          <View style={styles.addressContainer}>
+            <Feather name="map-pin" size={16} color="#FF0000" />
+            <Text style={styles.addressText}>{shop.address}</Text>
+          </View>
+          <Text style={styles.locationText}>{`${shop.city}, ${shop.state} ${shop.zipCode || ''}`}</Text>
+          
+          {shop.phone && (
+            <View style={styles.contactContainer}>
+              <Feather name="phone" size={16} color="#FF0000" />
+              <Text style={styles.contactText}>{shop.phone}</Text>
             </View>
           )}
           
-          {/* Action Buttons */}
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={handleCall}
-              disabled={!shopDetails?.phone}
-            >
-              <Feather name="phone" size={20} color="white" />
-              <Text style={styles.actionButtonText}>Call</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={handleDirections}
-            >
-              <Feather name="map" size={20} color="white" />
-              <Text style={styles.actionButtonText}>Directions</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={handleShare}
-            >
-              <Feather name="share-2" size={20} color="white" />
-              <Text style={styles.actionButtonText}>Share</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {/* Book Appointment Button */}
-          <TouchableOpacity 
-            style={styles.bookButton}
-            onPress={handleBookAppointment}
-          >
-            <Text style={styles.bookButtonText}>Book Appointment</Text>
-          </TouchableOpacity>
+          {shop.email && (
+            <View style={styles.contactContainer}>
+              <Feather name="mail" size={16} color="#FF0000" />
+              <Text style={styles.contactText}>{shop.email}</Text>
+            </View>
+          )}
         </View>
         
-        {/* Services Section */}
+        {/* Services */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Services</Text>
-          
-          {shopDetails?.services && shopDetails.services.length > 0 ? (
-            shopDetails.services.map((service, index) => (
-              <View key={`service-${index}`} style={styles.serviceItem}>
-                <View style={styles.serviceInfo}>
-                  <Text style={styles.serviceName}>{service.name}</Text>
-                  {service.description && (
-                    <Text style={styles.serviceDescription}>{service.description}</Text>
-                  )}
-                </View>
-                <View style={styles.servicePriceContainer}>
-                  <Text style={styles.servicePrice}>${service.price}</Text>
-                  <Text style={styles.serviceDuration}>{service.duration} min</Text>
-                </View>
+          {shop.services && shop.services.length > 0 ? (
+            shop.services.map((service, index) => (
+              <View key={index} style={styles.serviceItem}>
+                <Text style={styles.serviceName}>{service.name}</Text>
+                <Text style={styles.servicePrice}>${service.price.toFixed(2)}</Text>
               </View>
             ))
           ) : (
-            <Text style={styles.noDataText}>No services listed</Text>
+            <Text style={styles.noContentText}>No services listed</Text>
           )}
         </View>
         
-        {/* Barbers Section */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Barbers</Text>
-          
-          {shopDetails?.barbers && shopDetails.barbers.length > 0 ? (
-            <FlatList
-              data={shopDetails.barbers}
-              renderItem={({ item }) => (
-                <View style={styles.barberItem}>
-                  {item.profileImage ? (
-                    <Image source={{ uri: item.profileImage }} style={styles.barberImage} />
-                  ) : (
-                    <View style={styles.barberImagePlaceholder}>
-                      <Feather name="user" size={30} color="#666" />
-                    </View>
-                  )}
-                  <View style={styles.barberInfo}>
-                    <Text style={styles.barberName}>{item.name}</Text>
-                    {item.specialties && (
-                      <Text style={styles.barberSpecialties}>
-                        {item.specialties.join(', ')}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              )}
-              keyExtractor={(item, index) => `barber-${index}`}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.barbersContainer}
-            />
-          ) : (
-            <Text style={styles.noDataText}>No barbers listed</Text>
-          )}
-        </View>
-        
-        {/* Hours Section */}
+        {/* Hours */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Business Hours</Text>
-          
-          {shopDetails?.hours ? (
-            <View style={styles.hoursContainer}>
-              {Object.entries(shopDetails.hours).map(([day, hours]) => (
-                <View key={day} style={styles.hourRow}>
-                  <Text style={styles.dayText}>{day}</Text>
-                  <Text style={styles.hoursText}>
-                    {hours.open ? `${hours.open} - ${hours.close}` : 'Closed'}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.noDataText}>No business hours listed</Text>
-          )}
-        </View>
-        
-        {/* Reviews Section */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Reviews</Text>
-          
-          {shopDetails?.reviews && shopDetails.reviews.length > 0 ? (
-            shopDetails.reviews.map((review, index) => (
-              <View key={`review-${index}`} style={styles.reviewItem}>
-                <View style={styles.reviewHeader}>
-                  <Text style={styles.reviewerName}>{review.userName}</Text>
-                  <View style={styles.ratingContainer}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <FontAwesome
-                        key={`star-${star}`}
-                        name={star <= review.rating ? "star" : "star-o"}
-                        size={16}
-                        color={star <= review.rating ? "#FFD700" : "#666"}
-                        style={styles.starIcon}
-                      />
-                    ))}
-                  </View>
-                </View>
-                <Text style={styles.reviewDate}>
-                  {new Date(review.date).toLocaleDateString()}
-                </Text>
-                <Text style={styles.reviewText}>{review.comment}</Text>
+          {shop.hours ? (
+            Object.entries(shop.hours).map(([day, hours]) => (
+              <View key={day} style={styles.hoursItem}>
+                <Text style={styles.dayText}>{day}</Text>
+                <Text style={styles.hoursText}>{hours || 'Closed'}</Text>
               </View>
             ))
           ) : (
-            <Text style={styles.noDataText}>No reviews yet</Text>
+            <Text style={styles.noContentText}>Hours not available</Text>
           )}
         </View>
         
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Powered by Barber World
-          </Text>
-        </View>
+        {/* About */}
+        {shop.description && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>About</Text>
+            <Text style={styles.descriptionText}>{shop.description}</Text>
+          </View>
+        )}
+        
+        {/* Book Appointment Button */}
+        <TouchableOpacity 
+          style={styles.bookButton}
+          onPress={handleBookAppointment}
+        >
+          <Text style={styles.bookButtonText}>Book Appointment</Text>
+        </TouchableOpacity>
       </ScrollView>
     </LinearGradient>
   );
@@ -388,81 +199,51 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   errorText: {
     color: 'white',
-    marginTop: 10,
+    marginTop: 20,
     fontSize: 16,
     textAlign: 'center',
-    paddingHorizontal: 30,
+    marginBottom: 20,
   },
-  retryButton: {
-    backgroundColor: '#FF0000',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    paddingTop: 50,
+  },
+  backButton: {
+    padding: 10,
     borderRadius: 8,
-    marginTop: 20,
+    backgroundColor: '#FF0000',
   },
-  retryButtonText: {
+  backButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  scrollView: {
-    flex: 1,
-  },
-  backButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 20,
-    padding: 8,
+  headerTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 15,
   },
   imageContainer: {
-    width: imageWidth,
-    height: imageHeight,
-    position: 'relative',
+    width: '100%',
+    height: 200,
+    marginBottom: 15,
   },
-  mainImage: {
+  shopImage: {
     width: '100%',
     height: '100%',
   },
-  imageGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 100,
-  },
-  noImageContainer: {
-    width: imageWidth,
-    height: imageHeight,
-    backgroundColor: '#222',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  noImageText: {
-    color: '#666',
-    marginTop: 10,
-  },
-  carouselContainer: {
-    padding: 10,
-    backgroundColor: '#222',
-  },
-  carouselImage: {
-    width: 80,
-    height: 60,
-    borderRadius: 4,
-    marginRight: 10,
-    opacity: 0.7,
-  },
-  activeCarouselImage: {
-    opacity: 1,
-    borderWidth: 2,
-    borderColor: '#FF0000',
-  },
   infoContainer: {
-    padding: 20,
+    padding: 15,
   },
   shopName: {
     color: 'white',
@@ -470,201 +251,93 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
   },
-  description: {
-    color: '#CCC',
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 15,
-  },
-  locationContainer: {
+  ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
   },
+  ratingText: {
+    color: '#FFD700',
+    marginLeft: 5,
+  },
+  addressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  addressText: {
+    color: 'white',
+    marginLeft: 5,
+  },
   locationText: {
     color: '#CCC',
-    fontSize: 14,
-    marginLeft: 10,
-    flex: 1,
+    marginLeft: 21,
+    marginBottom: 10,
   },
-  actionButtonsContainer: {
+  contactContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  actionButton: {
-    backgroundColor: '#333',
-    borderRadius: 8,
-    padding: 12,
     alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 5,
+    marginBottom: 5,
   },
-  actionButtonText: {
+  contactText: {
     color: 'white',
-    marginTop: 5,
-    fontSize: 12,
-  },
-  bookButton: {
-    backgroundColor: '#FF0000',
-    borderRadius: 8,
-    padding: 15,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  bookButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    marginLeft: 5,
   },
   sectionContainer: {
-    padding: 20,
+    padding: 15,
     borderTopWidth: 1,
-    borderTopColor: '#333',
+    borderTopColor: '#444',
   },
   sectionTitle: {
     color: 'white',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 15,
   },
   serviceItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  serviceInfo: {
-    flex: 1,
+    marginBottom: 10,
   },
   serviceName: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  serviceDescription: {
-    color: '#999',
-    fontSize: 14,
-  },
-  servicePriceContainer: {
-    alignItems: 'flex-end',
   },
   servicePrice: {
     color: '#FF0000',
-    fontSize: 18,
     fontWeight: 'bold',
   },
-  serviceDuration: {
-    color: '#999',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  noDataText: {
-    color: '#666',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginVertical: 20,
-  },
-  barbersContainer: {
-    paddingVertical: 10,
-  },
-  barberItem: {
-    width: 120,
-    marginRight: 15,
-    alignItems: 'center',
-  },
-  barberImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 10,
-  },
-  barberImagePlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#333',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  barberInfo: {
-    alignItems: 'center',
-  },
-  barberName: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  barberSpecialties: {
-    color: '#999',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  hoursContainer: {
-    marginTop: 10,
-  },
-  hourRow: {
+  hoursItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    marginBottom: 8,
   },
   dayText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: 'bold',
   },
   hoursText: {
     color: '#CCC',
-    fontSize: 16,
   },
-  reviewItem: {
-    backgroundColor: '#222',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 15,
-  },
-  reviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  reviewerName: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-  },
-  starIcon: {
-    marginLeft: 2,
-  },
-  reviewDate: {
-    color: '#999',
-    fontSize: 12,
-    marginBottom: 8,
-  },
-  reviewText: {
+  descriptionText: {
     color: '#CCC',
-    fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 22,
   },
-  footer: {
-    padding: 20,
+  noContentText: {
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  bookButton: {
+    backgroundColor: '#FF0000',
+    padding: 15,
+    margin: 15,
+    borderRadius: 8,
     alignItems: 'center',
+    marginBottom: 30,
   },
-  footerText: {
-    color: '#666',
-    fontSize: 12,
+  bookButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 

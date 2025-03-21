@@ -211,7 +211,6 @@ export const authService = {
     }
   }
 };
-
 export const taxService = {
   uploadTaxDocument: async (documentFile, userToken) => {
     try {
@@ -474,28 +473,37 @@ export const shopService = {
     }
   },
 
-  // NEW METHOD: Get shop by ID (for public viewing)
-  getShopById: async (shopId) => {
-    try {
-      console.log(`Fetching shop details for ID: ${shopId}`);
-      
-      const response = await fetch(`${API_URL}/api/shop/${shopId}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Shop details response:', data);
-      return data;
-    } catch (error) {
-      console.error('Error fetching shop details:', error);
-      throw error;
+ // Update this method in the shopService object
+getShopById: async (shopId) => {
+  try {
+    console.log(`Fetching shop details using ID: ${shopId}`);
+    
+    // Use the search endpoint with the ID as userId
+    const response = await fetch(`${API_URL}/api/auth/barbershops/search`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ userId: shopId })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    
+    const shops = await response.json();
+    
+    if (!shops || shops.length === 0) {
+      throw new Error('Shop not found');
+    }
+    
+    // Return the first shop associated with this userId
+    console.log('Found shop:', shops[0]);
+    return shops[0];
+  } catch (error) {
+    console.error('Error fetching shop details:', error);
+    throw error;
   }
+}
 };
