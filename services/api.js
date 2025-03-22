@@ -21,7 +21,7 @@ export const appointmentService = {
 
   bookAppointment: async (appointmentData, userToken) => {
     try {
-      console.log('Making request to:', `${API_URL}/api/appointments`);
+      console.log('Making appointment request with data:', appointmentData);
       
       const response = await fetch(`${API_URL}/api/appointments`, {
         method: 'POST',
@@ -31,6 +31,7 @@ export const appointmentService = {
           'Authorization': `Bearer ${userToken}`
         },
         body: JSON.stringify({
+          shopId: appointmentData.shopId, // Include the shop ID
           date: appointmentData.date,
           timeSlot: appointmentData.timeSlot,
           service: appointmentData.service,
@@ -51,12 +52,61 @@ export const appointmentService = {
     }
   },
 
-  getTimeSlots: async (date) => {
+  getTimeSlots: async (date, shopId) => {
     try {
-      const response = await fetch(`${API_URL}/api/appointments/available-slots/${date}`);
+      // Include shopId in the request to get shop-specific time slots
+      const url = shopId 
+        ? `${API_URL}/api/appointments/available-slots/${date}?shopId=${shopId}`
+        : `${API_URL}/api/appointments/available-slots/${date}`;
+      
+      console.log('Fetching time slots from:', url);
+      
+      const response = await fetch(url);
       return await response.json();
     } catch (error) {
       console.error('Error fetching time slots:', error);
+      throw error;
+    }
+  },
+  
+  getUserAppointments: async (userToken) => {
+    try {
+      const response = await fetch(`${API_URL}/api/appointments/user`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching user appointments:', error);
+      throw error;
+    }
+  },
+  
+  cancelAppointment: async (appointmentId, userToken) => {
+    try {
+      const response = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error canceling appointment:', error);
       throw error;
     }
   }

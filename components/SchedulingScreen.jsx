@@ -20,7 +20,11 @@ const HAIRSTYLES = [
   { label: 'Custom Style', value: 'custom', price: '$50' }
 ];
 
-const SchedulingScreen = () => {
+const SchedulingScreen = ({ route, navigation }) => {
+  // Extract shop information from route params
+  const shopId = route.params?.shopId;
+  const shopName = route.params?.shopName || 'Barbershop';
+
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [selectedStyle, setSelectedStyle] = useState('');
@@ -33,10 +37,26 @@ const SchedulingScreen = () => {
   ]);
 
   useEffect(() => {
+    // Validate that we have a shop ID
+    if (!shopId) {
+      Alert.alert(
+        'Error',
+        'No barbershop selected. Please go back and select a barbershop.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+      return;
+    }
+
+    // Set the navigation title
+    navigation.setOptions({
+      title: `Book at ${shopName}`
+    });
+
+    // Fetch available slots if date is selected
     if (selectedDate) {
       fetchAvailableSlots(selectedDate);
     }
-  }, [selectedDate]);
+  }, [shopId, shopName, selectedDate, navigation]);
 
   const openMenu = () => setMenuVisible(true);
   const closeMenu = () => setMenuVisible(false);
@@ -49,7 +69,8 @@ const SchedulingScreen = () => {
 
   const fetchAvailableSlots = async (date) => {
     try {
-      const response = await appointmentService.getTimeSlots(date);
+      // Pass the shopId to get available slots for this specific shop
+      const response = await appointmentService.getTimeSlots(date, shopId);
       const slots = response?.availableSlots || [
         '9:00 AM', '10:00 AM', '11:00 AM',
         '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM'
@@ -70,21 +91,34 @@ const SchedulingScreen = () => {
       return;
     }
 
+    if (!shopId) {
+      Alert.alert('Error', 'No barbershop selected for booking');
+      return;
+    }
+
     setLoading(true);
     try {
       const appointmentData = {
+        shopId: shopId,
         date: selectedDate,
         timeSlot: selectedTime,
         service: selectedStyle
       };
       
       const result = await appointmentService.bookAppointment(appointmentData);
-      Alert.alert('Success! 💈', 'Your appointment has been booked!');
+      Alert.alert(
+        'Success! 💈', 
+        `Your appointment at ${shopName} has been booked!`,
+        [{ text: 'OK', onPress: () => navigation.navigate('AppointmentsScreen') }]
+      );
+      
+      // Reset form
       setSelectedDate('');
       setSelectedTime('');
       setSelectedStyle('');
       setSelectedStyleLabel('Select Style');
     } catch (error) {
+      console.error('Booking error:', error);
       Alert.alert('Booking Update', 'We could not process your booking at this time');
     } finally {
       setLoading(false);
@@ -96,7 +130,7 @@ const SchedulingScreen = () => {
       <LinearGradient colors={['#000000', '#333333']} style={styles.container}>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
           <View style={styles.contentContainer}>
-            <Text style={styles.title}>Book Your Appointment</Text>
+            <Text style={styles.title}>Book Your Appointment at {shopName}</Text>
             
             <Calendar
               style={styles.calendar}

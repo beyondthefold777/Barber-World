@@ -7,11 +7,15 @@ import {
   Image,
   TouchableOpacity,
   ActivityIndicator,
-  Alert
+  Alert,
+  FlatList,
+  Dimensions
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { shopService } from '../../services/api';
+
+const { width } = Dimensions.get('window');
 
 const BarbershopDetail = ({ route, navigation }) => {
   const [shop, setShop] = useState(null);
@@ -54,6 +58,17 @@ const BarbershopDetail = ({ route, navigation }) => {
       shopName: shop.businessName || shop.name
     });
   };
+
+  // Render a gallery item
+  const renderGalleryItem = ({ item }) => (
+    <TouchableOpacity style={styles.galleryItem}>
+      <Image 
+        source={{ uri: item }} 
+        style={styles.galleryImage}
+        resizeMode="cover"
+      />
+    </TouchableOpacity>
+  );
 
   if (loading) {
     return (
@@ -99,28 +114,20 @@ const BarbershopDetail = ({ route, navigation }) => {
           <Text style={styles.headerTitle}>Barbershop Details</Text>
         </View>
         
-        {/* Shop Image */}
+        {/* Shop Image - Always use barbershop.png as the main header image */}
         <View style={styles.imageContainer}>
-          {shop.images && shop.images.length > 0 ? (
-            <Image 
-              source={{ uri: shop.images[0] }}
-              style={styles.shopImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <Image 
-              source={require('../../assets/barbershop.png')}
-              style={styles.shopImage}
-              resizeMode="cover"
-            />
-          )}
+          <Image 
+            source={require('../../assets/barbershop.png')}
+            style={styles.shopImage}
+            resizeMode="contain"
+          />
         </View>
         
         {/* Shop Info */}
         <View style={styles.infoContainer}>
           <Text style={styles.shopName}>{shop.businessName || shop.name}</Text>
           <View style={styles.ratingContainer}>
-            <FontAwesome name="star" size={16} color="#FFD700" />
+            <FontAwesome name="star" size={16} color="#0066CC" />
             <Text style={styles.ratingText}>
               {shop.rating ? `${shop.rating.toFixed(1)} (${shop.reviewCount || 0} reviews)` : 'No ratings yet'}
             </Text>
@@ -147,6 +154,14 @@ const BarbershopDetail = ({ route, navigation }) => {
           )}
         </View>
         
+        {/* About */}
+        {shop.description && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>About</Text>
+            <Text style={styles.descriptionText}>{shop.description}</Text>
+          </View>
+        )}
+        
         {/* Services */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Services</Text>
@@ -159,6 +174,23 @@ const BarbershopDetail = ({ route, navigation }) => {
             ))
           ) : (
             <Text style={styles.noContentText}>No services listed</Text>
+          )}
+        </View>
+        
+        {/* Gallery Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>Gallery</Text>
+          {shop.images && shop.images.length > 0 ? (
+            <FlatList
+              data={shop.images}
+              renderItem={renderGalleryItem}
+              keyExtractor={(item, index) => index.toString()}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.galleryContainer}
+            />
+          ) : (
+            <Text style={styles.noContentText}>No gallery images available</Text>
           )}
         </View>
         
@@ -176,14 +208,6 @@ const BarbershopDetail = ({ route, navigation }) => {
             <Text style={styles.noContentText}>Hours not available</Text>
           )}
         </View>
-        
-        {/* About */}
-        {shop.description && (
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>About</Text>
-            <Text style={styles.descriptionText}>{shop.description}</Text>
-          </View>
-        )}
         
         {/* Book Appointment Button */}
         <TouchableOpacity 
@@ -246,8 +270,11 @@ const styles = StyleSheet.create({
     marginLeft: 15,
   },
   imageContainer: {
-    width: '100%',
-    height: 200,
+    width: width,
+    height: 220,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 15,
   },
   shopImage: {
@@ -269,7 +296,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   ratingText: {
-    color: '#FFD700',
+    color: '#0066CC',
     marginLeft: 5,
   },
   addressContainer: {
@@ -337,6 +364,20 @@ const styles = StyleSheet.create({
   noContentText: {
     color: '#999',
     fontStyle: 'italic',
+  },
+  galleryContainer: {
+    paddingVertical: 10,
+  },
+  galleryItem: {
+    marginRight: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
+    width: 150,
+    height: 150,
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
   },
   bookButton: {
     backgroundColor: '#FF0000',
