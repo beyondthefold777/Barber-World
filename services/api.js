@@ -189,28 +189,167 @@ export const authService = {
     try {
       console.log('Searching barbershops with params:', searchParams);
       
-      const response = await fetch(`${API_URL}/api/auth/barbershops/search`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(searchParams)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // If we're searching by userId, use the dedicated endpoint
+      if (searchParams.userId) {
+        try {
+          console.log(`Searching for shop with userId: ${searchParams.userId}`);
+          const response = await fetch(`${API_URL}/api/shop/byUserId/${searchParams.userId}`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Shop by userId response:', data);
+            if (data.success && data.shop) {
+              // Return as array for consistency with other search results
+              return [data.shop];
+            }
+          } else {
+            console.log(`Shop by userId request failed with status: ${response.status}`);
+          }
+        } catch (error) {
+          console.log('Error fetching shop by userId:', error);
+        }
       }
-
-      const data = await response.json();
-      console.log('Search response data:', data);
-      return data;
+      
+      // For location-based searches, use the searchShopsByLocation endpoint
+      if (searchParams.city || searchParams.state) {
+        try {
+          let queryString = '?';
+          if (searchParams.city) queryString += `city=${encodeURIComponent(searchParams.city.trim())}&`;
+          if (searchParams.state) queryString += `state=${encodeURIComponent(searchParams.state.trim())}&`;
+          if (searchParams.location) queryString += `location=${encodeURIComponent(searchParams.location.trim())}&`;
+          
+          console.log(`Searching shops with location params: ${queryString}`);
+          // Use the dedicated location search endpoint
+          const response = await fetch(`${API_URL}/api/shop/searchByLocation${queryString}`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Location search response:', data);
+            if (data.success && data.shops) {
+              return data.shops;
+            } else {
+              console.log('No shops found in location search');
+              return [];
+            }
+          } else {
+            console.log(`Location search failed with status: ${response.status}`);
+            // Fall back to the all shops endpoint if the location search fails
+            return await fallbackToAllShops(searchParams);
+          }
+        } catch (error) {
+          console.log('Error searching shops by location:', error);
+          // Try fallback if the location search throws an error
+          return await fallbackToAllShops(searchParams);
+        }
+      }
+      
+      // If we have a service parameter, use the service search endpoint
+      if (searchParams.service) {
+        try {
+          const queryString = `?service=${encodeURIComponent(searchParams.service.trim())}`;
+          console.log(`Searching shops by service: ${queryString}`);
+          
+          const response = await fetch(`${API_URL}/api/shop/searchByService${queryString}`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Service search response:', data);
+            if (data.success && data.shops) {
+              return data.shops;
+            } else {
+              console.log('No shops found offering this service');
+              return [];
+            }
+          } else {
+            console.log(`Service search failed with status: ${response.status}`);
+            return [];
+          }
+        } catch (error) {
+          console.log('Error searching shops by service:', error);
+          return [];
+        }
+      }
+      
+      // Fall back to the original search endpoint if no specific parameters matched
+      return await fallbackToOriginalSearch(searchParams);
     } catch (error) {
       console.error('Search error:', error);
-      throw error;
+      return [];
     }
   }
 };
+
+// Helper function for fallback to all shops endpoint
+async function fallbackToAllShops(searchParams) {
+  try {
+    let queryString = '?';
+    if (searchParams.city) queryString += `location=${encodeURIComponent(searchParams.city.trim())}&`;
+    if (searchParams.state) queryString += `state=${encodeURIComponent(searchParams.state.trim())}&`;
+    
+    console.log(`Falling back to all shops endpoint with params: ${queryString}`);
+    const response = await fetch(`${API_URL}/api/shop/all${queryString}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('All shops fallback response:', data);
+      if (data.success && data.shops) {
+        return data.shops;
+      }
+    }
+    return [];
+  } catch (error) {
+    console.log('Error with all shops fallback:', error);
+    return [];
+  }
+}
+
+// Helper function for fallback to original search endpoint
+async function fallbackToOriginalSearch(searchParams) {
+  try {
+    console.log('Falling back to original search endpoint with params:', searchParams);
+    const response = await fetch(`${API_URL}/api/shop/searchBarbershops`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(searchParams)
+    });
+
+    if (!response.ok) {
+      console.log(`Original search failed with status: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    console.log('Original search response data:', data);
+    return data.shops || (Array.isArray(data) ? data : []);
+  } catch (error) {
+    console.log('Error with original search endpoint:', error);
+    return [];
+  }
+}
+
 export const taxService = {
   uploadTaxDocument: async (documentFile, userToken) => {
     try {
@@ -473,37 +612,82 @@ export const shopService = {
     }
   },
 
- // Update this method in the shopService object
-getShopById: async (shopId) => {
-  try {
-    console.log(`Fetching shop details using ID: ${shopId}`);
-    
-    // Use the search endpoint with the ID as userId
-    const response = await fetch(`${API_URL}/api/auth/barbershops/search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({ userId: shopId })
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+  getShopById: async (shopId) => {
+    try {
+      console.log(`Fetching shop details using ID: ${shopId}`);
+      
+      // First try to get the shop directly (in case shopId is actually a shop ID)
+      try {
+        console.log(`Attempting direct fetch with ID: ${shopId}`);
+        const directResponse = await fetch(`${API_URL}/api/shop/${shopId}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (directResponse.ok) {
+          const responseData = await directResponse.json();
+          console.log('Direct fetch response:', responseData);
+          if (responseData.success && responseData.shop) {
+            console.log('Retrieved shop directly by ID:', responseData.shop);
+            return responseData.shop;
+          }
+        } else {
+          console.log(`Direct fetch failed with status: ${directResponse.status}`);
+        }
+      } catch (directError) {
+        console.log('Could not get shop directly by ID:', directError);
+      }
+      
+      // Try to get the shop by userId using our new endpoint
+      try {
+        console.log(`Attempting to fetch shop by userId: ${shopId}`);
+        const userIdResponse = await fetch(`${API_URL}/api/shop/byUserId/${shopId}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (userIdResponse.ok) {
+          const responseData = await userIdResponse.json();
+          console.log('Shop by userId response:', responseData);
+          if (responseData.success && responseData.shop) {
+            console.log('Retrieved shop by userId:', responseData.shop);
+            return responseData.shop;
+          }
+        } else {
+          console.log(`Shop by userId fetch failed with status: ${userIdResponse.status}`);
+        }
+      } catch (userIdError) {
+        console.log('Could not get shop by userId:', userIdError);
+      }
+      
+      // If both approaches fail, try the search function as a last resort
+      try {
+        console.log('Trying search function as last resort');
+        const shops = await authService.searchBarbershops({ userId: shopId });
+        if (shops && shops.length > 0) {
+          console.log('Found shop through search function:', shops[0]);
+          return shops[0];
+        }
+      } catch (searchError) {
+        console.log('Search function approach failed:', searchError);
+      }
+      
+      // If all approaches fail, throw an error
+      throw new Error(`Could not find shop with ID: ${shopId}`);
+    } catch (error) {
+      console.error('Error fetching shop details:', error);
+      throw error;
     }
-    
-    const shops = await response.json();
-    
-    if (!shops || shops.length === 0) {
-      throw new Error('Shop not found');
-    }
-    
-    // Return the first shop associated with this userId
-    console.log('Found shop:', shops[0]);
-    return shops[0];
-  } catch (error) {
-    console.error('Error fetching shop details:', error);
-    throw error;
   }
-}
+};
+
+export default {
+  appointmentService,
+  authService,
+  taxService,
+  shopService
 };

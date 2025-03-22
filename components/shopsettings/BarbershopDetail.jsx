@@ -79,6 +79,12 @@ const BarbershopDetail = ({ route, navigation }) => {
     );
   }
 
+  // Get address information from either location object or direct properties
+  const address = shop.location?.address || shop.address || '';
+  const city = shop.location?.city || shop.city || '';
+  const state = shop.location?.state || shop.state || '';
+  const zipCode = shop.location?.zip || shop.zipCode || '';
+
   return (
     <LinearGradient colors={['#000000', '#333333']} style={styles.container}>
       <ScrollView>
@@ -95,13 +101,19 @@ const BarbershopDetail = ({ route, navigation }) => {
         
         {/* Shop Image */}
         <View style={styles.imageContainer}>
-          <Image 
-            source={shop.images && shop.images.length > 0 
-              ? { uri: shop.images[0] } 
-              : require('../../assets/barbershop.png')}
-            style={styles.shopImage}
-            resizeMode="cover"
-          />
+          {shop.images && shop.images.length > 0 ? (
+            <Image 
+              source={{ uri: shop.images[0] }}
+              style={styles.shopImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <Image 
+              source={require('../../assets/barbershop.png')}
+              style={styles.shopImage}
+              resizeMode="cover"
+            />
+          )}
         </View>
         
         {/* Shop Info */}
@@ -116,9 +128,9 @@ const BarbershopDetail = ({ route, navigation }) => {
           
           <View style={styles.addressContainer}>
             <Feather name="map-pin" size={16} color="#FF0000" />
-            <Text style={styles.addressText}>{shop.address}</Text>
+            <Text style={styles.addressText}>{address}</Text>
           </View>
-          <Text style={styles.locationText}>{`${shop.city}, ${shop.state} ${shop.zipCode || ''}`}</Text>
+          <Text style={styles.locationText}>{`${city}, ${state} ${zipCode}`}</Text>
           
           {shop.phone && (
             <View style={styles.contactContainer}>
@@ -142,7 +154,7 @@ const BarbershopDetail = ({ route, navigation }) => {
             shop.services.map((service, index) => (
               <View key={index} style={styles.serviceItem}>
                 <Text style={styles.serviceName}>{service.name}</Text>
-                <Text style={styles.servicePrice}>${service.price.toFixed(2)}</Text>
+                <Text style={styles.servicePrice}>${typeof service.price === 'number' ? service.price.toFixed(2) : service.price}</Text>
               </View>
             ))
           ) : (
@@ -156,7 +168,7 @@ const BarbershopDetail = ({ route, navigation }) => {
           {shop.hours ? (
             Object.entries(shop.hours).map(([day, hours]) => (
               <View key={day} style={styles.hoursItem}>
-                <Text style={styles.dayText}>{day}</Text>
+                <Text style={styles.dayText}>{day.charAt(0).toUpperCase() + day.slice(1)}</Text>
                 <Text style={styles.hoursText}>{hours || 'Closed'}</Text>
               </View>
             ))
