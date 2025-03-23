@@ -54,6 +54,7 @@ const GuestLandingPage = ({ navigation }) => {
       
       // Use the existing searchBarbershops method from authService
       const results = await authService.searchBarbershops(searchParams);
+      console.log('Search results received:', results.length);
       setSearchResults(results);
     } catch (error) {
       console.error('Search error:', error);
@@ -63,7 +64,7 @@ const GuestLandingPage = ({ navigation }) => {
     }
   };
 
-  // Updated renderBarbershop function with safety checks
+  // Updated renderBarbershop function with proper address handling
   const renderBarbershop = ({ item }) => {
     // Make sure item has an _id before trying to use it
     if (!item || !item._id) {
@@ -71,14 +72,66 @@ const GuestLandingPage = ({ navigation }) => {
       return null;
     }
     
+    // Format the address for display
+    const formatAddress = () => {
+      if (item.address && typeof item.address === 'object') {
+        return item.address.street || '';
+      } else if (typeof item.address === 'string') {
+        return item.address;
+      }
+      return '';
+    };
+    
+    // Format the location (city, state, zip)
+    const formatLocation = () => {
+      let city = '';
+      let state = '';
+      let zip = '';
+      
+      // Try to get values from both possible locations
+      if (item.address && typeof item.address === 'object') {
+        city = item.address.city || item.city || '';
+        state = item.address.state || item.state || '';
+        zip = item.address.zip || item.address.zipCode || item.zipCode || '';
+      } else {
+        city = item.city || '';
+        state = item.state || '';
+        zip = item.zipCode || '';
+      }
+      
+      let location = '';
+      
+      if (city) {
+        location += city;
+      }
+      
+      if (city && state) {
+        location += ', ';
+      }
+      
+      if (state) {
+        location += state;
+      }
+      
+      if ((city || state) && zip) {
+        location += ' ';
+      }
+      
+      if (zip) {
+        location += zip;
+      }
+      
+      return location || '';
+    };
+    
     return (
       <TouchableOpacity 
         style={styles.barbershopCard}
         onPress={() => navigation.navigate('BarbershopDetail', { shopId: item._id })}
       >
-        <Text style={styles.barbershopName}>{item.businessName || item.name}</Text>
-        <Text style={styles.barbershopAddress}>{item.address}</Text>
-        <Text style={styles.barbershopLocation}>{`${item.city}, ${item.state} ${item.zipCode || ''}`}</Text>
+        <Text style={styles.barbershopName}>{item.name || item.businessName || 'Unnamed Barbershop'}</Text>
+        <Text style={styles.barbershopAddress}>{formatAddress()}</Text>
+        <Text style={styles.barbershopLocation}>{formatLocation()}</Text>
       </TouchableOpacity>
     );
   };
@@ -259,38 +312,38 @@ const GuestLandingPage = ({ navigation }) => {
 
       {/* Bottom Navigation Bar */}
       <View style={styles.navbar}>
-  <TouchableOpacity style={styles.navItem}>
-    <Feather name="home" size={24} color="white" />
-    <Text style={styles.navText}>Home</Text>
-  </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
+          <Feather name="home" size={24} color="white" />
+          <Text style={styles.navText}>Home</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity 
-    style={styles.navItem}
-    onPress={() => navigation.navigate('AppointmentsScreen')}
-  >
-    <Feather name="calendar" size={24} color="white" />
-    <Text style={styles.navText}>Appointments</Text>
-  </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => navigation.navigate('AppointmentsScreen')}
+        >
+          <Feather name="calendar" size={24} color="white" />
+          <Text style={styles.navText}>Appointments</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity>
-    <LinearGradient
-      colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.clipperButton}
-    />
-  </TouchableOpacity>
+        <TouchableOpacity>
+          <LinearGradient
+            colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.clipperButton}
+          />
+        </TouchableOpacity>
 
-  <TouchableOpacity style={styles.navItem}>
-    <Feather name="search" size={24} color="white" />
-    <Text style={styles.navText}>Find Shops</Text>
-  </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
+          <Feather name="search" size={24} color="white" />
+          <Text style={styles.navText}>Find Shops</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity style={styles.navItem}>
-    <Feather name="user" size={24} color="white" />
-    <Text style={styles.navText}>Profile</Text>
-  </TouchableOpacity>
-</View>
+        <TouchableOpacity style={styles.navItem}>
+          <Feather name="user" size={24} color="white" />
+          <Text style={styles.navText}>Profile</Text>
+        </TouchableOpacity>
+      </View>
     </LinearGradient>
   );
 };
@@ -455,24 +508,34 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   barbershopCard: {
-    backgroundColor: '#222',
-    padding: 15,
-    borderRadius: 8,
+    backgroundColor: '#000000',
+    padding: 18,
+    borderRadius: 12,
     marginBottom: 15,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   barbershopName: {
-    color: 'white',
-    fontSize: 18,
+    color: '#FFFFFF',
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 8,
+    textShadowColor: 'rgba(255, 255, 255, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   barbershopAddress: {
-    color: '#CCC',
-    fontSize: 14,
-    marginBottom: 3,
+    color: '#E0E0E0',
+    fontSize: 16,
+    marginBottom: 5,
   },
   barbershopLocation: {
-    color: '#999',
+    color: '#BBBBBB',
     fontSize: 14,
     marginBottom: 5,
   },

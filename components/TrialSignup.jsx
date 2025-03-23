@@ -11,8 +11,9 @@ import {
   KeyboardAvoidingView
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+
 
 const TrialSignup = () => {
   const navigation = useNavigation();
@@ -24,8 +25,13 @@ const TrialSignup = () => {
     phone: '',
     address: '',
     numberOfChairs: '',
-    paymentMethod: null
+    paymentMethod: null,
+    cardNumber: '',
+    cardExpiry: '',
+    cardCVC: '',
+    cardName: ''
   });
+
 
   const features = [
     {
@@ -55,9 +61,11 @@ const TrialSignup = () => {
     }
   ];
 
+
   const handlePaymentSelection = (method) => {
     setFormData({...formData, paymentMethod: method});
   };
+
 
   const handleNextStep = () => {
     if (currentStep < 3) {
@@ -68,11 +76,32 @@ const TrialSignup = () => {
     }
   };
 
+
   const handlePreviousStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
   };
+
+  const formatCardNumber = (text) => {
+    // Remove any non-digit characters
+    const cleaned = text.replace(/\D/g, '');
+    // Add space after every 4 digits
+    const formatted = cleaned.replace(/(\d{4})(?=\d)/g, '$1 ');
+    // Limit to 19 characters (16 digits + 3 spaces)
+    return formatted.slice(0, 19);
+  };
+
+  const formatExpiry = (text) => {
+    // Remove any non-digit characters
+    const cleaned = text.replace(/\D/g, '');
+    // Format as MM/YY
+    if (cleaned.length > 2) {
+      return `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}`;
+    }
+    return cleaned;
+  };
+
   const renderStep = () => {
     switch(currentStep) {
       case 1:
@@ -155,39 +184,78 @@ const TrialSignup = () => {
         return (
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Payment Method</Text>
-            <Text style={styles.paymentNote}>Your card won't be charged during the trial</Text>
+            <Text style={styles.paymentNote}>Your card won't be charged until after your 14-day free trial</Text>
             
-            <TouchableOpacity 
-              style={[
-                styles.paymentOption,
-                formData.paymentMethod === 'apple' && styles.selectedPayment
-              ]}
-              onPress={() => handlePaymentSelection('apple')}
-            >
-              <Image
-                source={require('../assets/apple-pay.png')}
-                style={styles.paymentIcon}
+            <View style={styles.cardContainer}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardHeaderText}>Credit/Debit Card</Text>
+                <View style={styles.cardTypes}>
+                  <FontAwesome name="cc-visa" size={24} color="#1A1F71" style={styles.cardIcon} />
+                  <FontAwesome name="cc-mastercard" size={24} color="#EB001B" style={styles.cardIcon} />
+                  <FontAwesome name="cc-amex" size={24} color="#006FCF" style={styles.cardIcon} />
+                  <FontAwesome name="cc-discover" size={24} color="#FF6600" style={styles.cardIcon} />
+                </View>
+              </View>
+              
+              <TextInput
+                style={styles.cardInput}
+                placeholder="Card Number"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+                value={formData.cardNumber}
+                onChangeText={(text) => {
+                  const formatted = formatCardNumber(text);
+                  setFormData({...formData, cardNumber: formatted});
+                }}
+                maxLength={19}
               />
-              <Text style={styles.paymentText}>Apple Pay</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[
-                styles.paymentOption,
-                formData.paymentMethod === 'google' && styles.selectedPayment
-              ]}
-              onPress={() => handlePaymentSelection('google')}
-            >
-              <Image
-                source={require('../assets/google-pay.png')}
-                style={styles.paymentIcon}
+              
+              <View style={styles.cardRow}>
+                <TextInput
+                  style={[styles.cardInput, styles.cardHalf]}
+                  placeholder="MM/YY"
+                  placeholderTextColor="#666"
+                  keyboardType="numeric"
+                  value={formData.cardExpiry}
+                  onChangeText={(text) => {
+                    const formatted = formatExpiry(text);
+                    setFormData({...formData, cardExpiry: formatted});
+                  }}
+                  maxLength={5}
+                />
+                <TextInput
+                  style={[styles.cardInput, styles.cardHalf]}
+                  placeholder="CVC"
+                  placeholderTextColor="#666"
+                  keyboardType="numeric"
+                  value={formData.cardCVC}
+                  onChangeText={(text) => setFormData({...formData, cardCVC: text.replace(/\D/g, '')})}
+                  maxLength={4}
+                  secureTextEntry={true}
+                />
+              </View>
+              
+              <TextInput
+                style={styles.cardInput}
+                placeholder="Name on Card"
+                placeholderTextColor="#666"
+                value={formData.cardName}
+                onChangeText={(text) => setFormData({...formData, cardName: text})}
               />
-              <Text style={styles.paymentText}>Google Pay</Text>
-            </TouchableOpacity>
+            </View>
+            
+            <View style={styles.termsContainer}>
+              <Text style={styles.termsText}>
+                By starting your trial, you agree to our{' '}
+                <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
+                <Text style={styles.termsLink}>Privacy Policy</Text>
+              </Text>
+            </View>
           </View>
         );
     }
   };
+
 
   return (
     <LinearGradient
@@ -219,14 +287,16 @@ const TrialSignup = () => {
             <View style={styles.headerRight} />
           </View>
 
+
           {renderStep()}
+
 
           <TouchableOpacity 
             style={styles.nextButton}
             onPress={handleNextStep}
           >
             <Text style={styles.nextButtonText}>
-              {currentStep === 3 ? 'Start Trial' : 'Next'}
+              {currentStep === 3 ? 'Start Free Trial' : 'Next'}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -234,6 +304,7 @@ const TrialSignup = () => {
     </LinearGradient>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
@@ -330,34 +401,70 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     color: 'white',
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#333',
   },
   paymentNote: {
     color: '#888',
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
     fontSize: 16,
   },
-  paymentOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#000000',
+  cardContainer: {
+    backgroundColor: '#111',
+    borderRadius: 12,
     padding: 20,
-    borderRadius: 10,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 15,
   },
-  selectedPayment: {
-    borderColor: '#FF0000',
-    borderWidth: 2,
-  },
-  paymentIcon: {
-    width: 40,
-    height: 40,
-    resizeMode: 'contain',
-  },
-  paymentText: {
+  cardHeaderText: {
     color: 'white',
     fontSize: 18,
-    marginLeft: 15,
+    fontWeight: 'bold',
+  },
+  cardTypes: {
+    flexDirection: 'row',
+  },
+  cardIcon: {
+    marginLeft: 8,
+  },
+  cardInput: {
+    backgroundColor: '#000',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 15,
+    color: 'white',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  cardHalf: {
+    width: '48%',
+  },
+  termsContainer: {
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  termsText: {
+    color: '#888',
+    textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  termsLink: {
+    color: '#FF0000',
+    textDecorationLine: 'underline',
   },
   nextButton: {
     backgroundColor: '#FF0000',
@@ -373,5 +480,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
 
 export default TrialSignup;

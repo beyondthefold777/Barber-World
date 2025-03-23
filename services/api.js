@@ -303,6 +303,8 @@ export const authService = {
     try {
       console.log('Searching barbershops with params:', searchParams);
       
+      let results = [];
+      
       // If we're searching by userId, use the dedicated endpoint
       if (searchParams.userId) {
         try {
@@ -319,7 +321,7 @@ export const authService = {
             console.log('Shop by userId response:', data);
             if (data.success && data.shop) {
               // Return as array for consistency with other search results
-              return [data.shop];
+              results = [data.shop];
             }
           } else {
             console.log(`Shop by userId request failed with status: ${response.status}`);
@@ -330,7 +332,7 @@ export const authService = {
       }
       
       // For location-based searches, use the searchShopsByLocation endpoint
-      if (searchParams.city || searchParams.state) {
+      else if (searchParams.city || searchParams.state) {
         try {
           let queryString = '?';
           if (searchParams.city) queryString += `city=${encodeURIComponent(searchParams.city.trim())}&`;
@@ -350,25 +352,24 @@ export const authService = {
             const data = await response.json();
             console.log('Location search response:', data);
             if (data.success && data.shops) {
-              return data.shops;
+              results = data.shops;
             } else {
               console.log('No shops found in location search');
-              return [];
             }
           } else {
             console.log(`Location search failed with status: ${response.status}`);
             // Fall back to the all shops endpoint if the location search fails
-            return await fallbackToAllShops(searchParams);
+            results = await fallbackToAllShops(searchParams);
           }
         } catch (error) {
           console.log('Error searching shops by location:', error);
           // Try fallback if the location search throws an error
-          return await fallbackToAllShops(searchParams);
+          results = await fallbackToAllShops(searchParams);
         }
       }
       
       // If we have a service parameter, use the service search endpoint
-      if (searchParams.service) {
+      else if (searchParams.service) {
         try {
           const queryString = `?service=${encodeURIComponent(searchParams.service.trim())}`;
           console.log(`Searching shops by service: ${queryString}`);
@@ -384,23 +385,60 @@ export const authService = {
             const data = await response.json();
             console.log('Service search response:', data);
             if (data.success && data.shops) {
-              return data.shops;
+              results = data.shops;
             } else {
               console.log('No shops found offering this service');
-              return [];
             }
           } else {
             console.log(`Service search failed with status: ${response.status}`);
-            return [];
           }
         } catch (error) {
           console.log('Error searching shops by service:', error);
-          return [];
+        }
+      }
+      
+      // If we have a zipCode parameter, use the zipCode search
+      else if (searchParams.zipCode) {
+        try {
+          const queryString = `?zipCode=${encodeURIComponent(searchParams.zipCode.trim())}`;
+          console.log(`Searching shops by zipCode: ${queryString}`);
+          
+          const response = await fetch(`${API_URL}/api/shop/searchByLocation${queryString}`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('ZipCode search response:', data);
+            if (data.success && data.shops) {
+              results = data.shops;
+            } else {
+              console.log('No shops found in this zip code');
+            }
+          } else {
+            console.log(`ZipCode search failed with status: ${response.status}`);
+            // Fall back to the all shops endpoint if the zipCode search fails
+            results = await fallbackToAllShops(searchParams);
+          }
+        } catch (error) {
+          console.log('Error searching shops by zipCode:', error);
+          // Try fallback if the zipCode search throws an error
+          results = await fallbackToAllShops(searchParams);
         }
       }
       
       // Fall back to the original search endpoint if no specific parameters matched
-      return await fallbackToOriginalSearch(searchParams);
+      else {
+        results = await fallbackToOriginalSearch(searchParams);
+      }
+      
+      // Normalize the shop data structure before returning
+      const normalizedResults = normalizeShopData(results);
+      console.log('Normalized search results:', normalizedResults);
+      return normalizedResults;
     } catch (error) {
       console.error('Search error:', error);
       return [];
@@ -408,61 +446,69 @@ export const authService = {
   }
 };
 
-// Helper function for fallback to all shops endpoint
-async function fallbackToAllShops(searchParams) {
-  try {
-    let queryString = '?';
-    if (searchParams.city) queryString += `location=${encodeURIComponent(searchParams.city.trim())}&`;
-    if (searchParams.state) queryString += `state=${encodeURIComponent(searchParams.state.trim())}&`;
+// Helper function to normalize shop data structure
+function normalizeShopData(shops) {
+  if (!shops || !Array.isArray(shops)) return [];
+  
+  return shops.map(shop => {
+    if (!shop) return null;
     
-    console.log(`Falling back to all shops endpoint with params: ${queryString}`);
-    const response = await fetch(`${API_URL}/api/shop/all${queryString}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
+    // Create a normalized shop object
+    const normalizedShop = {
+      _id: shop._id || shop.id || Math.random().toString(),
+      name: shop.businessName || shop.name || 'Unnamed Barbershop',
+    };
     
-    if (response.ok) {
-      const data = await response.json();
-      console.log('All shops fallback response:', data);
-      if (data.success && data.shops) {
-        return data.shops;
-      }
+    // Handle address data
+    if (typeof shop.address === 'object' && shop.address !== null) {
+      // If address is already an object, use it
+      normalizedShop.address = {
+        street: shop.address.street || shop.address.line1 || '',
+        city: shop.address.city || shop.city || '',
+        state: shop.address.state || shop.state || '',
+        zip: shop.address.zip || shop.address.zipCode || shop.zipCode || ''
+      };
+    } else if (typeof shop.address === 'string') {
+      // If address is a string, use it as street address
+      normalizedShop.address = {
+        street: shop.address,
+        city: shop.city || '',
+        state: shop.state || '',
+        zip: shop.zipCode || ''
+      };
+    } else {
+      // If no address object or string, create an empty one and try to fill it
+      normalizedShop.address = {
+        street: '',
+        city: shop.city || '',
+        state: shop.state || '',
+        zip: shop.zipCode || ''
+      };
     }
-    return [];
-  } catch (error) {
-    console.log('Error with all shops fallback:', error);
-    return [];
-  }
+    
+    // Make sure city, state, zip are available at both levels for flexibility
+    normalizedShop.city = shop.city || normalizedShop.address.city || '';
+    normalizedShop.state = shop.state || normalizedShop.address.state || '';
+    normalizedShop.zipCode = shop.zipCode || normalizedShop.address.zip || '';
+    
+    // Copy these values to the address object too for consistency
+    normalizedShop.address.city = normalizedShop.address.city || normalizedShop.city;
+    normalizedShop.address.state = normalizedShop.address.state || normalizedShop.state;
+    normalizedShop.address.zip = normalizedShop.address.zip || normalizedShop.zipCode;
+    
+    // Include other important fields
+    normalizedShop.phone = shop.phone || shop.phoneNumber || '';
+    normalizedShop.email = shop.email || '';
+    normalizedShop.website = shop.website || '';
+    normalizedShop.rating = shop.rating || 0;
+    normalizedShop.services = shop.services || [];
+    normalizedShop.images = shop.images || [];
+    
+    return normalizedShop;
+  }).filter(shop => shop !== null); // Remove any null entries
 }
 
-// Helper function for fallback to original search endpoint
-async function fallbackToOriginalSearch(searchParams) {
-  try {
-    console.log('Falling back to original search endpoint with params:', searchParams);
-    const response = await fetch(`${API_URL}/api/shop/searchBarbershops`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(searchParams)
-    });
-
-    if (!response.ok) {
-      console.log(`Original search failed with status: ${response.status}`);
-      return [];
-    }
-
-    const data = await response.json();
-    console.log('Original search response data:', data);
-    return data.shops || (Array.isArray(data) ? data : []);
-  } catch (error) {
-    console.log('Error with original search endpoint:', error);
-    return [];
-  }
-}
+  
 
 export const taxService = {
   uploadTaxDocument: async (documentFile, userToken) => {
