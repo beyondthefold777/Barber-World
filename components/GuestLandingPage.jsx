@@ -259,38 +259,38 @@ const GuestLandingPage = ({ navigation }) => {
 
       {/* Bottom Navigation Bar */}
       <View style={styles.navbar}>
-        <TouchableOpacity style={styles.navItem}>
-          <Feather name="home" size={24} color="white" />
-          <Text style={styles.navText}>Home</Text>
-        </TouchableOpacity>
+  <TouchableOpacity style={styles.navItem}>
+    <Feather name="home" size={24} color="white" />
+    <Text style={styles.navText}>Home</Text>
+  </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => navigation.navigate('SchedulingScreen')}
-        >
-          <Feather name="calendar" size={24} color="white" />
-          <Text style={styles.navText}>Schedule</Text>
-        </TouchableOpacity>
+  <TouchableOpacity 
+    style={styles.navItem}
+    onPress={() => navigation.navigate('AppointmentsScreen')}
+  >
+    <Feather name="calendar" size={24} color="white" />
+    <Text style={styles.navText}>Appointments</Text>
+  </TouchableOpacity>
 
-        <TouchableOpacity>
-          <LinearGradient
-            colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.clipperButton}
-          />
-        </TouchableOpacity>
+  <TouchableOpacity>
+    <LinearGradient
+      colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.clipperButton}
+    />
+  </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
-          <Feather name="search" size={24} color="white" />
-          <Text style={styles.navText}>Find Shops</Text>
-        </TouchableOpacity>
+  <TouchableOpacity style={styles.navItem}>
+    <Feather name="search" size={24} color="white" />
+    <Text style={styles.navText}>Find Shops</Text>
+  </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
-          <Feather name="user" size={24} color="white" />
-          <Text style={styles.navText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
+  <TouchableOpacity style={styles.navItem}>
+    <Feather name="user" size={24} color="white" />
+    <Text style={styles.navText}>Profile</Text>
+  </TouchableOpacity>
+</View>
     </LinearGradient>
   );
 };

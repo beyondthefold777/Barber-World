@@ -19,6 +19,9 @@ import BarbershopDashboard from './components/BarbershopDashboard';
 import TrialSignup from './components/TrialSignup';
 import AppointmentList from './components/AppointmentList';
 
+// Import the new AppointmentsScreen
+import AppointmentsScreen from './components/AppointmentsScreen';
+
 // Import the BarbershopDetail screen from shopsettings directory
 import BarbershopDetail from './components/shopsettings/BarbershopDetail';
 
@@ -89,6 +92,13 @@ const App = () => {
                 headerShown: true,
                 title: 'Appointments'
               }} 
+            />
+            
+            {/* Add AppointmentsScreen */}
+            <Stack.Screen 
+              name="AppointmentsScreen" 
+              component={AppointmentsScreen} 
+              options={{ headerShown: false }}
             />
             
             {/* Add BarbershopDetail Screen */}
