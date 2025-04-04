@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useState, useEffect } from 'react';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { PaperProvider } from 'react-native-paper';
+import { StripeProvider } from '@stripe/stripe-react-native';
 
 // Import AuthProvider
 import { AuthProvider } from './context/AuthContext';
@@ -36,6 +37,9 @@ import PaymentHistoryScreen from './components/financial/PaymentHistoryScreen';
 // Shop Settings Screens
 import CustomizeShopScreen from './components/shopsettings/CustomizeShopScreen';
 
+// Stripe publishable key - replace with your actual key
+const STRIPE_PUBLISHABLE_KEY = "pk_live_51R84BeG26bbnswX58Tc2UsjudsmU18MUdLXNNmFfd9Rdl3cGu0aKK0qLHBgZilHqoVRRYxtqWw5KP6UuZWT3hPXr00nH8YHsqC";
+
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -61,75 +65,77 @@ const App = () => {
   }
 
   return (
-    <AuthProvider>
-      <PaperProvider>
-        <NavigationContainer>
-          <Stack.Navigator 
-            initialRouteName="Splash" 
-            screenOptions={{
-              headerShown: false,
-              headerStyle: {
-                backgroundColor: '#000000',
-              },
-              headerTintColor: '#FFFFFF',
-              headerTitleStyle: {
-                fontWeight: 'bold',
-              },
-            }}
-          >
-            <Stack.Screen name="Splash" component={SplashScreen} />
-            <Stack.Screen name="Register" component={RegisterScreen} />
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="GuestLandingPage" component={GuestLandingPage} />
-            <Stack.Screen name="LandingPage" component={LandingPage} />
-            <Stack.Screen name="SchedulingScreen" component={SchedulingScreen} />
-            <Stack.Screen name="BarbershopDashboard" component={BarbershopDashboard} />
-            <Stack.Screen name="TrialSignup" component={TrialSignup} />
-            <Stack.Screen 
-              name="AppointmentList" 
-              component={AppointmentList} 
-              options={{ 
-                headerShown: true,
-                title: 'Appointments'
-              }} 
-            />
-            
-            {/* Add AppointmentsScreen */}
-            <Stack.Screen 
-              name="AppointmentsScreen" 
-              component={AppointmentsScreen} 
-              options={{ headerShown: false }}
-            />
-            
-            {/* Add BarbershopDetail Screen */}
-            <Stack.Screen 
-              name="BarbershopDetail" 
-              component={BarbershopDetail} 
-              options={{ headerShown: false }}
-            />
+    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+      <AuthProvider>
+        <PaperProvider>
+          <NavigationContainer>
+            <Stack.Navigator 
+              initialRouteName="Splash"
+              screenOptions={{
+                headerShown: false,
+                headerStyle: {
+                  backgroundColor: '#000000',
+                },
+                headerTintColor: '#FFFFFF',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+            >
+              <Stack.Screen name="Splash" component={SplashScreen} />
+              <Stack.Screen name="Register" component={RegisterScreen} />
+              <Stack.Screen name="Login" component={LoginScreen} />
+              <Stack.Screen name="GuestLandingPage" component={GuestLandingPage} />
+              <Stack.Screen name="LandingPage" component={LandingPage} />
+              <Stack.Screen name="SchedulingScreen" component={SchedulingScreen} />
+              <Stack.Screen name="BarbershopDashboard" component={BarbershopDashboard} />
+              <Stack.Screen name="TrialSignup" component={TrialSignup} />
+              <Stack.Screen 
+                name="AppointmentList"
+                component={AppointmentList}
+                options={{
+                  headerShown: true,
+                  title: 'Appointments'
+                }}
+              />
+              
+              {/* Add AppointmentsScreen */}
+              <Stack.Screen 
+                name="AppointmentsScreen"
+                component={AppointmentsScreen}
+                options={{ headerShown: false }}
+              />
+              
+              {/* Add BarbershopDetail Screen */}
+              <Stack.Screen 
+                name="BarbershopDetail"
+                component={BarbershopDetail}
+                options={{ headerShown: false }}
+              />
 
-            {/* Financial Hub Screens */}
-            <Stack.Screen name="TaxForms" component={TaxFormsScreen} options={{ headerShown: true }} />
-            <Stack.Screen name="WriteOffs" component={WriteOffsScreen} options={{ headerShown: true }} />
-            <Stack.Screen name="Expenses" component={ExpensesScreen} options={{ headerShown: true }} />
-            <Stack.Screen name="PaySchedule" component={PayScheduleScreen} options={{ headerShown: true }} />
-            <Stack.Screen name="ProjectedIncome" component={ProjectedIncomeScreen} options={{ headerShown: true }} />
-            <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ headerShown: true }} />
+              {/* Financial Hub Screens */}
+              <Stack.Screen name="TaxForms" component={TaxFormsScreen} options={{ headerShown: true }} />
+              <Stack.Screen name="WriteOffs" component={WriteOffsScreen} options={{ headerShown: true }} />
+              <Stack.Screen name="Expenses" component={ExpensesScreen} options={{ headerShown: true }} />
+              <Stack.Screen name="PaySchedule" component={PayScheduleScreen} options={{ headerShown: true }} />
+              <Stack.Screen name="ProjectedIncome" component={ProjectedIncomeScreen} options={{ headerShown: true }} />
+              <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ headerShown: true }} />
 
-            {/* Shop Settings Screens */}
-            <Stack.Screen 
-              name="CustomizeShop" 
-              component={CustomizeShopScreen} 
-              options={{ 
-                headerShown: true,
-                title: 'Customize Shop'
-              }} 
-            />
-          </Stack.Navigator>
-          <StatusBar style="light" />
-        </NavigationContainer>
-      </PaperProvider>
-    </AuthProvider>
+              {/* Shop Settings Screens */}
+              <Stack.Screen 
+                name="CustomizeShop"
+                component={CustomizeShopScreen}
+                options={{
+                  headerShown: true,
+                  title: 'Customize Shop'
+                }}
+              />
+            </Stack.Navigator>
+            <StatusBar style="light" />
+          </NavigationContainer>
+        </PaperProvider>
+      </AuthProvider>
+    </StripeProvider>
   );
 };
 

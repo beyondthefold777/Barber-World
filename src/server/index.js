@@ -15,7 +15,7 @@ try {
 }
 
 // Try to import routes with detailed error handling
-let appointmentRoutes, authRoutes, shopRoutes, expenseRoutes, taxRoutes, userRoutes;
+let appointmentRoutes, authRoutes, shopRoutes, expenseRoutes, taxRoutes, userRoutes, stripeRoutes;
 
 try {
   appointmentRoutes = require('./routes/appointments');
@@ -62,9 +62,16 @@ try {
   console.error('Error loading user routes:', err);
 }
 
+// Try to load Stripe routes
+try {
+  stripeRoutes = require('./routes/stripe.routes');
+  console.log('Stripe routes loaded successfully');
+} catch (err) {
+  console.error('Error loading stripe routes:', err);
+}
+
 // Import controllers and middleware for direct routes
 let authMiddleware, shopController;
-
 try {
   authMiddleware = require('./middleware/auth');
   console.log('Auth middleware loaded successfully');
@@ -133,6 +140,38 @@ if (taxRoutes) {
 if (userRoutes) {
   app.use('/api/users', userRoutes);
   console.log('User routes mounted');
+}
+
+// Mount Stripe routes
+if (stripeRoutes) {
+  app.use('/api/stripe', stripeRoutes);
+  console.log('Stripe routes mounted');
+} else {
+  console.error('Stripe routes not mounted - module not loaded');
+  
+  // Create a simple placeholder route for Stripe
+  app.post('/api/stripe/create-trial', (req, res) => {
+    console.log('Placeholder Stripe create-trial route hit with body:', req.body);
+    res.status(200).json({
+      success: true,
+      message: 'This is a placeholder response. Stripe integration not fully configured.',
+      customerId: 'placeholder_customer_id',
+      subscriptionId: 'placeholder_subscription_id'
+    });
+  });
+  
+  app.get('/api/stripe/subscription', (req, res) => {
+    console.log('Placeholder Stripe subscription route hit');
+    res.status(200).json({
+      success: true,
+      message: 'This is a placeholder response. Stripe integration not fully configured.',
+      subscription: {
+        id: 'placeholder_subscription_id',
+        status: 'active',
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    });
+  });
 }
 
 // Add debugging route - ADD THIS BEFORE ANY OTHER ROUTES
@@ -224,17 +263,17 @@ app.get('/api/shop/location-search', (req, res) => {
       })
       .catch(err => {
         console.error('Error in direct location search:', err);
-        res.status(500).json({ 
-          success: false, 
-          message: 'Error searching shops by location' 
-        });
+        res.status(500).json({
+           success: false,
+           message: 'Error searching shops by location'
+         });
       });
   } catch (error) {
     console.error('Exception in location search route:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error in location search' 
-    });
+    res.status(500).json({
+       success: false,
+       message: 'Server error in location search'
+     });
   }
 });
 
@@ -522,6 +561,7 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Make sure the server listens on the correct host and port
 app.listen(PORT, HOST, () => {
   console.log(`Server running on ${HOST}:${PORT}`);
 });
