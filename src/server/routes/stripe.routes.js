@@ -4,10 +4,10 @@ const stripeController = require('../controllers/stripeController');
 const authMiddleware = require('../middleware/auth');
 
 // Public routes
-router.post('/create-trial', stripeController.createTrial);
+router.post('/create-trial', stripeController.createTrialSubscription);
 
 // Protected routes (require authentication)
-router.get('/subscription', authMiddleware, stripeController.getSubscription);
+router.get('/subscription', authMiddleware, stripeController.getSubscriptionStatus);
 router.post('/subscription/cancel', authMiddleware, stripeController.cancelSubscription);
 router.post('/create-payment-intent', authMiddleware, stripeController.createPaymentIntent);
 
