@@ -9,6 +9,7 @@ console.log('Stripe Key Type:', process.env.STRIPE_SECRET_KEY.startsWith('sk_tes
 console.log('Stripe Price ID:', process.env.STRIPE_PRICE_ID);
 
 // Create a Stripe customer and start a trial subscription
+// Update the createTrialSubscription function to handle the payment method ID
 exports.createTrialSubscription = async (req, res) => {
   console.log('createTrialSubscription called with body:', JSON.stringify(req.body, null, 2));
   
@@ -20,18 +21,17 @@ exports.createTrialSubscription = async (req, res) => {
       phone, 
       address, 
       numberOfChairs,
-      cardToken 
+      paymentMethodId 
     } = req.body;
     
     console.log('Validating input data...');
-    if (!email || !ownerName || !cardToken) {
-      console.error('Missing required fields:', { email, ownerName, cardToken: !!cardToken });
+    if (!email || !ownerName || !paymentMethodId) {
+      console.error('Missing required fields:', { email, ownerName, paymentMethodId: !!paymentMethodId });
       return res.status(400).json({
         success: false,
         message: 'Missing required fields'
       });
     }
-
     // Check if user already exists
     console.log('Checking if user exists:', email);
     let user = await User.findOne({ email });
@@ -43,7 +43,6 @@ exports.createTrialSubscription = async (req, res) => {
         message: 'User with this email already exists'
       });
     }
-
     console.log('Creating Stripe customer...');
     // Create a Stripe customer
     const customer = await stripe.customers.create({
@@ -52,15 +51,24 @@ exports.createTrialSubscription = async (req, res) => {
       phone,
       address: {
         line1: address
-      },
-      payment_method: cardToken,
-      invoice_settings: {
-        default_payment_method: cardToken
       }
     });
     
     console.log('Stripe customer created:', customer.id);
     
+    // Attach the payment method to the customer
+    console.log('Attaching payment method to customer...');
+    await stripe.paymentMethods.attach(paymentMethodId, {
+      customer: customer.id,
+    });
+    
+    // Set as default payment method
+    console.log('Setting payment method as default...');
+    await stripe.customers.update(customer.id, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
+    });
     // Verify price ID exists
     if (!process.env.STRIPE_PRICE_ID) {
       console.error('STRIPE_PRICE_ID not set in environment variables');
@@ -94,28 +102,24 @@ exports.createTrialSubscription = async (req, res) => {
       phone,
       role: 'shop_owner'
     });
-
     // Set a temporary password
     const tempPassword = Math.random().toString(36).slice(-8);
     user.setPassword(tempPassword);
     
     const savedUser = await user.save();
     console.log('User created in database:', savedUser._id);
-
     console.log('Creating shop in database...');
     // Create a new shop
     const shop = new Shop({
-      name: shopName,
+      name: shopName || `${ownerName}'s Barbershop`, // Use provided name or create a default
       userId: user._id,
       location: {
         address,
       },
       numberOfChairs: parseInt(numberOfChairs) || 1
     });
-
     const savedShop = await shop.save();
     console.log('Shop created in database:', savedShop._id);
-
     console.log('Creating subscription record in database...');
     // Create subscription record
     const subscriptionRecord = new Subscription({
@@ -127,10 +131,8 @@ exports.createTrialSubscription = async (req, res) => {
       trialEndDate: new Date(subscription.trial_end * 1000),
       currentPeriodEnd: new Date(subscription.current_period_end * 1000)
     });
-
     const savedSubscription = await subscriptionRecord.save();
     console.log('Subscription saved to database:', savedSubscription._id);
-
     res.status(201).json({
       success: true,
       message: 'Trial subscription created successfully',
@@ -405,6 +407,70 @@ exports.updatePaymentMethod = async (req, res) => {
   }
 };
 
+// Create payment intent
+exports.createPaymentIntent = async (req, res) => {
+  console.log('createPaymentIntent called for user:', req.user.id);
+  console.log('Request body:', JSON.stringify(req.body, null, 2));
+  
+  try {
+    const { amount, currency = 'usd' } = req.body;
+    
+    if (!amount) {
+      console.error('Missing amount');
+      return res.status(400).json({
+        success: false,
+        message: 'Amount is required'
+      });
+    }
+    
+    const userId = req.user.id;
+    
+    console.log('Finding subscription for user:', userId);
+    const subscription = await Subscription.findOne({ userId });
+    
+    if (!subscription) {
+      console.log('No subscription found for user:', userId);
+      return res.status(404).json({
+        success: false,
+        message: 'No subscription found for this user'
+      });
+    }
+    
+    console.log('Creating payment intent for amount:', amount, currency);
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100), // Convert to cents
+      currency,
+      customer: subscription.stripeCustomerId,
+      setup_future_usage: 'off_session',
+    });
+    
+    console.log('Payment intent created:', paymentIntent.id);
+    
+    res.status(200).json({
+      success: true,
+      clientSecret: paymentIntent.client_secret
+    });
+  } catch (error) {
+    console.error('Error creating payment intent:', error);
+    
+    // Log more details about Stripe errors
+    if (error.type && error.type.startsWith('Stripe')) {
+      console.error('Stripe error details:', {
+        type: error.type,
+        code: error.code,
+        param: error.param,
+        detail: error.detail
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create payment intent',
+      error: error.message
+    });
+  }
+};
+
 // Handle Stripe webhook events
 exports.handleWebhook = async (req, res) => {
   console.log('handleWebhook called');
@@ -423,7 +489,6 @@ exports.handleWebhook = async (req, res) => {
     console.error('Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
-
   // Handle the event
   console.log('Processing webhook event:', event.type);
   switch (event.type) {
@@ -442,7 +507,6 @@ exports.handleWebhook = async (req, res) => {
     default:
       console.log(`Unhandled event type ${event.type}`);
   }
-
   console.log('Webhook processing completed');
   res.status(200).json({ received: true });
 };
@@ -570,3 +634,4 @@ async function handleInvoicePaymentFailed(invoice) {
     console.error('Error handling invoice payment failed event:', error);
   }
 }
+

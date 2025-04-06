@@ -143,8 +143,14 @@ const HOST = '0.0.0.0';
 // Add CORS middleware
 app.use(cors());
 
-// Increase payload size limits
-app.use(express.json({limit: '200mb'}));
+// Add this before your express.json() middleware
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  const stripeController = require('./controllers/stripeController');
+  stripeController.handleWebhook(req, res);
+});
+
+// Then your regular middleware
+app.use(express.json({ limit: '200mb' }));
 app.use(express.urlencoded({limit: '200mb', extended: true}));
 
 // Enhanced request logging
@@ -188,7 +194,8 @@ if (userRoutes) {
   console.log('User routes mounted');
 }
 
-// Mount Stripe routes with enhanced handling
+// Mount Stripe routes - REMOVED DUPLICATE DECLARATION
+// Using the already loaded stripeRoutes variable from above
 if (stripeRoutes) {
   console.log('Mounting Stripe routes...');
   app.use('/api/stripe', stripeRoutes);
@@ -424,256 +431,256 @@ app.post('/api/auth/barbershops/search', (req, res) => {
     }
   });
   
-  // Direct routes for shop operations
-  // Only add these if shopController is available
-  if (shopController) {
-    // IMPORTANT: Order matters! More specific routes first, catch-all routes last
+// Direct routes for shop operations
+// Only add these if shopController is available
+if (shopController) {
+  // IMPORTANT: Order matters! More specific routes first, catch-all routes last
+  
+  // 1. Fixed path routes (most specific)
+  // FIXED: Remove duplicate route definition for '/api/shop/all'
+  app.get('/api/shop/all', (req, res) => {
+    console.log('Direct get all shops route hit with query:', req.query);
+    if (typeof shopController.getAllShops === 'function') {
+      try {
+        // Call directly without next to prevent middleware chain issues
+        shopController.getAllShops(req, res);
+      } catch (error) {
+        console.error('Error in getAllShops route handler:', error);
+        res.status(500).json({ success: false, message: 'Internal server error in getAllShops' });
+      }
+    } else {
+      res.status(500).json({ error: 'Get all shops controller method not found' });
+    }
+  });
+  
+  // Add a new route with a different path for testing
+  app.get('/api/shop/all-shops', (req, res) => {
+    console.log('Alternative all shops route hit with query:', req.query);
+    if (typeof shopController.getAllShops === 'function') {
+      try {
+        shopController.getAllShops(req, res);
+      } catch (error) {
+        console.error('Error in all-shops route handler:', error);
+        res.status(500).json({ success: false, message: 'Internal server error in all-shops' });
+      }
+    } else {
+      res.status(500).json({ error: 'Get all shops controller method not found' });
+    }
+  });
+  
+  app.get('/api/shop/searchByService', (req, res, next) => {
+    console.log('Direct search shops by service route hit with query:', req.query);
+    if (typeof shopController.searchShopsByService === 'function') {
+      shopController.searchShopsByService(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Search shops by service controller method not found' });
+    }
+  });
+  
+  app.get('/api/shop/searchByLocation', (req, res, next) => {
+    console.log('Direct search shops by location route hit with query:', req.query);
+    if (typeof shopController.searchShopsByLocation === 'function') {
+      shopController.searchShopsByLocation(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Search shops by location controller method not found' });
+    }
+  });
+  
+  app.get('/api/shop/featured', (req, res, next) => {
+    console.log('Direct get featured shops route hit');
+    if (typeof shopController.getFeaturedShops === 'function') {
+      shopController.getFeaturedShops(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Get featured shops controller method not found' });
+    }
+  });
+  
+  // 2. Routes with parameters in the middle of the path
+  app.get('/api/shop/byUserId/:userId', (req, res, next) => {
+    console.log('Direct get shop by userId route hit with userId:', req.params.userId);
+    if (typeof shopController.getShopByUserId === 'function') {
+      shopController.getShopByUserId(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Get shop by userId controller method not found' });
+    }
+  });
+  
+  console.log('Public shop routes added successfully');
+}
+
+// Routes that require authentication
+if (authMiddleware && shopController) {
+  // Authenticated routes with fixed paths
+  app.get('/api/shop/data', authMiddleware, (req, res, next) => {
+    console.log('Direct get shop data route hit');
+    if (typeof shopController.getShop === 'function') {
+      shopController.getShop(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Get shop controller method not found' });
+    }
+  });
+  
+  app.get('/api/shop', authMiddleware, (req, res, next) => {
+    console.log('Direct get shop route hit');
+    if (typeof shopController.getShop === 'function') {
+      shopController.getShop(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Get shop controller method not found' });
+    }
+  });
+  
+  app.post('/api/shop/upload-image', authMiddleware, (req, res, next) => {
+    console.log('Direct upload image route hit');
+    if (typeof shopController.uploadImage === 'function') {
+      shopController.uploadImage(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Upload image controller method not found' });
+    }
+  });
+  
+  app.get('/api/shop/stats', authMiddleware, (req, res, next) => {
+    console.log('Direct get shop stats route hit');
+    if (typeof shopController.getShopStats === 'function') {
+      shopController.getShopStats(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Get shop stats controller method not found' });
+    }
+  });
+  
+  app.put('/api/shop/update', authMiddleware, (req, res, next) => {
+    console.log('Direct update shop route hit');
+    if (typeof shopController.updateShop === 'function') {
+      shopController.updateShop(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Update shop controller method not found' });
+    }
+  });
+  
+  app.delete('/api/shop/images/:imageId', authMiddleware, (req, res, next) => {
+    console.log('Direct delete image route hit');
+    if (typeof shopController.deleteImage === 'function') {
+      shopController.deleteImage(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Delete image controller method not found' });
+    }
+  });
+  
+  app.post('/api/shop/services', authMiddleware, (req, res, next) => {
+    console.log('Direct add service route hit');
+    if (typeof shopController.addService === 'function') {
+      shopController.addService(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Add service controller method not found' });
+    }
+  });
+  
+  app.delete('/api/shop/services/:serviceId', authMiddleware, (req, res, next) => {
+    console.log('Direct remove service route hit');
+    if (typeof shopController.removeService === 'function') {
+      shopController.removeService(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Remove service controller method not found' });
+    }
+  });
+  
+  // Routes with shopId parameter
+  app.post('/api/shop/:shopId/reviews', authMiddleware, (req, res, next) => {
+    console.log('Direct add review route hit');
+    if (typeof shopController.addReview === 'function') {
+      shopController.addReview(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Add review controller method not found' });
+    }
+  });
+  
+  app.get('/api/shop/:shopId/reviews', (req, res, next) => {
+    console.log('Direct get shop reviews route hit');
+    if (typeof shopController.getShopReviews === 'function') {
+      shopController.getShopReviews(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Get shop reviews controller method not found' });
+    }
+  });
+  
+  console.log('Authenticated shop routes added successfully');
+}
+
+// Mount the shop routes from the router
+if (shopRoutes) {
+  app.use('/api/shop', shopRoutes);
+  console.log('Shop router mounted');
+} else {
+  console.error('Shop routes not mounted - module not loaded');
+}
+
+// IMPORTANT: This catch-all route must come LAST
+if (shopController) {
+  app.get('/api/shop/:id', (req, res, next) => {
+    // Skip this handler if the ID is 'all' to prevent conflicts
+    if (req.params.id === 'all') {
+      console.log('Skipping catch-all handler for /api/shop/all');
+      return next();
+    }
     
-    // 1. Fixed path routes (most specific)
-    // FIXED: Remove duplicate route definition for '/api/shop/all'
-    app.get('/api/shop/all', (req, res) => {
-      console.log('Direct get all shops route hit with query:', req.query);
-      if (typeof shopController.getAllShops === 'function') {
-        try {
-          // Call directly without next to prevent middleware chain issues
-          shopController.getAllShops(req, res);
-        } catch (error) {
-          console.error('Error in getAllShops route handler:', error);
-          res.status(500).json({ success: false, message: 'Internal server error in getAllShops' });
+    console.log('Direct get shop by ID route hit with ID:', req.params.id);
+    if (typeof shopController.getShopById === 'function') {
+      shopController.getShopById(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Get shop by ID controller method not found' });
+    }
+  });
+}
+
+// Test route to verify server is working
+app.get('/', (req, res) => {
+  res.send('Barber World API is running!');
+});
+
+// Route for checking all registered routes
+app.get('/api/routes', (req, res) => {
+  const routes = [];
+  app._router.stack.forEach(middleware => {
+    if (middleware.route) {
+      // Routes registered directly on the app
+      routes.push({
+        path: middleware.route.path,
+        method: Object.keys(middleware.route.methods)[0]
+      });
+    } else if (middleware.name === 'router') {
+      // Router middleware
+      middleware.handle.stack.forEach(handler => {
+        if (handler.route) {
+          routes.push({
+            path: middleware.regexp.toString() + handler.route.path,
+            method: Object.keys(handler.route.methods)[0]
+          });
         }
-      } else {
-        res.status(500).json({ error: 'Get all shops controller method not found' });
-      }
-    });
-    
-    // Add a new route with a different path for testing
-    app.get('/api/shop/all-shops', (req, res) => {
-      console.log('Alternative all shops route hit with query:', req.query);
-      if (typeof shopController.getAllShops === 'function') {
-        try {
-          shopController.getAllShops(req, res);
-        } catch (error) {
-          console.error('Error in all-shops route handler:', error);
-          res.status(500).json({ success: false, message: 'Internal server error in all-shops' });
-        }
-      } else {
-        res.status(500).json({ error: 'Get all shops controller method not found' });
-      }
-    });
-    
-    app.get('/api/shop/searchByService', (req, res, next) => {
-      console.log('Direct search shops by service route hit with query:', req.query);
-      if (typeof shopController.searchShopsByService === 'function') {
-        shopController.searchShopsByService(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Search shops by service controller method not found' });
-      }
-    });
-    
-    app.get('/api/shop/searchByLocation', (req, res, next) => {
-      console.log('Direct search shops by location route hit with query:', req.query);
-      if (typeof shopController.searchShopsByLocation === 'function') {
-        shopController.searchShopsByLocation(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Search shops by location controller method not found' });
-      }
-    });
-    
-    app.get('/api/shop/featured', (req, res, next) => {
-      console.log('Direct get featured shops route hit');
-      if (typeof shopController.getFeaturedShops === 'function') {
-        shopController.getFeaturedShops(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Get featured shops controller method not found' });
-      }
-    });
-    
-    // 2. Routes with parameters in the middle of the path
-    app.get('/api/shop/byUserId/:userId', (req, res, next) => {
-      console.log('Direct get shop by userId route hit with userId:', req.params.userId);
-      if (typeof shopController.getShopByUserId === 'function') {
-        shopController.getShopByUserId(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Get shop by userId controller method not found' });
-      }
-    });
-    
-    console.log('Public shop routes added successfully');
-  }
-  
-  // Routes that require authentication
-  if (authMiddleware && shopController) {
-    // Authenticated routes with fixed paths
-    app.get('/api/shop/data', authMiddleware, (req, res, next) => {
-      console.log('Direct get shop data route hit');
-      if (typeof shopController.getShop === 'function') {
-        shopController.getShop(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Get shop controller method not found' });
-      }
-    });
-    
-    app.get('/api/shop', authMiddleware, (req, res, next) => {
-      console.log('Direct get shop route hit');
-      if (typeof shopController.getShop === 'function') {
-        shopController.getShop(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Get shop controller method not found' });
-      }
-    });
-    
-    app.post('/api/shop/upload-image', authMiddleware, (req, res, next) => {
-      console.log('Direct upload image route hit');
-      if (typeof shopController.uploadImage === 'function') {
-        shopController.uploadImage(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Upload image controller method not found' });
-      }
-    });
-    
-    app.get('/api/shop/stats', authMiddleware, (req, res, next) => {
-      console.log('Direct get shop stats route hit');
-      if (typeof shopController.getShopStats === 'function') {
-        shopController.getShopStats(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Get shop stats controller method not found' });
-      }
-    });
-    
-    app.put('/api/shop/update', authMiddleware, (req, res, next) => {
-      console.log('Direct update shop route hit');
-      if (typeof shopController.updateShop === 'function') {
-        shopController.updateShop(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Update shop controller method not found' });
-      }
-    });
-    
-    app.delete('/api/shop/images/:imageId', authMiddleware, (req, res, next) => {
-      console.log('Direct delete image route hit');
-      if (typeof shopController.deleteImage === 'function') {
-        shopController.deleteImage(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Delete image controller method not found' });
-      }
-    });
-    
-    app.post('/api/shop/services', authMiddleware, (req, res, next) => {
-      console.log('Direct add service route hit');
-      if (typeof shopController.addService === 'function') {
-        shopController.addService(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Add service controller method not found' });
-      }
-    });
-    
-    app.delete('/api/shop/services/:serviceId', authMiddleware, (req, res, next) => {
-      console.log('Direct remove service route hit');
-      if (typeof shopController.removeService === 'function') {
-        shopController.removeService(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Remove service controller method not found' });
-      }
-    });
-    
-    // Routes with shopId parameter
-    app.post('/api/shop/:shopId/reviews', authMiddleware, (req, res, next) => {
-      console.log('Direct add review route hit');
-      if (typeof shopController.addReview === 'function') {
-        shopController.addReview(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Add review controller method not found' });
-      }
-    });
-    
-    app.get('/api/shop/:shopId/reviews', (req, res, next) => {
-      console.log('Direct get shop reviews route hit');
-      if (typeof shopController.getShopReviews === 'function') {
-        shopController.getShopReviews(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Get shop reviews controller method not found' });
-      }
-    });
-    
-    console.log('Authenticated shop routes added successfully');
-  }
-  
-  // Mount the shop routes from the router
-  if (shopRoutes) {
-    app.use('/api/shop', shopRoutes);
-    console.log('Shop router mounted');
-  } else {
-    console.error('Shop routes not mounted - module not loaded');
-  }
-  
-  // IMPORTANT: This catch-all route must come LAST
-  if (shopController) {
-    app.get('/api/shop/:id', (req, res, next) => {
-      // Skip this handler if the ID is 'all' to prevent conflicts
-      if (req.params.id === 'all') {
-        console.log('Skipping catch-all handler for /api/shop/all');
-        return next();
-      }
-      
-      console.log('Direct get shop by ID route hit with ID:', req.params.id);
-      if (typeof shopController.getShopById === 'function') {
-        shopController.getShopById(req, res, next);
-      } else {
-        res.status(500).json({ error: 'Get shop by ID controller method not found' });
-      }
-    });
-  }
-  
-  // Test route to verify server is working
-  app.get('/', (req, res) => {
-    res.send('Barber World API is running!');
+      });
+    }
   });
+  res.json(routes);
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  const errorDetails = {
+    timestamp: new Date().toISOString(),
+    error: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method
+  };
   
-  // Route for checking all registered routes
-  app.get('/api/routes', (req, res) => {
-    const routes = [];
-    app._router.stack.forEach(middleware => {
-      if (middleware.route) {
-        // Routes registered directly on the app
-        routes.push({
-          path: middleware.route.path,
-          method: Object.keys(middleware.route.methods)[0]
-        });
-      } else if (middleware.name === 'router') {
-        // Router middleware
-        middleware.handle.stack.forEach(handler => {
-          if (handler.route) {
-            routes.push({
-              path: middleware.regexp.toString() + handler.route.path,
-              method: Object.keys(handler.route.methods)[0]
-            });
-          }
-        });
-      }
-    });
-    res.json(routes);
+  console.log('Error occurred:', errorDetails);
+  
+  res.status(500).json({
+    error: err.message,
+    path: req.path
   });
-  
-  // Global error handler
-  app.use((err, req, res, next) => {
-    const errorDetails = {
-      timestamp: new Date().toISOString(),
-      error: err.message,
-      stack: err.stack,
-      path: req.path,
-      method: req.method
-    };
-    
-    console.log('Error occurred:', errorDetails);
-    
-    res.status(500).json({
-      error: err.message,
-      path: req.path
-    });
-  });
-  
-  // Make sure the server listens on the correct host and port
-  app.listen(PORT, HOST, () => {
-    console.log(`Server running on ${HOST}:${PORT}`);
-  });
-  
+});
+
+// Make sure the server listens on the correct host and port
+app.listen(PORT, HOST, () => {
+  console.log(`Server running on ${HOST}:${PORT}`);
+});
+

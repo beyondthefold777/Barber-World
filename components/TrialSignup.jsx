@@ -39,95 +39,102 @@ const TrialSignup = ({ navigation }) => {
   const [paymentMethod, setPaymentMethod] = useState('card');
 
   // Handle form submission
-  const handleSubmit = async () => {
-    // Validate billing information
-    if (!validateBillingInfo()) {
-      Alert.alert('Missing Information', 'Please complete all billing information fields');
-      return;
-    }
+// Update the handleSubmit function to match your server's expectations
+const handleSubmit = async () => {
+  // Validate billing information
+  if (!validateBillingInfo()) {
+    Alert.alert('Missing Information', 'Please complete all billing information fields');
+    return;
+  }
     
-    if (paymentMethod === 'card' && !cardComplete) {
-      Alert.alert('Please complete card details');
-      return;
-    }
+  if (paymentMethod === 'card' && !cardComplete) {
+    Alert.alert('Please complete card details');
+    return;
+  }
     
-    try {
-      setIsLoading(true);
-      
-      console.log('Creating payment method with type:', paymentMethod);
-      console.log('Card details:', cardDetails);
-      
-      // Create a payment method using Stripe React Native SDK
-      const { paymentMethod: stripePaymentMethod, error } = await createPaymentMethod({
-        paymentMethodType: 'Card', // Explicitly specify the payment method type
-        card: cardDetails,
-        billingDetails: {
-          name: billingInfo.name,
-          email: billingInfo.email,
-          address: {
-            line1: billingInfo.address,
-            city: billingInfo.city,
-            state: billingInfo.state,
-            postalCode: billingInfo.zipCode,
-            country: billingInfo.country,
-          },
+  try {
+    setIsLoading(true);
+        
+    console.log('Creating payment method with type:', paymentMethod);
+    console.log('Card details:', cardDetails);
+        
+    // Create a payment method using Stripe React Native SDK
+    const { paymentMethod: stripePaymentMethod, error } = await createPaymentMethod({
+      paymentMethodType: 'Card',
+      card: cardDetails,
+      billingDetails: {
+        name: billingInfo.name,
+        email: billingInfo.email,
+        address: {
+          line1: billingInfo.address,
+          city: billingInfo.city,
+          state: billingInfo.state,
+          postalCode: billingInfo.zipCode,
+          country: billingInfo.country,
         },
-      });
-      
-      if (error) {
-        console.error('Error creating payment method:', error);
-        Alert.alert('Payment Method Error', error.message);
-        setIsLoading(false);
-        return;
-      }
-      
-      console.log('Payment method created successfully:', stripePaymentMethod.id);
-      
-      // Send data to your server
-      const response = await axios.post('https://barber-world.fly.dev/api/stripe/create-trial', {
-        paymentMethodId: stripePaymentMethod.id,
-        billingInfo: billingInfo
-      });
-      
-      console.log('Trial signup response:', response.status, response.data);
-      
-      if (response.data.success) {
-        Alert.alert(
-          'Success!',
-          'Your trial has been activated. You now have full access to all premium features.',
-          [{ text: 'OK', onPress: () => navigation.navigate('BarbershopDashboard') }]
-        );
-      } else {
-        Alert.alert('Error', response.data.message || 'Something went wrong');
-      }
-    } catch (error) {
-      console.error('Error creating trial:', error);
-      
-      // Enhanced error logging
-      if (error.response) {
-        // The server responded with a status code outside of 2xx
-        console.error('Server error details:', {
-          status: error.response.status,
-          data: error.response.data,
-          headers: error.response.headers
-        });
-        Alert.alert('Server Error', `Status: ${error.response.status}\n${JSON.stringify(error.response.data) || 'Unknown error'}`);
-      } else if (error.request) {
-        // The request was made but no response was received
-        console.error('No response received:', error.request);
-        Alert.alert('Network Error', 'No response received from server. Please check your internet connection.');
-      } else {
-        // Something happened in setting up the request
-        console.error('Request setup error:', {
-          message: error.message,
-          stack: error.stack
-        });
-        Alert.alert('Error', error.message || 'Something went wrong');
-      }
-    } finally {
+      },
+    });
+        
+    if (error) {
+      console.error('Error creating payment method:', error);
+      Alert.alert('Payment Method Error', error.message);
       setIsLoading(false);
+      return;
     }
-  };
+        
+    console.log('Payment method created successfully:', stripePaymentMethod.id);
+        
+    // Send data to your server
+    const response = await axios.post('https://barber-world.fly.dev/api/stripe/create-trial', {
+      paymentMethodId: stripePaymentMethod.id,
+      shopName: "My Barbershop", // Add a default or get from previous screen
+      ownerName: billingInfo.name,
+      email: billingInfo.email,
+      phone: "", // Add a phone field to your form if needed
+      address: billingInfo.address + ", " + billingInfo.city + ", " + billingInfo.state + " " + billingInfo.zipCode,
+      numberOfChairs: 1 // Add a field to your form if needed
+    });
+        
+    console.log('Trial signup response:', response.status, response.data);
+        
+    if (response.data.success) {
+      Alert.alert(
+        'Success!',
+        'Your trial has been activated. You now have full access to all premium features.',
+        [{ text: 'OK', onPress: () => navigation.navigate('BarbershopDashboard') }]
+      );
+    } else {
+      Alert.alert('Error', response.data.message || 'Something went wrong');
+    }
+  } catch (error) {
+    console.error('Error creating trial:', error);
+        
+    // Enhanced error logging
+    if (error.response) {
+      // The server responded with a status code outside of 2xx
+      console.error('Server error details:', {
+        status: error.response.status,
+        data: error.response.data,
+        headers: error.response.headers
+      });
+      Alert.alert('Server Error', `Status: ${error.response.status}\n${JSON.stringify(error.response.data) || 'Unknown error'}`);
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error('No response received:', error.request);
+      Alert.alert('Network Error', 'No response received from server. Please check your internet connection.');
+    } else {
+      // Something happened in setting up the request
+      console.error('Request setup error:', {
+        message: error.message,
+        stack: error.stack
+      });
+      Alert.alert('Error', error.message || 'Something went wrong');
+    }
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   // Validate billing information
   const validateBillingInfo = () => {

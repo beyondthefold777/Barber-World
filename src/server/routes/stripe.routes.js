@@ -9,6 +9,7 @@ router.post('/create-trial', stripeController.createTrialSubscription);
 // Protected routes (require authentication)
 router.get('/subscription', authMiddleware, stripeController.getSubscriptionStatus);
 router.post('/subscription/cancel', authMiddleware, stripeController.cancelSubscription);
-router.post('/create-payment-intent', authMiddleware, stripeController.createPaymentIntent);
+router.post('/subscription/resume', authMiddleware, stripeController.resumeSubscription);
+router.post('/payment-method/update', authMiddleware, stripeController.updatePaymentMethod);
 
 module.exports = router;
