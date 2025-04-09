@@ -16,6 +16,7 @@ import { CardField, useStripe } from '@stripe/stripe-react-native';
 import { Feather, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext'; // Import Auth context to get user ID
 
 const TrialSignup = ({ navigation }) => {
   const { createPaymentMethod, confirmPayment } = useStripe();
@@ -23,6 +24,7 @@ const TrialSignup = ({ navigation }) => {
   const [cardComplete, setCardComplete] = useState(false);
   const [cardDetails, setCardDetails] = useState(null);
   const scrollViewRef = useRef();
+  const { user } = useAuth(); // Get current user from auth context
   
   // Billing information state
   const [billingInfo, setBillingInfo] = useState({
@@ -39,102 +41,98 @@ const TrialSignup = ({ navigation }) => {
   const [paymentMethod, setPaymentMethod] = useState('card');
 
   // Handle form submission
-// Update the handleSubmit function to match your server's expectations
-const handleSubmit = async () => {
-  // Validate billing information
-  if (!validateBillingInfo()) {
-    Alert.alert('Missing Information', 'Please complete all billing information fields');
-    return;
-  }
-    
-  if (paymentMethod === 'card' && !cardComplete) {
-    Alert.alert('Please complete card details');
-    return;
-  }
-    
-  try {
-    setIsLoading(true);
-        
-    console.log('Creating payment method with type:', paymentMethod);
-    console.log('Card details:', cardDetails);
-        
-    // Create a payment method using Stripe React Native SDK
-    const { paymentMethod: stripePaymentMethod, error } = await createPaymentMethod({
-      paymentMethodType: 'Card',
-      card: cardDetails,
-      billingDetails: {
-        name: billingInfo.name,
-        email: billingInfo.email,
-        address: {
-          line1: billingInfo.address,
-          city: billingInfo.city,
-          state: billingInfo.state,
-          postalCode: billingInfo.zipCode,
-          country: billingInfo.country,
-        },
-      },
-    });
-        
-    if (error) {
-      console.error('Error creating payment method:', error);
-      Alert.alert('Payment Method Error', error.message);
-      setIsLoading(false);
+  const handleSubmit = async () => {
+    // Validate billing information
+    if (!validateBillingInfo()) {
+      Alert.alert('Missing Information', 'Please complete all billing information fields');
       return;
     }
-        
-    console.log('Payment method created successfully:', stripePaymentMethod.id);
-        
-    // Send data to your server
-    const response = await axios.post('https://barber-world.fly.dev/api/stripe/create-trial', {
-      paymentMethodId: stripePaymentMethod.id,
-      shopName: "My Barbershop", // Add a default or get from previous screen
-      ownerName: billingInfo.name,
-      email: billingInfo.email,
-      phone: "", // Add a phone field to your form if needed
-      address: billingInfo.address + ", " + billingInfo.city + ", " + billingInfo.state + " " + billingInfo.zipCode,
-      numberOfChairs: 1 // Add a field to your form if needed
-    });
-        
-    console.log('Trial signup response:', response.status, response.data);
-        
-    if (response.data.success) {
-      Alert.alert(
-        'Success!',
-        'Your trial has been activated. You now have full access to all premium features.',
-        [{ text: 'OK', onPress: () => navigation.navigate('BarbershopDashboard') }]
-      );
-    } else {
-      Alert.alert('Error', response.data.message || 'Something went wrong');
+    
+    if (paymentMethod === 'card' && !cardComplete) {
+      Alert.alert('Please complete card details');
+      return;
     }
-  } catch (error) {
-    console.error('Error creating trial:', error);
-        
-    // Enhanced error logging
-    if (error.response) {
-      // The server responded with a status code outside of 2xx
-      console.error('Server error details:', {
-        status: error.response.status,
-        data: error.response.data,
-        headers: error.response.headers
+    
+    try {
+      setIsLoading(true);
+      
+      console.log('Creating payment method with type:', paymentMethod);
+      console.log('Card details:', cardDetails);
+      
+      // Create a payment method using Stripe React Native SDK
+      const { paymentMethod: stripePaymentMethod, error } = await createPaymentMethod({
+        paymentMethodType: 'Card',
+        card: cardDetails,
+        billingDetails: {
+          name: billingInfo.name,
+          email: billingInfo.email,
+          address: {
+            line1: billingInfo.address,
+            city: billingInfo.city,
+            state: billingInfo.state,
+            postalCode: billingInfo.zipCode,
+            country: billingInfo.country,
+          },
+        },
       });
-      Alert.alert('Server Error', `Status: ${error.response.status}\n${JSON.stringify(error.response.data) || 'Unknown error'}`);
-    } else if (error.request) {
-      // The request was made but no response was received
-      console.error('No response received:', error.request);
-      Alert.alert('Network Error', 'No response received from server. Please check your internet connection.');
-    } else {
-      // Something happened in setting up the request
-      console.error('Request setup error:', {
-        message: error.message,
-        stack: error.stack
+      
+      if (error) {
+        console.error('Error creating payment method:', error);
+        Alert.alert('Payment Method Error', error.message);
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log('Payment method created successfully:', stripePaymentMethod.id);
+      
+      // Send data to your server - only passing userId, not shopId
+      const response = await axios.post('https://barber-world.fly.dev/api/stripe/create-trial', {
+        paymentMethodId: stripePaymentMethod.id,
+        userId: user.id, // Pass the user ID from auth context
+        email: billingInfo.email,
+        name: billingInfo.name,
+        address: billingInfo.address + ", " + billingInfo.city + ", " + billingInfo.state + " " + billingInfo.zipCode,
       });
-      Alert.alert('Error', error.message || 'Something went wrong');
+      
+      console.log('Trial signup response:', response.status, response.data);
+      
+      if (response.data.success) {
+        Alert.alert(
+          'Success!',
+          'Your trial has been activated. You now have full access to all premium features.',
+          [{ text: 'OK', onPress: () => navigation.navigate('BarbershopDashboard') }]
+        );
+      } else {
+        Alert.alert('Error', response.data.message || 'Something went wrong');
+      }
+    } catch (error) {
+      console.error('Error creating trial:', error);
+      
+      // Enhanced error logging
+      if (error.response) {
+        // The server responded with a status code outside of 2xx
+        console.error('Server error details:', {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+        Alert.alert('Server Error', `Status: ${error.response.status}\n${JSON.stringify(error.response.data) || 'Unknown error'}`);
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('No response received:', error.request);
+        Alert.alert('Network Error', 'No response received from server. Please check your internet connection.');
+      } else {
+        // Something happened in setting up the request
+        console.error('Request setup error:', {
+          message: error.message,
+          stack: error.stack
+        });
+        Alert.alert('Error', error.message || 'Something went wrong');
+      }
+    } finally {
+      setIsLoading(false);
     }
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  };
 
   // Validate billing information
   const validateBillingInfo = () => {
@@ -437,7 +435,6 @@ const handleSubmit = async () => {
           </Text>
         </View>
       </ScrollView>
-      
       {/* Bottom Navigation Bar */}
       <View style={styles.navbar}>
         <TouchableOpacity style={styles.navItem}>
@@ -445,328 +442,327 @@ const handleSubmit = async () => {
           <Text style={styles.navText}>Alerts</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-                    style={styles.navItem}
-                    onPress={() => navigation.navigate('AppointmentList')}
-                  >
-                    <Feather name="calendar" size={24} color="white" />
-                    <Text style={styles.navText}>Appointments</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity>
-                    <LinearGradient
-                      colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.clipperButton}
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.navItem}>
-                    <Feather name="trending-up" size={24} color="white" />
-                    <Text style={styles.navText}>Analytics</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.navItem}>
-                    <Feather name="user" size={24} color="white" />
-                    <Text style={styles.navText}>Profile</Text>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-            );
-          };
-          
-          const { width } = Dimensions.get('window');
-          const styles = StyleSheet.create({
-            container: {
-              flex: 1,
-            },
-            topBar: {
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingTop: 50,
-              paddingHorizontal: 20,
-              paddingBottom: 10,
-            },
-            backButton: {
-              padding: 10,
-            },
-            title: {
-              fontSize: 20,
-              fontWeight: 'bold',
-              color: '#FFFFFF',
-              textAlign: 'center',
-            },
-            topRightImage: {
-              padding: 10,
-            },
-            scrollContent: {
-              padding: 20,
-              paddingBottom: 40,
-            },
-            headerContainer: {
-              marginBottom: 25,
-              alignItems: 'center',
-            },
-            mainTitle: {
-              fontSize: 24,
-              fontWeight: 'bold',
-              color: '#FFFFFF',
-              textAlign: 'center',
-              marginBottom: 10,
-            },
-            subtitle: {
-              fontSize: 16,
-              color: '#BBBBBB',
-              textAlign: 'center',
-              lineHeight: 22,
-            },
-            pricingContainer: {
-              backgroundColor: '#000000',
-              borderRadius: 12,
-              borderWidth: 2,
-              borderColor: '#FF0000',
-              padding: 20,
-              marginBottom: 25,
-              alignItems: 'center',
-              shadowColor: '#FF0000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.3,
-              shadowRadius: 4,
-              elevation: 5,
-            },
-            pricingHeader: {
-              alignItems: 'center',
-            },
-            pricingTitle: {
-              fontSize: 20,
-              fontWeight: 'bold',
-              color: '#FFFFFF',
-              marginBottom: 15,
-            },
-            priceRow: {
-              flexDirection: 'row',
-              alignItems: 'flex-start',
-              justifyContent: 'center',
-            },
-            currency: {
-              fontSize: 24,
-              fontWeight: 'bold',
-              color: '#FFFFFF',
-              marginTop: 5,
-            },
-            price: {
-              fontSize: 48,
-              fontWeight: 'bold',
-              color: '#FFFFFF',
-            },
-            periodContainer: {
-              flexDirection: 'column',
-              alignItems: 'flex-start',
-              justifyContent: 'flex-start',
-            },
-            cents: {
-              fontSize: 20,
-              fontWeight: 'bold',
-              color: '#FFFFFF',
-            },
-            period: {
-              fontSize: 16,
-              color: '#BBBBBB',
-            },
-            billingInfo: {
-              fontSize: 14,
-              color: '#BBBBBB',
-              marginTop: 10,
-            },
-            featureCategory: {
-              backgroundColor: '#000000',
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: '#444444',
-              padding: 20,
-              marginBottom: 20,
-            },
-            categoryHeader: {
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginBottom: 15,
-            },
-            categoryTitle: {
-              fontSize: 18,
-              fontWeight: 'bold',
-              color: '#FFFFFF',
-              marginLeft: 10,
-            },
-            featureItem: {
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginBottom: 12,
-            },
-            featureText: {
-              fontSize: 15,
-              color: '#DDDDDD',
-              marginLeft: 10,
-            },
-            cardContainer: {
-              backgroundColor: '#000000',
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: '#444444',
-              padding: 20,
-              marginBottom: 25,
-            },
-            cardTitle: {
-              fontSize: 18,
-              fontWeight: 'bold',
-              color: '#FFFFFF',
-              marginBottom: 10,
-            },
-            cardDescription: {
-              fontSize: 14,
-              color: '#BBBBBB',
-              marginBottom: 20,
-              lineHeight: 20,
-            },
-            fieldLabel: {
-              fontSize: 16,
-              fontWeight: '500',
-              color: '#FFFFFF',
-              marginBottom: 8,
-            },
-            cardField: {
-              width: '100%',
-              height: 50,
-              marginBottom: 15,
-            },
-            cardStyle: {
-              backgroundColor: '#222222',
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: '#444444',
-              textColor: '#FFFFFF',
-              placeholderColor: '#999999',
-              fontSize: 16,
-            },
-            securityNote: {
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginTop: 5,
-            },
-            securityText: {
-              color: '#BBBBBB',
-              fontSize: 14,
-              marginLeft: 8,
-            },
-            startTrialButton: {
-              backgroundColor: '#FF0000',
-              borderRadius: 10,
-              paddingVertical: 16,
-              alignItems: 'center',
-              marginBottom: 20,
-            },
-            startTrialText: {
-              color: '#FFFFFF',
-              fontSize: 18,
-              fontWeight: 'bold',
-            },
-            disabledButton: {
-              backgroundColor: '#661111',
-              opacity: 0.7,
-            },
-            loadingButton: {
-              backgroundColor: '#FF0000',
-              opacity: 0.8,
-            },
-            guaranteeContainer: {
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 30,
-            },
-            guaranteeText: {
-              color: '#BBBBBB',
-              fontSize: 14,
-              marginLeft: 8,
-              textAlign: 'center',
-            },
-            navbar: {
-              flexDirection: 'row',
-              justifyContent: 'space-around',
-              alignItems: 'center',
-              backgroundColor: '#000000',
-              paddingVertical: 15,
-              borderTopWidth: 1,
-              borderTopColor: '#333',
-            },
-            navItem: {
-              alignItems: 'center',
-            },
-            navText: {
-              color: 'white',
-              fontSize: 12,
-              marginTop: 5,
-            },
-            clipperButton: {
-              width: 60,
-              height: 60,
-              borderRadius: 30,
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginTop: -25,
-              borderWidth: 3,
-              borderColor: '#FFFFFF',
-            },
-            // New styles for billing info and payment method selection
-            input: {
-              backgroundColor: '#222222',
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: '#444444',
-              color: '#FFFFFF',
-              paddingHorizontal: 15,
-              paddingVertical: 12,
-              fontSize: 16,
-              width: '100%',
-            },
-            inputRow: {
-              marginBottom: 15,
-            },
-            inputRowHalf: {
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              marginBottom: 15,
-            },
-            halfInput: {
-              width: '48%',
-            },
-            paymentMethodContainer: {
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              marginBottom: 20,
-            },
-            paymentMethodOption: {
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#222222',
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: '#444444',
-              padding: 15,
-              width: '48%',
-            },
-            selectedPaymentMethod: {
-              borderColor: '#FF0000',
-              backgroundColor: 'rgba(255, 0, 0, 0.1)',
-            },
-            paymentMethodText: {
-              color: '#FFFFFF',
-              fontSize: 16,
-              marginLeft: 10,
-            },
-            selectedPaymentMethodText: {
-              color: '#FF0000',
-              fontWeight: 'bold',
-            },
-          });
-          
-          export default TrialSignup;
-          
+          style={styles.navItem}
+          onPress={() => navigation.navigate('AppointmentList')}
+        >
+          <Feather name="calendar" size={24} color="white" />
+          <Text style={styles.navText}>Appointments</Text>
+        </TouchableOpacity>
+        <TouchableOpacity>
+          <LinearGradient
+            colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.clipperButton}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
+          <Feather name="trending-up" size={24} color="white" />
+          <Text style={styles.navText}>Analytics</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
+          <Feather name="user" size={24} color="white" />
+          <Text style={styles.navText}>Profile</Text>
+        </TouchableOpacity>
+      </View>
+    </LinearGradient>
+  );
+};
+
+const { width } = Dimensions.get('window');
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+  },
+  backButton: {
+    padding: 10,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  topRightImage: {
+    padding: 10,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  headerContainer: {
+    marginBottom: 25,
+    alignItems: 'center',
+  },
+  mainTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#BBBBBB',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  pricingContainer: {
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FF0000',
+    padding: 20,
+    marginBottom: 25,
+    alignItems: 'center',
+    shadowColor: '#FF0000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  pricingHeader: {
+    alignItems: 'center',
+  },
+  pricingTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 15,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  currency: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginTop: 5,
+  },
+  price: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  periodContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+  },
+  cents: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  period: {
+    fontSize: 16,
+    color: '#BBBBBB',
+  },
+  billingInfo: {
+    fontSize: 14,
+    color: '#BBBBBB',
+    marginTop: 10,
+  },
+  featureCategory: {
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#444444',
+    padding: 20,
+    marginBottom: 20,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  categoryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginLeft: 10,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  featureText: {
+    fontSize: 15,
+    color: '#DDDDDD',
+    marginLeft: 10,
+  },
+  cardContainer: {
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#444444',
+    padding: 20,
+    marginBottom: 25,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 10,
+  },
+  cardDescription: {
+    fontSize: 14,
+    color: '#BBBBBB',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  fieldLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  cardField: {
+    width: '100%',
+    height: 50,
+    marginBottom: 15,
+  },
+  cardStyle: {
+    backgroundColor: '#222222',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#444444',
+    textColor: '#FFFFFF',
+    placeholderColor: '#999999',
+    fontSize: 16,
+  },
+  securityNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  securityText: {
+    color: '#BBBBBB',
+    fontSize: 14,
+    marginLeft: 8,
+  },
+  startTrialButton: {
+    backgroundColor: '#FF0000',
+    borderRadius: 10,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  startTrialText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  disabledButton: {
+    backgroundColor: '#661111',
+    opacity: 0.7,
+  },
+  loadingButton: {
+    backgroundColor: '#FF0000',
+    opacity: 0.8,
+  },
+  guaranteeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 30,
+  },
+  guaranteeText: {
+    color: '#BBBBBB',
+    fontSize: 14,
+    marginLeft: 8,
+    textAlign: 'center',
+  },
+  navbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    paddingVertical: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  navItem: {
+    alignItems: 'center',
+  },
+  navText: {
+    color: 'white',
+    fontSize: 12,
+    marginTop: 5,
+  },
+  clipperButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: -25,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+  },
+  // New styles for billing info and payment method selection
+  input: {
+    backgroundColor: '#222222',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#444444',
+    color: '#FFFFFF',
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    width: '100%',
+  },
+  inputRow: {
+    marginBottom: 15,
+  },
+  inputRowHalf: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  halfInput: {
+    width: '48%',
+  },
+  paymentMethodContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  paymentMethodOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#222222',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#444444',
+    padding: 15,
+    width: '48%',
+  },
+  selectedPaymentMethod: {
+    borderColor: '#FF0000',
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+  },
+  paymentMethodText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginLeft: 10,
+  },
+  selectedPaymentMethodText: {
+    color: '#FF0000',
+    fontWeight: 'bold',
+  },
+});
+
+export default TrialSignup;

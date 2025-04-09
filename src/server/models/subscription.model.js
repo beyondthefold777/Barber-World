@@ -6,11 +6,7 @@ const SubscriptionSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  shopId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Shop',
-    required: true
-  },
+  // shopId field removed completely
   stripeCustomerId: {
     type: String,
     required: true

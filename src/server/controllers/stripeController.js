@@ -12,17 +12,16 @@ if (!process.env.STRIPE_SECRET_KEY) {
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Subscription = require('../models/subscription.model');
 const User = require('../models/User');
-const Shop = require('../models/shop.model');
 
 // Create a checkout session for subscription
 exports.createCheckoutSession = async (req, res) => {
   try {
-    const { userId, shopId, planType } = req.body;
+    const { userId, planType } = req.body;
     
-    if (!userId || !shopId) {
+    if (!userId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID and Shop ID are required'
+        message: 'User ID is required'
       });
     }
     
@@ -35,25 +34,15 @@ exports.createCheckoutSession = async (req, res) => {
       });
     }
     
-    // Find the shop
-    const shop = await Shop.findById(shopId);
-    if (!shop) {
-      return res.status(404).json({
-        success: false,
-        message: 'Shop not found'
-      });
-    }
-    
-    // Check if user already has a subscription for this shop
+    // Check if user already has a subscription
     const existingSubscription = await Subscription.findOne({
-      userId,
-      shopId
+      userId
     });
     
     if (existingSubscription && existingSubscription.status === 'active') {
       return res.status(400).json({
         success: false,
-        message: 'User already has an active subscription for this shop'
+        message: 'User already has an active subscription'
       });
     }
     
@@ -96,7 +85,6 @@ exports.createCheckoutSession = async (req, res) => {
       cancel_url: `${process.env.CLIENT_URL || 'https://barberworld.app'}/subscription/cancel`,
       metadata: {
         userId: userId,
-        shopId: shopId,
         planType: planType
       }
     });
@@ -119,14 +107,33 @@ exports.createCheckoutSession = async (req, res) => {
 // Create a trial subscription with payment method
 exports.createTrial = async (req, res) => {
   try {
-    const { userId, shopId, planType = 'monthly', paymentMethodId } = req.body;
+    const { 
+      userId, 
+      planType = 'monthly', 
+      paymentMethodId, 
+      name, 
+      email, 
+      address, 
+      city, 
+      state, 
+      zipCode, 
+      country = 'US' 
+    } = req.body;
     
-    console.log('Received trial signup request:', { userId, shopId, planType, hasPaymentMethod: !!paymentMethodId });
+    console.log('Received trial signup request:', { 
+      userId, 
+      planType, 
+      hasPaymentMethod: !!paymentMethodId,
+      address,
+      city,
+      state,
+      zipCode
+    });
 
-    if (!userId || !shopId) {
+    if (!userId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID and Shop ID are required'
+        message: 'User ID is required'
       });
     }
     
@@ -139,25 +146,15 @@ exports.createTrial = async (req, res) => {
       });
     }
     
-    // Find the shop
-    const shop = await Shop.findById(shopId);
-    if (!shop) {
-      return res.status(404).json({
-        success: false,
-        message: 'Shop not found'
-      });
-    }
-    
-    // Check if user already has a subscription for this shop
+    // Check if user already has a subscription
     const existingSubscription = await Subscription.findOne({
-      userId,
-      shopId
+      userId
     });
     
     if (existingSubscription) {
       return res.status(400).json({
         success: false,
-        message: 'User already has a subscription for this shop'
+        message: 'User already has a subscription'
       });
     }
     
@@ -190,12 +187,23 @@ exports.createTrial = async (req, res) => {
     } else {
       // Create a new customer
       const customerData = {
-        email: user.email,
-        name: `${user.firstName} ${user.lastName}`,
+        email: email || user.email,
+        name: name || `${user.firstName} ${user.lastName}`,
         metadata: {
           userId: user._id.toString()
         }
       };
+      
+      // Add address if all fields are provided
+      if (address && city && state && zipCode) {
+        customerData.address = {
+          line1: address,
+          city: city,
+          state: state,
+          postal_code: zipCode,
+          country: country
+        };
+      }
       
       // If payment method provided, add it to customer creation
       if (paymentMethodId) {
@@ -211,7 +219,24 @@ exports.createTrial = async (req, res) => {
       
       // Update user with Stripe customer ID
       user.stripeCustomerId = stripeCustomerId;
-      await user.save();
+    }
+    
+    // Update user fields if they exist in the request
+    // Using findByIdAndUpdate to avoid validation errors
+    const updateFields = {};
+    if (address) updateFields.address = address;
+    if (city) updateFields.city = city;
+    if (state) updateFields.state = state;
+    if (zipCode) updateFields.zipCode = zipCode;
+    if (country) updateFields.country = country;
+    if (stripeCustomerId) updateFields.stripeCustomerId = stripeCustomerId;
+    
+    // Only update if there are fields to update
+    if (Object.keys(updateFields).length > 0) {
+      await User.findByIdAndUpdate(userId, updateFields, { 
+        new: true,
+        runValidators: false // Skip validation
+      });
     }
     
     // Use the price ID from environment variables
@@ -224,7 +249,6 @@ exports.createTrial = async (req, res) => {
       trial_period_days: 14,
       metadata: {
         userId: userId,
-        shopId: shopId,
         planType: planType
       }
     });
@@ -235,7 +259,6 @@ exports.createTrial = async (req, res) => {
     // Create subscription in database
     const subscriptionRecord = await Subscription.create({
       userId,
-      shopId,
       stripeCustomerId,
       stripeSubscriptionId: subscription.id,
       status: subscription.status,
@@ -265,6 +288,7 @@ exports.createTrial = async (req, res) => {
   }
 };
 
+
 // Handle subscription success
 exports.handleSubscriptionSuccess = async (req, res) => {
   try {
@@ -284,7 +308,7 @@ exports.handleSubscriptionSuccess = async (req, res) => {
     const subscription = await stripe.subscriptions.retrieve(session.subscription);
     
     // Get metadata from the session
-    const { userId, shopId, planType } = session.metadata;
+    const { userId, planType } = session.metadata;
     
     // Calculate trial end date (14 days from now)
     const trialEndDate = new Date();
@@ -292,8 +316,7 @@ exports.handleSubscriptionSuccess = async (req, res) => {
     
     // Create or update subscription in database
     let subscriptionRecord = await Subscription.findOne({
-      userId,
-      shopId
+      userId
     });
     
     if (subscriptionRecord) {
@@ -311,7 +334,6 @@ exports.handleSubscriptionSuccess = async (req, res) => {
       // Create new subscription
       subscriptionRecord = await Subscription.create({
         userId,
-        shopId,
         stripeCustomerId: session.customer,
         stripeSubscriptionId: session.subscription,
         status: subscription.status,
@@ -345,7 +367,6 @@ exports.handleSubscriptionSuccess = async (req, res) => {
 exports.getSubscription = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { shopId } = req.query;
     
     if (!userId) {
       return res.status(400).json({
@@ -354,14 +375,8 @@ exports.getSubscription = async (req, res) => {
       });
     }
     
-    // Build query
-    const query = { userId };
-    if (shopId) {
-      query.shopId = shopId;
-    }
-    
     // Find subscription in database
-    const subscription = await Subscription.findOne(query);
+    const subscription = await Subscription.findOne({ userId });
     
     if (!subscription) {
       return res.status(404).json({
@@ -393,8 +408,7 @@ exports.getSubscription = async (req, res) => {
         planType: subscription.planType,
         currentPeriodEnd: subscription.currentPeriodEnd,
         trialEndDate: subscription.trialEndDate,
-        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
-        shopId: subscription.shopId
+        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd
       }
     });
   } catch (error) {
@@ -411,20 +425,16 @@ exports.getSubscription = async (req, res) => {
 exports.cancelSubscription = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { shopId } = req.body;
     
-    if (!userId || !shopId) {
+    if (!userId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID and Shop ID are required'
+        message: 'User ID is required'
       });
     }
     
     // Find subscription in database
-    const subscription = await Subscription.findOne({
-      userId,
-      shopId
-    });
+    const subscription = await Subscription.findOne({ userId });
     
     if (!subscription) {
       return res.status(404).json({
@@ -466,20 +476,16 @@ exports.cancelSubscription = async (req, res) => {
 exports.reactivateSubscription = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { shopId } = req.body;
     
-    if (!userId || !shopId) {
+    if (!userId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID and Shop ID are required'
+        message: 'User ID is required'
       });
     }
     
     // Find subscription in database
-    const subscription = await Subscription.findOne({
-      userId,
-      shopId
-    });
+    const subscription = await Subscription.findOne({ userId });
     
     if (!subscription) {
       return res.status(404).json({
@@ -539,9 +545,7 @@ exports.handleWebhook = async (req, res) => {
     console.error('Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
-
   console.log('Received Stripe webhook event:', event.type);
-
   try {
     switch (event.type) {
       case 'checkout.session.completed':
@@ -578,7 +582,6 @@ exports.handleWebhook = async (req, res) => {
 // Helper functions for webhook event handling
 async function handleCheckoutSessionCompleted(session) {
   console.log('Processing checkout.session.completed event');
-
   try {
     // Only process subscription checkouts
     if (session.mode !== 'subscription') {
@@ -586,10 +589,10 @@ async function handleCheckoutSessionCompleted(session) {
       return;
     }
     
-    const { userId, shopId, planType } = session.metadata;
+    const { userId, planType } = session.metadata;
     
-    if (!userId || !shopId) {
-      console.error('Missing userId or shopId in session metadata');
+    if (!userId) {
+      console.error('Missing userId in session metadata');
       return;
     }
     
@@ -602,8 +605,7 @@ async function handleCheckoutSessionCompleted(session) {
     
     // Create or update subscription in database
     let subscriptionRecord = await Subscription.findOne({
-      userId,
-      shopId
+      userId
     });
     
     if (subscriptionRecord) {
@@ -624,7 +626,6 @@ async function handleCheckoutSessionCompleted(session) {
       
       subscriptionRecord = await Subscription.create({
         userId,
-        shopId,
         stripeCustomerId: session.customer,
         stripeSubscriptionId: session.subscription,
         status: subscription.status,
@@ -644,7 +645,6 @@ async function handleCheckoutSessionCompleted(session) {
 
 async function handleInvoicePaymentSucceeded(invoice) {
   console.log('Processing invoice.payment_succeeded event');
-
   try {
     if (!invoice.subscription) {
       console.log('Invoice not related to a subscription, skipping');
@@ -678,7 +678,6 @@ async function handleInvoicePaymentSucceeded(invoice) {
 
 async function handleInvoicePaymentFailed(invoice) {
   console.log('Processing invoice.payment_failed event');
-
   try {
     if (!invoice.subscription) {
       console.log('Invoice not related to a subscription, skipping');
@@ -713,7 +712,6 @@ async function handleInvoicePaymentFailed(invoice) {
 
 async function handleSubscriptionUpdated(subscription) {
   console.log('Processing customer.subscription.updated event');
-
   try {
     // Find the subscription in our database
     const subscriptionRecord = await Subscription.findOne({
@@ -740,7 +738,6 @@ async function handleSubscriptionUpdated(subscription) {
 
 async function handleSubscriptionDeleted(subscription) {
   console.log('Processing customer.subscription.deleted event');
-
   try {
     // Find the subscription in our database
     const subscriptionRecord = await Subscription.findOne({
