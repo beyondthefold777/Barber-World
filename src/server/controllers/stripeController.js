@@ -120,9 +120,9 @@ exports.createTrial = async (req, res) => {
       country = 'US' 
     } = req.body;
     
-    console.log('Received trial signup request:', { 
-      userId, 
-      planType, 
+    console.log('Received trial signup request:', {
+      userId,
+      planType,
       hasPaymentMethod: !!paymentMethodId,
       address,
       city,
@@ -140,6 +140,7 @@ exports.createTrial = async (req, res) => {
     // Find the user
     const user = await User.findById(userId);
     if (!user) {
+      console.log('User not found with ID:', userId);
       return res.status(404).json({
         success: false,
         message: 'User not found'
@@ -233,8 +234,8 @@ exports.createTrial = async (req, res) => {
     
     // Only update if there are fields to update
     if (Object.keys(updateFields).length > 0) {
-      await User.findByIdAndUpdate(userId, updateFields, { 
-        new: true,
+      await User.findByIdAndUpdate(userId, updateFields, {
+         new: true,
         runValidators: false // Skip validation
       });
     }
@@ -243,41 +244,84 @@ exports.createTrial = async (req, res) => {
     const priceId = process.env.STRIPE_PRICE_ID;
     
     // Create a subscription with a trial period
-    const subscription = await stripe.subscriptions.create({
-      customer: stripeCustomerId,
-      items: [{ price: priceId }],
-      trial_period_days: 14,
-      metadata: {
-        userId: userId,
-        planType: planType
+    console.log('Creating subscription with trial for customer:', stripeCustomerId);
+    try {
+      const subscription = await stripe.subscriptions.create({
+        customer: stripeCustomerId,
+        items: [{ price: priceId }],
+        trial_period_days: 14,
+        metadata: {
+          userId: userId,
+          planType: planType
+        }
+      });
+      
+      console.log('Subscription created successfully:', subscription.id);
+      
+      // Calculate trial end date
+      let trialEndDate = new Date();
+      if (subscription.trial_end && typeof subscription.trial_end === 'number') {
+        trialEndDate = new Date(subscription.trial_end * 1000);
+      } else {
+        // Fallback: set trial end date to current date + 14 days
+        trialEndDate.setDate(trialEndDate.getDate() + 14);
       }
-    });
-    
-    // Calculate trial end date
-    const trialEndDate = new Date(subscription.trial_end * 1000);
-    
-    // Create subscription in database
-    const subscriptionRecord = await Subscription.create({
-      userId,
-      stripeCustomerId,
-      stripeSubscriptionId: subscription.id,
-      status: subscription.status,
-      planType,
-      trialEndDate,
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-      cancelAtPeriodEnd: subscription.cancel_at_period_end
-    });
-    
-    res.status(200).json({
-      success: true,
-      message: 'Trial subscription created successfully',
-      subscription: {
-        id: subscriptionRecord._id,
-        status: subscriptionRecord.status,
-        trialEndDate: subscriptionRecord.trialEndDate,
-        currentPeriodEnd: subscriptionRecord.currentPeriodEnd
+      
+      // Ensure current_period_end is a valid timestamp before converting to Date
+      let currentPeriodEnd;
+      if (subscription.current_period_end && typeof subscription.current_period_end === 'number') {
+        currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+      } else {
+        // Fallback: set current period end to trial end date + 30 days
+        currentPeriodEnd = new Date(trialEndDate);
+        currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30);
       }
-    });
+      
+      // Validate dates before creating subscription record
+      if (isNaN(trialEndDate.getTime())) {
+        console.error('Invalid trial end date detected, using current date + 14 days');
+        trialEndDate = new Date();
+        trialEndDate.setDate(trialEndDate.getDate() + 14);
+      }
+      
+      if (isNaN(currentPeriodEnd.getTime())) {
+        console.error('Invalid current period end date detected, using trial end date + 30 days');
+        currentPeriodEnd = new Date(trialEndDate);
+        currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30);
+      }
+      
+      // Create subscription in database
+      const subscriptionRecord = await Subscription.create({
+        userId,
+        stripeCustomerId,
+        stripeSubscriptionId: subscription.id,
+        status: subscription.status,
+        planType,
+        trialEndDate,
+        currentPeriodEnd,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end
+      });
+      
+      console.log('Subscription record created in database:', subscriptionRecord._id);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Trial subscription created successfully',
+        subscription: {
+          id: subscriptionRecord._id,
+          status: subscriptionRecord.status,
+          trialEndDate: subscriptionRecord.trialEndDate,
+          currentPeriodEnd: subscriptionRecord.currentPeriodEnd
+        }
+      });
+    } catch (subscriptionError) {
+      console.error('Error creating Stripe subscription:', subscriptionError);
+      res.status(500).json({
+        success: false,
+        message: 'Error creating trial subscription',
+        error: subscriptionError.message
+      });
+    }
   } catch (error) {
     console.error('Error creating trial subscription:', error);
     res.status(500).json({
@@ -287,6 +331,7 @@ exports.createTrial = async (req, res) => {
     });
   }
 };
+
 
 
 // Handle subscription success
