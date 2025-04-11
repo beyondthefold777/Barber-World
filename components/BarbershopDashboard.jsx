@@ -74,7 +74,10 @@ const BarbershopDashboard = () => {
       title: "Marketing Center",
       items: [
         "Promotions Manager",
-        "Boost Campaigns",
+        {
+          label: "Boost Campaigns",
+          screen: "BoostCampaign"
+        },
         "Social Media Integration",
         "Client Reviews",
         "Message Blasts",

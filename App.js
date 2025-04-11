@@ -37,6 +37,9 @@ import PaymentHistoryScreen from './components/financial/PaymentHistoryScreen';
 // Shop Settings Screens
 import CustomizeShopScreen from './components/shopsettings/CustomizeShopScreen';
 
+// Marketing Center Screens
+import BoostCampaignScreen from './components/marketcenter/BoostCampaignScreen';
+
 // Stripe publishable key - replace with your actual key
 const STRIPE_PUBLISHABLE_KEY = "pk_live_51R84BeG26bbnswX58Tc2UsjudsmU18MUdLXNNmFfd9Rdl3cGu0aKK0qLHBgZilHqoVRRYxtqWw5KP6UuZWT3hPXr00nH8YHsqC";
 
@@ -128,6 +131,16 @@ const App = () => {
                 options={{
                   headerShown: true,
                   title: 'Customize Shop'
+                }}
+              />
+              
+              {/* Marketing Center Screens */}
+              <Stack.Screen 
+                name="BoostCampaign"
+                component={BoostCampaignScreen}
+                options={{
+                  headerShown: true,
+                  title: 'Boost Campaigns'
                 }}
               />
             </Stack.Navigator>
