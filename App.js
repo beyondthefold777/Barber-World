@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useState, useEffect } from 'react';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { PaperProvider } from 'react-native-paper';
-import { StripeProvider } from '@stripe/stripe-react-native';
+import { View, Text } from 'react-native';
 
 // Import AuthProvider
 import { AuthProvider } from './context/AuthContext';
@@ -37,11 +37,19 @@ import PaymentHistoryScreen from './components/financial/PaymentHistoryScreen';
 // Shop Settings Screens
 import CustomizeShopScreen from './components/shopsettings/CustomizeShopScreen';
 
-// Marketing Center Screens
-import BoostCampaignScreen from './components/marketcenter/BoostCampaignScreen';
+// Import the actual SettingsScreen
+import SettingsScreen from './components/settings/SettingsScreen';
 
-// Stripe publishable key - replace with your actual key
-const STRIPE_PUBLISHABLE_KEY = "pk_live_51R84BeG26bbnswX58Tc2UsjudsmU18MUdLXNNmFfd9Rdl3cGu0aKK0qLHBgZilHqoVRRYxtqWw5KP6UuZWT3hPXr00nH8YHsqC";
+// Create placeholder components for the other settings screens
+const PaymentMethodsScreen = () => <View style={{flex: 1, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center'}}><Text style={{color: 'white'}}>Payment Methods Screen</Text></View>;
+const ChangePasswordScreen = () => <View style={{flex: 1, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center'}}><Text style={{color: 'white'}}>Change Password Screen</Text></View>;
+const AccountDetailsScreen = () => <View style={{flex: 1, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center'}}><Text style={{color: 'white'}}>Account Details Screen</Text></View>;
+const ContactSupportScreen = () => <View style={{flex: 1, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center'}}><Text style={{color: 'white'}}>Contact Support Screen</Text></View>;
+const HelpCenterScreen = () => <View style={{flex: 1, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center'}}><Text style={{color: 'white'}}>Help Center Screen</Text></View>;
+const ForgotPasswordScreen = () => <View style={{flex: 1, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center'}}><Text style={{color: 'white'}}>Forgot Password Screen</Text></View>;
+const TermsOfServiceScreen = () => <View style={{flex: 1, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center'}}><Text style={{color: 'white'}}>Terms of Service Screen</Text></View>;
+const PrivacyPolicyScreen = () => <View style={{flex: 1, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center'}}><Text style={{color: 'white'}}>Privacy Policy Screen</Text></View>;
+const FeedbackScreen = () => <View style={{flex: 1, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center'}}><Text style={{color: 'white'}}>Feedback Screen</Text></View>;
 
 const Stack = createStackNavigator();
 
@@ -68,87 +76,87 @@ const App = () => {
   }
 
   return (
-    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
-      <AuthProvider>
-        <PaperProvider>
-          <NavigationContainer>
-            <Stack.Navigator 
-              initialRouteName="Splash"
-              screenOptions={{
-                headerShown: false,
-                headerStyle: {
-                  backgroundColor: '#000000',
-                },
-                headerTintColor: '#FFFFFF',
-                headerTitleStyle: {
-                  fontWeight: 'bold',
-                },
+    <AuthProvider>
+      <PaperProvider>
+        <NavigationContainer>
+          <Stack.Navigator 
+            initialRouteName="Splash"
+            screenOptions={{
+              headerShown: false,
+              headerStyle: {
+                backgroundColor: '#000000',
+              },
+              headerTintColor: '#FFFFFF',
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
+            }}
+          >
+            <Stack.Screen name="Splash" component={SplashScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="GuestLandingPage" component={GuestLandingPage} />
+            <Stack.Screen name="LandingPage" component={LandingPage} />
+            <Stack.Screen name="SchedulingScreen" component={SchedulingScreen} />
+            <Stack.Screen name="BarbershopDashboard" component={BarbershopDashboard} />
+            <Stack.Screen name="TrialSignup" component={TrialSignup} />
+            <Stack.Screen 
+              name="AppointmentList"
+              component={AppointmentList}
+              options={{
+                headerShown: true,
+                title: 'Appointments'
               }}
-            >
-              <Stack.Screen name="Splash" component={SplashScreen} />
-              <Stack.Screen name="Register" component={RegisterScreen} />
-              <Stack.Screen name="Login" component={LoginScreen} />
-              <Stack.Screen name="GuestLandingPage" component={GuestLandingPage} />
-              <Stack.Screen name="LandingPage" component={LandingPage} />
-              <Stack.Screen name="SchedulingScreen" component={SchedulingScreen} />
-              <Stack.Screen name="BarbershopDashboard" component={BarbershopDashboard} />
-              <Stack.Screen name="TrialSignup" component={TrialSignup} />
-              <Stack.Screen 
-                name="AppointmentList"
-                component={AppointmentList}
-                options={{
-                  headerShown: true,
-                  title: 'Appointments'
-                }}
-              />
-              
-              {/* Add AppointmentsScreen */}
-              <Stack.Screen 
-                name="AppointmentsScreen"
-                component={AppointmentsScreen}
-                options={{ headerShown: false }}
-              />
-              
-              {/* Add BarbershopDetail Screen */}
-              <Stack.Screen 
-                name="BarbershopDetail"
-                component={BarbershopDetail}
-                options={{ headerShown: false }}
-              />
+            />
+            
+            {/* Add AppointmentsScreen */}
+            <Stack.Screen 
+              name="AppointmentsScreen"
+              component={AppointmentsScreen}
+              options={{ headerShown: false }}
+            />
+            
+            {/* Add BarbershopDetail Screen */}
+            <Stack.Screen 
+              name="BarbershopDetail"
+              component={BarbershopDetail}
+              options={{ headerShown: false }}
+            />
 
-              {/* Financial Hub Screens */}
-              <Stack.Screen name="TaxForms" component={TaxFormsScreen} options={{ headerShown: true }} />
-              <Stack.Screen name="WriteOffs" component={WriteOffsScreen} options={{ headerShown: true }} />
-              <Stack.Screen name="Expenses" component={ExpensesScreen} options={{ headerShown: true }} />
-              <Stack.Screen name="PaySchedule" component={PayScheduleScreen} options={{ headerShown: true }} />
-              <Stack.Screen name="ProjectedIncome" component={ProjectedIncomeScreen} options={{ headerShown: true }} />
-              <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ headerShown: true }} />
+            {/* Financial Hub Screens */}
+            <Stack.Screen name="TaxForms" component={TaxFormsScreen} options={{ headerShown: true }} />
+            <Stack.Screen name="WriteOffs" component={WriteOffsScreen} options={{ headerShown: true }} />
+            <Stack.Screen name="Expenses" component={ExpensesScreen} options={{ headerShown: true }} />
+            <Stack.Screen name="PaySchedule" component={PayScheduleScreen} options={{ headerShown: true }} />
+            <Stack.Screen name="ProjectedIncome" component={ProjectedIncomeScreen} options={{ headerShown: true }} />
+            <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ headerShown: true }} />
 
-              {/* Shop Settings Screens */}
-              <Stack.Screen 
-                name="CustomizeShop"
-                component={CustomizeShopScreen}
-                options={{
-                  headerShown: true,
-                  title: 'Customize Shop'
-                }}
-              />
-              
-              {/* Marketing Center Screens */}
-              <Stack.Screen 
-                name="BoostCampaign"
-                component={BoostCampaignScreen}
-                options={{
-                  headerShown: true,
-                  title: 'Boost Campaigns'
-                }}
-              />
-            </Stack.Navigator>
-            <StatusBar style="light" />
-          </NavigationContainer>
-        </PaperProvider>
-      </AuthProvider>
-    </StripeProvider>
+            {/* Shop Settings Screens */}
+            <Stack.Screen 
+              name="CustomizeShop"
+              component={CustomizeShopScreen}
+              options={{
+                headerShown: true,
+                title: 'Customize Shop'
+              }}
+            />
+
+            {/* Settings Screens */}
+            <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} options={{ headerShown: true, title: 'Payment Methods' }} />
+            <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: true, title: 'Change Password' }} />
+            <Stack.Screen name="AccountDetails" component={AccountDetailsScreen} options={{ headerShown: true, title: 'Account Details' }} />
+            <Stack.Screen name="ContactSupport" component={ContactSupportScreen} options={{ headerShown: true, title: 'Contact Support' }} />
+            <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: true, title: 'Help Center' }} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ headerShown: true, title: 'Forgot Password' }} />
+            <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: true, title: 'Terms of Service' }} />
+            <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ headerShown: true, title: 'Privacy Policy' }} />
+            <Stack.Screen name="Feedback" component={FeedbackScreen} options={{ headerShown: true, title: 'Send Feedback' }} />
+          </Stack.Navigator>
+          <StatusBar style="light" />
+        </NavigationContainer>
+      </PaperProvider>
+    </AuthProvider>
   );
 };
 

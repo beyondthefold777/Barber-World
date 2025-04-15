@@ -54,7 +54,6 @@ const GuestLandingPage = ({ navigation }) => {
       
       // Use the existing searchBarbershops method from authService
       const results = await authService.searchBarbershops(searchParams);
-      console.log('Search results received:', results.length);
       setSearchResults(results);
     } catch (error) {
       console.error('Search error:', error);
@@ -64,7 +63,7 @@ const GuestLandingPage = ({ navigation }) => {
     }
   };
 
-  // Updated renderBarbershop function with proper address handling
+  // Updated renderBarbershop function with safety checks
   const renderBarbershop = ({ item }) => {
     // Make sure item has an _id before trying to use it
     if (!item || !item._id) {
@@ -72,66 +71,14 @@ const GuestLandingPage = ({ navigation }) => {
       return null;
     }
     
-    // Format the address for display
-    const formatAddress = () => {
-      if (item.address && typeof item.address === 'object') {
-        return item.address.street || '';
-      } else if (typeof item.address === 'string') {
-        return item.address;
-      }
-      return '';
-    };
-    
-    // Format the location (city, state, zip)
-    const formatLocation = () => {
-      let city = '';
-      let state = '';
-      let zip = '';
-      
-      // Try to get values from both possible locations
-      if (item.address && typeof item.address === 'object') {
-        city = item.address.city || item.city || '';
-        state = item.address.state || item.state || '';
-        zip = item.address.zip || item.address.zipCode || item.zipCode || '';
-      } else {
-        city = item.city || '';
-        state = item.state || '';
-        zip = item.zipCode || '';
-      }
-      
-      let location = '';
-      
-      if (city) {
-        location += city;
-      }
-      
-      if (city && state) {
-        location += ', ';
-      }
-      
-      if (state) {
-        location += state;
-      }
-      
-      if ((city || state) && zip) {
-        location += ' ';
-      }
-      
-      if (zip) {
-        location += zip;
-      }
-      
-      return location || '';
-    };
-    
     return (
       <TouchableOpacity 
         style={styles.barbershopCard}
         onPress={() => navigation.navigate('BarbershopDetail', { shopId: item._id })}
       >
-        <Text style={styles.barbershopName}>{item.name || item.businessName || 'Unnamed Barbershop'}</Text>
-        <Text style={styles.barbershopAddress}>{formatAddress()}</Text>
-        <Text style={styles.barbershopLocation}>{formatLocation()}</Text>
+        <Text style={styles.barbershopName}>{item.businessName || item.name}</Text>
+        <Text style={styles.barbershopAddress}>{item.address}</Text>
+        <Text style={styles.barbershopLocation}>{`${item.city}, ${item.state} ${item.zipCode || ''}`}</Text>
       </TouchableOpacity>
     );
   };
@@ -142,7 +89,6 @@ const GuestLandingPage = ({ navigation }) => {
       style={styles.container}
     >
       <StatusBar barStyle="light-content" translucent={true} backgroundColor="transparent" />
-
       {/* Hamburger Menu Button */}
       <TouchableOpacity 
         style={styles.menuButton}
@@ -150,7 +96,6 @@ const GuestLandingPage = ({ navigation }) => {
       >
         <Feather name="menu" size={24} color="white" />
       </TouchableOpacity>
-
       {/* Animated Sidebar */}
       <Animated.View 
         style={[
@@ -167,12 +112,10 @@ const GuestLandingPage = ({ navigation }) => {
           <TouchableOpacity onPress={toggleMenu} style={styles.closeButton}>
             <Feather name="x" size={24} color="white" />
           </TouchableOpacity>
-
           <View style={styles.sidebarHeader}>
             <Text style={styles.sidebarTitle}>Business Center</Text>
             <View style={styles.titleUnderline} />
           </View>
-
           <View style={styles.sidebarContent}>
             <ScrollView 
               showsVerticalScrollIndicator={true}
@@ -184,22 +127,55 @@ const GuestLandingPage = ({ navigation }) => {
               <Text style={styles.sidebarSection}>Marketing & Promotions</Text>
               <Text style={styles.sidebarSection}>Communication Hub</Text>
               <Text style={styles.sidebarSection}>Analytics & Reports</Text>
-              <Text style={styles.sidebarSection}>Settings</Text>
+              
+              {/* Settings Section with Navigation */}
+              <TouchableOpacity 
+                onPress={() => {
+                  toggleMenu(); // Close the menu
+                  navigation.navigate('Settings'); // Navigate to Settings
+                }}
+              >
+                <Text style={styles.sidebarSection}>Settings</Text>
+              </TouchableOpacity>
+              
               <Text style={styles.sidebarSection}>Support & Resources</Text>
             </ScrollView>
           </View>
-
           <View style={styles.sidebarFooter}>
-            <TouchableOpacity style={styles.footerLink}>
+            <TouchableOpacity 
+              style={styles.footerLink}
+              onPress={() => {
+                toggleMenu();
+                navigation.navigate('TermsOfService');
+              }}
+            >
               <Text style={styles.footerText}>Terms of Service</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.footerLink}>
+            <TouchableOpacity 
+              style={styles.footerLink}
+              onPress={() => {
+                toggleMenu();
+                navigation.navigate('PrivacyPolicy');
+              }}
+            >
               <Text style={styles.footerText}>Privacy Policy</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.footerLink}>
+            <TouchableOpacity 
+              style={styles.footerLink}
+              onPress={() => {
+                toggleMenu();
+                navigation.navigate('ContactSupport');
+              }}
+            >
               <Text style={styles.footerText}>Contact Us</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.footerLink}>
+            <TouchableOpacity 
+              style={styles.footerLink}
+              onPress={() => {
+                toggleMenu();
+                navigation.navigate('HelpCenter');
+              }}
+            >
               <Text style={styles.footerText}>Help Center</Text>
             </TouchableOpacity>
             <TouchableOpacity 
@@ -212,7 +188,6 @@ const GuestLandingPage = ({ navigation }) => {
           </View>
         </LinearGradient>
       </Animated.View>
-
       {/* Top Right Image */}
       <View style={styles.topRightImage}>
         <Image 
@@ -220,7 +195,6 @@ const GuestLandingPage = ({ navigation }) => {
           style={{width: 50, height: 50}}
         />
       </View>
-
       {/* Main Content Area */}
       <ScrollView style={styles.content}>
         <View style={styles.searchSection}>
@@ -247,7 +221,6 @@ const GuestLandingPage = ({ navigation }) => {
               <Text style={styles.searchTypeText}>ZIP Code</Text>
             </TouchableOpacity>
           </View>
-
           {searchType === 'location' ? (
             <View style={styles.locationInputs}>
               <TextInput
@@ -277,7 +250,6 @@ const GuestLandingPage = ({ navigation }) => {
               maxLength={5}
             />
           )}
-
           <TouchableOpacity 
             style={styles.searchButton}
             onPress={handleSearch}
@@ -288,7 +260,6 @@ const GuestLandingPage = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
         </View>
-
         <FlatList
           data={searchResults}
           renderItem={renderBarbershop}
@@ -301,7 +272,6 @@ const GuestLandingPage = ({ navigation }) => {
             </Text>
           }
         />
-
         <TouchableOpacity 
           style={styles.barberSignup}
           onPress={() => navigation.navigate('Register')}
@@ -309,14 +279,12 @@ const GuestLandingPage = ({ navigation }) => {
           <Text style={styles.signupText}>Barbershop? List Your Shop</Text>
         </TouchableOpacity>
       </ScrollView>
-
       {/* Bottom Navigation Bar */}
       <View style={styles.navbar}>
         <TouchableOpacity style={styles.navItem}>
           <Feather name="home" size={24} color="white" />
           <Text style={styles.navText}>Home</Text>
         </TouchableOpacity>
-
         <TouchableOpacity 
           style={styles.navItem}
           onPress={() => navigation.navigate('AppointmentsScreen')}
@@ -324,7 +292,6 @@ const GuestLandingPage = ({ navigation }) => {
           <Feather name="calendar" size={24} color="white" />
           <Text style={styles.navText}>Appointments</Text>
         </TouchableOpacity>
-
         <TouchableOpacity>
           <LinearGradient
             colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
@@ -333,13 +300,14 @@ const GuestLandingPage = ({ navigation }) => {
             style={styles.clipperButton}
           />
         </TouchableOpacity>
-
         <TouchableOpacity style={styles.navItem}>
           <Feather name="search" size={24} color="white" />
           <Text style={styles.navText}>Find Shops</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => navigation.navigate('Settings')}
+        >
           <Feather name="user" size={24} color="white" />
           <Text style={styles.navText}>Profile</Text>
         </TouchableOpacity>
@@ -508,34 +476,24 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   barbershopCard: {
-    backgroundColor: '#000000',
-    padding: 18,
-    borderRadius: 12,
+    backgroundColor: '#222',
+    padding: 15,
+    borderRadius: 8,
     marginBottom: 15,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
   },
   barbershopName: {
-    color: '#FFFFFF',
-    fontSize: 20,
+    color: 'white',
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 8,
-    textShadowColor: 'rgba(255, 255, 255, 0.5)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  barbershopAddress: {
-    color: '#E0E0E0',
-    fontSize: 16,
     marginBottom: 5,
   },
+  barbershopAddress: {
+    color: '#CCC',
+    fontSize: 14,
+    marginBottom: 3,
+  },
   barbershopLocation: {
-    color: '#BBBBBB',
+    color: '#999',
     fontSize: 14,
     marginBottom: 5,
   },
