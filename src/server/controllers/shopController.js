@@ -354,82 +354,218 @@ const shopController = {
     }
   },
 
-  // Add a review to a shop
   addReview: async (req, res, next) => {
     try {
-      const userId = req.user.userId;
       const { shopId } = req.params;
-      const { rating, comment } = req.body;
+      const { rating, text } = req.body;
       
-      if (!rating) {
-        return res.status(400).json({ success: false, message: 'Rating is required' });
+      console.log(`Processing review for shop ${shopId}`);
+      
+      // Validate inputs
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({
+          success: false,
+          message: 'Rating must be between 1 and 5'
+        });
+      }
+      
+      if (!text || text.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'Review text is required'
+        });
       }
       
       if (!isValidObjectId(shopId)) {
-        return res.status(400).json({ success: false, message: 'Invalid shop ID' });
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid shop ID'
+        });
       }
       
+      // Find the shop
       const shop = await Shop.findById(shopId);
       if (!shop) {
-        return res.status(404).json({ success: false, message: 'Shop not found' });
+        return res.status(404).json({
+          success: false,
+          message: 'Shop not found'
+        });
       }
-
-      // Check if user already reviewed this shop
-      const existingReviewIndex = shop.reviews.findIndex(review => 
-        review.userId.toString() === userId
-      );
       
+      // Check for authentication token
+      let userId = null;
+      let userName = 'Anonymous';
+      let user = null;
+      
+      // Try to get the token from the request headers
+      const token = req.header('x-auth-token');
+      
+      if (token) {
+        try {
+          // Verify the token
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(token, process.env.JWT_SECRET);
+          
+          // Get user ID from token
+          userId = decoded.userId;
+          console.log(`Found authenticated user: ${userId}`);
+          
+          // Get user details
+          user = await User.findById(userId);
+          if (user) {
+            userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Anonymous';
+            console.log(`User name: ${userName}`);
+          }
+        } catch (tokenError) {
+          console.log('Invalid token, continuing as anonymous:', tokenError.message);
+          // Continue as anonymous if token verification fails
+        }
+      } else {
+        console.log('No authentication token found, continuing as anonymous');
+      }
+      
+      // Check if user already reviewed this shop (only if userId is available)
+      let existingReviewIndex = -1;
+      if (userId) {
+        existingReviewIndex = shop.reviews.findIndex(review => 
+          review.userId && review.userId.toString() === userId
+        );
+      }
+      
+      let newReview;
       if (existingReviewIndex !== -1) {
         // Update existing review
         shop.reviews[existingReviewIndex].rating = rating;
-        shop.reviews[existingReviewIndex].comment = comment;
-        shop.reviews[existingReviewIndex].date = Date.now();
+        shop.reviews[existingReviewIndex].comment = text;
+        shop.reviews[existingReviewIndex].date = new Date();
+        
+        newReview = shop.reviews[existingReviewIndex];
+        console.log(`Updated existing review at index ${existingReviewIndex}`);
       } else {
         // Add new review
-        shop.reviews.push({
-          userId: userId,
+        newReview = {
+          userId: userId, // This can be null for anonymous reviews
           rating,
-          comment,
-          date: Date.now()
-        });
+          comment: text,
+          date: new Date()
+        };
+        
+        shop.reviews.push(newReview);
+        console.log('Added new review');
       }
       
       // Update shop's overall rating
       const totalRating = shop.reviews.reduce((sum, review) => sum + review.rating, 0);
-      shop.rating = totalRating / shop.reviews.length;
+      shop.rating = parseFloat((totalRating / shop.reviews.length).toFixed(1));
+      
+      // Update reviewCount field if it exists
+      if ('reviewCount' in shop) {
+        shop.reviewCount = shop.reviews.length;
+      }
       
       await shop.save();
+      console.log(`Shop saved with new rating: ${shop.rating}`);
       
-      res.json({ success: true, message: 'Review added successfully', rating: shop.rating });
+      res.status(201).json({
+        success: true,
+        message: 'Review added successfully',
+        review: {
+          _id: newReview._id,
+          userId: newReview.userId,
+          userName: userName,
+          rating: newReview.rating,
+          comment: newReview.comment,
+          date: newReview.date
+        },
+        shopRating: shop.rating,
+        reviewCount: shop.reviews.length
+      });
     } catch (error) {
       console.error('Error adding review:', error);
-      res.status(500).json({ success: false, message: 'Server error' });
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message
+      });
     }
   },
   
-  // Get reviews for a shop
+
+
   getShopReviews: async (req, res, next) => {
     try {
       const { shopId } = req.params;
+      console.log(`Getting reviews for shop ${shopId}`);
       
       if (!isValidObjectId(shopId)) {
-        return res.status(400).json({ success: false, message: 'Invalid shop ID' });
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid shop ID'
+        });
       }
       
-      const shop = await Shop.findById(shopId)
-        .populate('reviews.userId', 'firstName lastName profileImage');
-        
+      const shop = await Shop.findById(shopId);
+      
       if (!shop) {
-        return res.status(404).json({ success: false, message: 'Shop not found' });
+        return res.status(404).json({
+          success: false,
+          message: 'Shop not found'
+        });
       }
       
-      res.json({ success: true, reviews: shop.reviews, rating: shop.rating });
+      // Process reviews to include user information
+      const processedReviews = await Promise.all(shop.reviews.map(async (review) => {
+        let userName = 'Anonymous';
+        let profileImage = null;
+        
+        // Fetch user information for each review
+        if (review.userId) {
+          try {
+            const user = await User.findById(review.userId);
+            if (user) {
+              userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Anonymous';
+              profileImage = user.profileImage || null;
+            }
+          } catch (err) {
+            console.error('Error fetching user for review:', err);
+          }
+        }
+        
+        return {
+          _id: review._id,
+          userId: review.userId,
+          rating: review.rating,
+          text: review.comment, // Map 'comment' to 'text' for frontend
+          date: review.date,
+          userName: userName,
+          user: {
+            id: review.userId,
+            name: userName,
+            avatar: profileImage
+          }
+        };
+      }));
+      
+      console.log(`Returning ${processedReviews.length} reviews for shop ${shopId}`);
+      
+      res.json({
+        success: true,
+        reviews: processedReviews,
+        rating: shop.rating,
+        reviewCount: shop.reviews.length
+      });
     } catch (error) {
       console.error('Error getting shop reviews:', error);
-      res.status(500).json({ success: false, message: 'Server error' });
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message
+      });
     }
   },
   
+
+
    // Search shops by location - UPDATED METHOD
    searchShopsByLocation: async (req, res, next) => {
     try {

@@ -16,6 +16,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { shopService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import reviewService from '../../services/reviewService';
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 const { width } = Dimensions.get('window');
 
@@ -28,6 +31,10 @@ const BarbershopDetail = ({ route, navigation }) => {
   const [rating, setRating] = useState(0);
   const [reviews, setReviews] = useState([]);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  
+  // Get auth context to check if user is logged in
+  const { user } = useAuth();
   
   // Extract shopId from route params with safety check
   const shopId = route.params?.shopId;
@@ -47,10 +54,8 @@ const BarbershopDetail = ({ route, navigation }) => {
         console.log('Shop data received:', shopData);
         setShop(shopData);
         
-        // If the shop has reviews, set them
-        if (shopData.reviews && Array.isArray(shopData.reviews)) {
-          setReviews(shopData.reviews);
-        }
+        // Fetch reviews separately
+        fetchReviews();
       } catch (error) {
         console.error('Error fetching shop details:', error);
         setError('Failed to load barbershop details');
@@ -58,8 +63,33 @@ const BarbershopDetail = ({ route, navigation }) => {
         setLoading(false);
       }
     };
+    
     fetchShopDetails();
   }, [shopId]);
+  
+  const fetchReviews = async () => {
+    if (!shopId) return;
+    
+    setLoadingReviews(true);
+    try {
+      console.log('Fetching reviews for shop', shopId);
+      const response = await reviewService.getShopReviews(shopId);
+      console.log('Successfully fetched', response.reviews?.length || 0, 'reviews');
+      
+      if (response.success && Array.isArray(response.reviews)) {
+        setReviews(response.reviews);
+      } else {
+        console.error('Invalid reviews response:', response);
+        setReviews([]);
+      }
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+      setReviews([]);
+      // Don't set error state here to avoid blocking the whole screen
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
 
   const handleBookAppointment = () => {
     if (!shop) return;
@@ -75,63 +105,53 @@ const BarbershopDetail = ({ route, navigation }) => {
       Alert.alert('Error', 'Please select a rating');
       return;
     }
-
+    
     if (reviewText.trim() === '') {
       Alert.alert('Error', 'Please enter a review');
       return;
     }
-
+    
     setSubmittingReview(true);
-
+    
     try {
-      // This is a placeholder for the actual API call
-      // We'll implement the backend later
       const reviewData = {
-        shopId,
         rating,
-        text: reviewText,
-        date: new Date().toISOString(),
-        // In a real app, you'd get the user info from auth context
-        user: {
-          name: 'Customer', // Placeholder
-          id: 'user123' // Placeholder
-        }
+        text: reviewText
       };
-
-      // Simulate API call success
-      // In a real implementation, you would call an API endpoint
-      // const response = await shopService.submitReview(reviewData);
       
-      // For now, just add the review to the local state
-      const newReview = {
-        _id: Date.now().toString(), // Temporary ID
-        rating,
-        text: reviewText,
-        date: new Date().toISOString(),
-        user: {
-          name: 'You',
-          id: 'user123'
-        }
-      };
-
-      setReviews([newReview, ...reviews]);
+      console.log('Submitting review for shop', shopId, 'with data:', reviewData);
       
-      // Update the shop's average rating (simplified calculation)
-      const totalRatings = (shop.reviewCount || 0) + 1;
-      const newAverageRating = ((shop.rating || 0) * (totalRatings - 1) + rating) / totalRatings;
+      // Get the auth token from AsyncStorage
+      const token = await AsyncStorage.getItem('userToken');
+      console.log('Auth token available:', !!token);
       
-      setShop({
-        ...shop,
-        rating: newAverageRating,
-        reviewCount: totalRatings
-      });
-
-      // Close the modal and reset form
-      setReviewModalVisible(false);
-      setReviewText('');
-      setRating(0);
+      // Pass the token to the review service
+      const response = await reviewService.submitShopReview(shopId, reviewData, token);
+      console.log('Review submission response:', response);
       
-      Alert.alert('Success', 'Your review has been submitted!');
+      if (response.success) {
+        // Update the reviews list with the new review
+        const newReview = response.review;
+        
+        // Update the shop's rating and review count
+        setShop({
+          ...shop,
+          rating: response.shopRating || shop.rating,
+          reviewCount: response.reviewCount || (shop.reviewCount || 0) + 1
+        });
+        
+        // Add the new review to the top of the list
+        setReviews([newReview, ...reviews]);
+        
+        // Close the modal and reset form
+        setReviewModalVisible(false);
+        setReviewText('');
+        setRating(0);
+        
+        Alert.alert('Success', 'Your review has been submitted!');
+      } else {
+        Alert.alert('Error', response.message || 'Failed to submit review');
+      }
     } catch (error) {
       console.error('Error submitting review:', error);
       Alert.alert('Error', 'Failed to submit review. Please try again.');
@@ -139,7 +159,6 @@ const BarbershopDetail = ({ route, navigation }) => {
       setSubmittingReview(false);
     }
   };
-
   // Render a gallery item
   const renderGalleryItem = ({ item }) => (
     <TouchableOpacity style={styles.galleryItem}>
@@ -305,13 +324,15 @@ const BarbershopDetail = ({ route, navigation }) => {
             <Text style={styles.sectionTitle}>Customer Reviews</Text>
             <TouchableOpacity 
               style={styles.writeReviewButton}
-              onPress={() => setReviewModalVisible(true)}
+              onPress={() => setReviewModalVisible(true)} // Removed authentication check
             >
               <Text style={styles.writeReviewText}>Write a Review</Text>
             </TouchableOpacity>
           </View>
           
-          {reviews && reviews.length > 0 ? (
+          {loadingReviews ? (
+            <ActivityIndicator size="small" color="#FF0000" style={{marginVertical: 20}} />
+          ) : reviews && reviews.length > 0 ? (
             <FlatList
               data={reviews}
               renderItem={renderReviewItem}
@@ -709,3 +730,4 @@ const styles = StyleSheet.create({
 });
 
 export default BarbershopDetail;
+

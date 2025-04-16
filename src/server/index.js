@@ -427,15 +427,15 @@ if (authMiddleware && shopController) {
   });
   
   // Routes with shopId parameter
-  app.post('/api/shop/:shopId/reviews', authMiddleware, (req, res, next) => {
-    console.log('Direct add review route hit');
-    if (typeof shopController.addReview === 'function') {
-      shopController.addReview(req, res, next);
-    } else {
-      res.status(500).json({ error: 'Add review controller method not found' });
-    }
-  });
-  
+app.post('/api/shop/:shopId/reviews', (req, res, next) => {
+  console.log('Direct add review route hit');
+  if (typeof shopController.addReview === 'function') {
+    shopController.addReview(req, res, next);
+  } else {
+    res.status(500).json({ error: 'Add review controller method not found' });
+  }
+});
+
   app.get('/api/shop/:shopId/reviews', (req, res, next) => {
     console.log('Direct get shop reviews route hit');
     if (typeof shopController.getShopReviews === 'function') {

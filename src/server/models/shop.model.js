@@ -1,6 +1,4 @@
-//shop.model.js
 const mongoose = require('mongoose');
-
 const shopSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -38,11 +36,16 @@ const shopSchema = new mongoose.Schema({
     min: 0,
     max: 5
   },
+  reviewCount: {
+    type: Number,
+    default: 0
+  },
   reviews: [{
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     },
+    userName: String, // Add this to store the user's name
     rating: Number,
     comment: String,
     date: {

@@ -132,7 +132,7 @@ router.delete('/services/:serviceId', authMiddleware, (req, res, next) => {
 });
 
 // Review routes
-router.post('/:shopId/reviews', authMiddleware, (req, res, next) => {
+router.post('/:shopId/reviews', (req, res, next) => {
   console.log('Add review route hit');
   shopController.addReview(req, res, next);
 });
