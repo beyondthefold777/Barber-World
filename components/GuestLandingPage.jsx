@@ -142,7 +142,6 @@ const GuestLandingPage = ({ navigation }) => {
       style={styles.container}
     >
       <StatusBar barStyle="light-content" translucent={true} backgroundColor="transparent" />
-
       {/* Hamburger Menu Button */}
       <TouchableOpacity 
         style={styles.menuButton}
@@ -150,7 +149,6 @@ const GuestLandingPage = ({ navigation }) => {
       >
         <Feather name="menu" size={24} color="white" />
       </TouchableOpacity>
-
       {/* Animated Sidebar */}
       <Animated.View 
         style={[
@@ -167,12 +165,10 @@ const GuestLandingPage = ({ navigation }) => {
           <TouchableOpacity onPress={toggleMenu} style={styles.closeButton}>
             <Feather name="x" size={24} color="white" />
           </TouchableOpacity>
-
           <View style={styles.sidebarHeader}>
             <Text style={styles.sidebarTitle}>Business Center</Text>
             <View style={styles.titleUnderline} />
           </View>
-
           <View style={styles.sidebarContent}>
             <ScrollView 
               showsVerticalScrollIndicator={true}
@@ -184,11 +180,15 @@ const GuestLandingPage = ({ navigation }) => {
               <Text style={styles.sidebarSection}>Marketing & Promotions</Text>
               <Text style={styles.sidebarSection}>Communication Hub</Text>
               <Text style={styles.sidebarSection}>Analytics & Reports</Text>
-              <Text style={styles.sidebarSection}>Settings</Text>
+              <TouchableOpacity onPress={() => {
+                navigation.navigate('Settings');
+                toggleMenu(); // Close the menu after navigation
+              }}>
+                <Text style={styles.sidebarSection}>Settings</Text>
+              </TouchableOpacity>
               <Text style={styles.sidebarSection}>Support & Resources</Text>
             </ScrollView>
           </View>
-
           <View style={styles.sidebarFooter}>
             <TouchableOpacity style={styles.footerLink}>
               <Text style={styles.footerText}>Terms of Service</Text>
@@ -212,7 +212,6 @@ const GuestLandingPage = ({ navigation }) => {
           </View>
         </LinearGradient>
       </Animated.View>
-
       {/* Top Right Image */}
       <View style={styles.topRightImage}>
         <Image 
@@ -220,7 +219,6 @@ const GuestLandingPage = ({ navigation }) => {
           style={{width: 50, height: 50}}
         />
       </View>
-
       {/* Main Content Area */}
       <ScrollView style={styles.content}>
         <View style={styles.searchSection}>
@@ -247,7 +245,6 @@ const GuestLandingPage = ({ navigation }) => {
               <Text style={styles.searchTypeText}>ZIP Code</Text>
             </TouchableOpacity>
           </View>
-
           {searchType === 'location' ? (
             <View style={styles.locationInputs}>
               <TextInput
@@ -277,7 +274,6 @@ const GuestLandingPage = ({ navigation }) => {
               maxLength={5}
             />
           )}
-
           <TouchableOpacity 
             style={styles.searchButton}
             onPress={handleSearch}
@@ -288,7 +284,6 @@ const GuestLandingPage = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
         </View>
-
         <FlatList
           data={searchResults}
           renderItem={renderBarbershop}
@@ -301,7 +296,6 @@ const GuestLandingPage = ({ navigation }) => {
             </Text>
           }
         />
-
         <TouchableOpacity 
           style={styles.barberSignup}
           onPress={() => navigation.navigate('Register')}
@@ -309,14 +303,12 @@ const GuestLandingPage = ({ navigation }) => {
           <Text style={styles.signupText}>Barbershop? List Your Shop</Text>
         </TouchableOpacity>
       </ScrollView>
-
       {/* Bottom Navigation Bar */}
       <View style={styles.navbar}>
         <TouchableOpacity style={styles.navItem}>
           <Feather name="home" size={24} color="white" />
           <Text style={styles.navText}>Home</Text>
         </TouchableOpacity>
-
         <TouchableOpacity 
           style={styles.navItem}
           onPress={() => navigation.navigate('AppointmentsScreen')}
@@ -324,7 +316,6 @@ const GuestLandingPage = ({ navigation }) => {
           <Feather name="calendar" size={24} color="white" />
           <Text style={styles.navText}>Appointments</Text>
         </TouchableOpacity>
-
         <TouchableOpacity>
           <LinearGradient
             colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
@@ -333,13 +324,14 @@ const GuestLandingPage = ({ navigation }) => {
             style={styles.clipperButton}
           />
         </TouchableOpacity>
-
         <TouchableOpacity style={styles.navItem}>
           <Feather name="search" size={24} color="white" />
           <Text style={styles.navText}>Find Shops</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => navigation.navigate('Settings')}
+        >
           <Feather name="user" size={24} color="white" />
           <Text style={styles.navText}>Profile</Text>
         </TouchableOpacity>
