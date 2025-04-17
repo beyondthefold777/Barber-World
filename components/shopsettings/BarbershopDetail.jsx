@@ -101,6 +101,8 @@ const BarbershopDetail = ({ route, navigation }) => {
   };
 
   const handleSubmitReview = async () => {
+    if (submittingReview) return; // Prevent double submission
+    
     if (rating === 0) {
       Alert.alert('Error', 'Please select a rating');
       return;
@@ -130,9 +132,6 @@ const BarbershopDetail = ({ route, navigation }) => {
       console.log('Review submission response:', response);
       
       if (response.success) {
-        // Update the reviews list with the new review
-        const newReview = response.review;
-        
         // Update the shop's rating and review count
         setShop({
           ...shop,
@@ -140,8 +139,8 @@ const BarbershopDetail = ({ route, navigation }) => {
           reviewCount: response.reviewCount || (shop.reviewCount || 0) + 1
         });
         
-        // Add the new review to the top of the list
-        setReviews([newReview, ...reviews]);
+        // Instead of manually adding the review, fetch all reviews again
+        await fetchReviews();
         
         // Close the modal and reset form
         setReviewModalVisible(false);
@@ -159,6 +158,7 @@ const BarbershopDetail = ({ route, navigation }) => {
       setSubmittingReview(false);
     }
   };
+  
   // Render a gallery item
   const renderGalleryItem = ({ item }) => (
     <TouchableOpacity style={styles.galleryItem}>
@@ -334,12 +334,13 @@ const BarbershopDetail = ({ route, navigation }) => {
             <ActivityIndicator size="small" color="#FF0000" style={{marginVertical: 20}} />
           ) : reviews && reviews.length > 0 ? (
             <FlatList
-              data={reviews}
-              renderItem={renderReviewItem}
-              keyExtractor={(item) => item._id?.toString() || Math.random().toString()}
-              scrollEnabled={false}
-              contentContainerStyle={styles.reviewsContainer}
-            />
+            data={reviews}
+            renderItem={renderReviewItem}
+            keyExtractor={(item) => item._id?.toString() || `review-${Math.random()}`}
+            scrollEnabled={false}
+            contentContainerStyle={styles.reviewsContainer}
+          />
+          
           ) : (
             <Text style={styles.noContentText}>No reviews yet. Be the first to review!</Text>
           )}

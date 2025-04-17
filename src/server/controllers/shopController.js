@@ -357,7 +357,7 @@ const shopController = {
   addReview: async (req, res, next) => {
     try {
       const { shopId } = req.params;
-      const { rating, text } = req.body;
+      const { rating, text, userName: requestUserName } = req.body;
       
       console.log(`Processing review for shop ${shopId}`);
       
@@ -414,7 +414,7 @@ const shopController = {
           user = await User.findById(userId);
           if (user) {
             userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Anonymous';
-            console.log(`User name: ${userName}`);
+            console.log(`User name from auth: ${userName}`);
           }
         } catch (tokenError) {
           console.log('Invalid token, continuing as anonymous:', tokenError.message);
@@ -422,6 +422,12 @@ const shopController = {
         }
       } else {
         console.log('No authentication token found, continuing as anonymous');
+      }
+      
+      // Use userName from request body if provided and no authenticated user name was found
+      if (userName === 'Anonymous' && requestUserName) {
+        userName = requestUserName;
+        console.log(`Using userName from request body: ${userName}`);
       }
       
       // Check if user already reviewed this shop (only if userId is available)
@@ -438,6 +444,7 @@ const shopController = {
         shop.reviews[existingReviewIndex].rating = rating;
         shop.reviews[existingReviewIndex].comment = text;
         shop.reviews[existingReviewIndex].date = new Date();
+        shop.reviews[existingReviewIndex].userName = userName; // Update userName too
         
         newReview = shop.reviews[existingReviewIndex];
         console.log(`Updated existing review at index ${existingReviewIndex}`);
@@ -445,6 +452,7 @@ const shopController = {
         // Add new review
         newReview = {
           userId: userId, // This can be null for anonymous reviews
+          userName: userName, // Store the userName in the review document
           rating,
           comment: text,
           date: new Date()
@@ -490,81 +498,83 @@ const shopController = {
     }
   },
   
-
-
-  getShopReviews: async (req, res, next) => {
-    try {
-      const { shopId } = req.params;
-      console.log(`Getting reviews for shop ${shopId}`);
-      
-      if (!isValidObjectId(shopId)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid shop ID'
-        });
-      }
-      
-      const shop = await Shop.findById(shopId);
-      
-      if (!shop) {
-        return res.status(404).json({
-          success: false,
-          message: 'Shop not found'
-        });
-      }
-      
-      // Process reviews to include user information
-      const processedReviews = await Promise.all(shop.reviews.map(async (review) => {
-        let userName = 'Anonymous';
-        let profileImage = null;
-        
-        // Fetch user information for each review
-        if (review.userId) {
-          try {
-            const user = await User.findById(review.userId);
-            if (user) {
-              userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Anonymous';
-              profileImage = user.profileImage || null;
-            }
-          } catch (err) {
-            console.error('Error fetching user for review:', err);
-          }
-        }
-        
-        return {
-          _id: review._id,
-          userId: review.userId,
-          rating: review.rating,
-          text: review.comment, // Map 'comment' to 'text' for frontend
-          date: review.date,
-          userName: userName,
-          user: {
-            id: review.userId,
-            name: userName,
-            avatar: profileImage
-          }
-        };
-      }));
-      
-      console.log(`Returning ${processedReviews.length} reviews for shop ${shopId}`);
-      
-      res.json({
-        success: true,
-        reviews: processedReviews,
-        rating: shop.rating,
-        reviewCount: shop.reviews.length
-      });
-    } catch (error) {
-      console.error('Error getting shop reviews:', error);
-      res.status(500).json({
+getShopReviews: async (req, res, next) => {
+  try {
+    const { shopId } = req.params;
+    console.log(`Getting reviews for shop ${shopId}`);
+    
+    if (!isValidObjectId(shopId)) {
+      return res.status(400).json({
         success: false,
-        message: 'Server error',
-        error: error.message
+        message: 'Invalid shop ID'
       });
     }
-  },
-  
-
+    
+    const shop = await Shop.findById(shopId);
+    
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shop not found'
+      });
+    }
+    
+    // Process reviews to include user information
+    const processedReviews = await Promise.all(shop.reviews.map(async (review) => {
+      // First try to use the userName stored in the review
+      let userName = review.userName || null;
+      let profileImage = null;
+      
+      // If no userName in review, try to get from user document
+      if (!userName && review.userId) {
+        try {
+          const user = await User.findById(review.userId);
+          if (user) {
+            userName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+            profileImage = user.profileImage || null;
+          }
+        } catch (err) {
+          console.error('Error fetching user for review:', err);
+        }
+      }
+      
+      // If still no userName, use Anonymous
+      if (!userName) {
+        userName = 'Anonymous';
+      }
+      
+      return {
+        _id: review._id,
+        userId: review.userId,
+        rating: review.rating,
+        text: review.comment, // Map 'comment' to 'text' for frontend
+        date: review.date,
+        userName: userName,
+        user: {
+          id: review.userId,
+          name: userName,
+          avatar: profileImage
+        }
+      };
+    }));
+    
+    console.log(`Returning ${processedReviews.length} reviews for shop ${shopId}`);
+    
+    res.json({
+      success: true,
+      reviews: processedReviews,
+      rating: shop.rating,
+      reviewCount: shop.reviews.length
+    });
+  } catch (error) {
+    console.error('Error getting shop reviews:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+},
 
    // Search shops by location - UPDATED METHOD
    searchShopsByLocation: async (req, res, next) => {

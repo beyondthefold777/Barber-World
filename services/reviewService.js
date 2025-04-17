@@ -23,7 +23,7 @@ export const getShopReviews = async (shopId) => {
   }
 };
 
-// Submit a review for a shop - Updated to handle token from parameter or AsyncStorage
+// Submit a review for a shop - Updated to include username with correct field names
 export const submitShopReview = async (shopId, reviewData, token = null) => {
   try {
     console.log(`Submitting review for shop ${shopId}:`, reviewData);
@@ -31,6 +31,33 @@ export const submitShopReview = async (shopId, reviewData, token = null) => {
     // If token is not provided as parameter, try to get it from AsyncStorage
     if (!token) {
       token = await AsyncStorage.getItem('userToken');
+    }
+    
+    // Ensure we're using the correct field name for the review text
+    // If reviewData has 'comment' but backend expects 'text', convert it
+    if (reviewData.comment && !reviewData.text) {
+      reviewData.text = reviewData.comment;
+      delete reviewData.comment;
+    }
+    
+    // Try to get user data from AsyncStorage
+    try {
+      const userDataString = await AsyncStorage.getItem('userData');
+      if (userDataString) {
+        const userData = JSON.parse(userDataString);
+        // Use the username field specifically
+        if (userData.username) {
+          // Make sure we're using the field name the backend expects
+          reviewData.userName = userData.username;
+          console.log('Found username from storage:', userData.username);
+        } else if (userData.businessName) {
+          // For barbershop users, use businessName as fallback
+          reviewData.userName = userData.businessName;
+          console.log('Using businessName as username:', userData.businessName);
+        }
+      }
+    } catch (error) {
+      console.log('Error getting user data from storage:', error);
     }
     
     // Set up headers
@@ -45,6 +72,8 @@ export const submitShopReview = async (shopId, reviewData, token = null) => {
     } else {
       console.log('No authentication token found, submitting review without authentication');
     }
+    
+    console.log('Final review data being sent:', reviewData);
     
     // Make the API request with or without the token
     const response = await axios.post(
