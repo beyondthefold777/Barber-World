@@ -25,18 +25,15 @@ const RegisterScreen = ({ navigation }) => {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
-
     if (formData.role === 'client' && (!formData.username || !formData.phoneNumber)) {
       Alert.alert('Error', 'Username and phone number are required for guests');
       return;
     }
-
     if ((formData.role === 'barbershop' || formData.role === 'mainBarbershop') && 
         (!formData.businessName || !formData.address || !formData.city || !formData.state || !formData.zipCode)) {
       Alert.alert('Error', 'All business information is required for barbershops');
       return;
     }
-
     if (formData.role === 'mainBarbershop' && !formData.adminCode) {
       Alert.alert('Error', 'Admin code is required for main barbershop registration');
       return;
@@ -46,22 +43,23 @@ const RegisterScreen = ({ navigation }) => {
       setLoading(true);
       const response = await authService.register(formData);
       
+      // Store token and user role
       await AsyncStorage.setItem('userToken', response.token);
       await AsyncStorage.setItem('userRole', response.user.role);
-
-      switch (response.user.role) {
-        case 'client':
-          navigation.replace('GuestLandingPage');
-          break;
-        case 'barbershop':
-          navigation.replace('BarbershopDashboard');
-          break;
-        case 'mainBarbershop':
-          navigation.replace('LandingPage');
-          break;
-        default:
-          navigation.replace('Home');
-      }
+      
+      // Navigate to email verification screen instead of directly to dashboard
+      navigation.replace('EmailVerification', {
+        email: formData.email,
+        userId: response.user._id
+      });
+      
+      // Show success message
+      Alert.alert(
+        'Registration Successful', 
+        'Please check your email to verify your account.',
+        [{ text: 'OK' }]
+      );
+      
     } catch (error) {
       Alert.alert('Registration Failed', error.message);
     } finally {
@@ -80,7 +78,6 @@ const RegisterScreen = ({ navigation }) => {
     >
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Create an Account</Text>
-
         <View style={styles.roleContainer}>
           {['client', 'barbershop', 'mainBarbershop'].map((role) => (
             <TouchableOpacity 
@@ -92,14 +89,13 @@ const RegisterScreen = ({ navigation }) => {
               onPress={() => updateFormData('role', role)}
             >
               <Text style={styles.roleText}>
-                {role === 'mainBarbershop' ? 'Admin' : 
-                 role === 'client' ? 'New Guests' :
+                {role === 'mainBarbershop' ? 'Admin' :
+                  role === 'client' ? 'New Guests' :
                  role.charAt(0).toUpperCase() + role.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
-
         <View style={styles.inputContainer}>
           {formData.role === 'client' && (
             <>
@@ -121,7 +117,6 @@ const RegisterScreen = ({ navigation }) => {
               />
             </>
           )}
-
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -139,7 +134,6 @@ const RegisterScreen = ({ navigation }) => {
             onChangeText={(value) => updateFormData('password', value)}
             secureTextEntry
           />
-
           {(formData.role === 'barbershop' || formData.role === 'mainBarbershop') && (
             <>
               <TextInput
@@ -180,7 +174,6 @@ const RegisterScreen = ({ navigation }) => {
               />
             </>
           )}
-
           {formData.role === 'mainBarbershop' && (
             <TextInput
               style={styles.input}
@@ -192,7 +185,6 @@ const RegisterScreen = ({ navigation }) => {
             />
           )}
         </View>
-
         <TouchableOpacity 
           style={[styles.registerButton, loading && styles.disabledButton]}
           onPress={handleRegister}
@@ -202,7 +194,6 @@ const RegisterScreen = ({ navigation }) => {
             {loading ? 'Creating Account...' : 'Register'}
           </Text>
         </TouchableOpacity>
-
         <TouchableOpacity onPress={() => navigation.navigate('Login')}>
           <Text style={styles.loginText}>Already have an account? Login</Text>
         </TouchableOpacity>

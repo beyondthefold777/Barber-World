@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,16 +7,12 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
-  ActivityIndicator,
   Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather, MaterialIcons, Ionicons, FontAwesome } from '@expo/vector-icons';
-import { authService } from '../../services/api';
+import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
 
 const SettingsScreen = ({ navigation }) => {
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
   const [settings, setSettings] = useState({
     pushNotifications: true,
     emailNotifications: true,
@@ -32,46 +28,11 @@ const SettingsScreen = ({ navigation }) => {
     currency: 'USD',
   });
 
-  useEffect(() => {
-    fetchUserData();
-  }, []);
-
-  const fetchUserData = async () => {
-    try {
-      setLoading(true);
-      // In a real app, you would fetch user data and settings from your API
-      const userData = await authService.getUserProfile();
-      const userSettings = await authService.getUserSettings();
-      
-      setUser(userData);
-      setSettings(userSettings);
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-      Alert.alert('Error', 'Failed to load your profile information');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleToggleSetting = async (setting) => {
-    try {
-      const updatedSettings = {
-        ...settings,
-        [setting]: !settings[setting]
-      };
-      
-      setSettings(updatedSettings);
-      
-      // In a real app, you would save this to your backend
-      await authService.updateUserSettings({
-        [setting]: !settings[setting]
-      });
-    } catch (error) {
-      console.error(`Error updating ${setting}:`, error);
-      // Revert the change if the update fails
-      setSettings(settings);
-      Alert.alert('Error', `Failed to update ${setting.replace(/([A-Z])/g, ' $1').toLowerCase()}`);
-    }
+  const handleToggleSetting = (setting) => {
+    setSettings({
+      ...settings,
+      [setting]: !settings[setting]
+    });
   };
 
   const renderSettingToggle = (title, description, settingKey, icon) => (
@@ -92,18 +53,6 @@ const SettingsScreen = ({ navigation }) => {
     </View>
   );
 
-  if (loading) {
-    return (
-      <LinearGradient
-        colors={['#000000', '#333333']}
-        style={styles.loadingContainer}
-      >
-        <ActivityIndicator size="large" color="#FF0000" />
-        <Text style={styles.loadingText}>Loading settings...</Text>
-      </LinearGradient>
-    );
-  }
-
   return (
     <LinearGradient
       colors={['#000000', '#333333']}
@@ -122,30 +71,21 @@ const SettingsScreen = ({ navigation }) => {
       <ScrollView style={styles.content}>
         {/* Account Section */}
         <View style={styles.accountSection}>
-          {user && (
-            <TouchableOpacity 
-              style={styles.profilePreview}
-              onPress={() => navigation.navigate('AccountDetails')}
-            >
-              <View style={styles.profileImageContainer}>
-                {user.profileImage ? (
-                  <Image 
-                    source={{ uri: user.profileImage }}
-                    style={styles.profileImage}
-                  />
-                ) : (
-                  <View style={styles.profileImagePlaceholder}>
-                    <Feather name="user" size={30} color="#666" />
-                  </View>
-                )}
+          <TouchableOpacity 
+            style={styles.profilePreview}
+            onPress={() => navigation.navigate('AccountDetails')}
+          >
+            <View style={styles.profileImageContainer}>
+              <View style={styles.profileImagePlaceholder}>
+                <Feather name="user" size={30} color="#666" />
               </View>
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>{user.firstName} {user.lastName}</Text>
-                <Text style={styles.profileEmail}>{user.email}</Text>
-              </View>
-              <Feather name="chevron-right" size={24} color="#888" />
-            </TouchableOpacity>
-          )}
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>Account Details</Text>
+              <Text style={styles.profileEmail}>Tap to view your profile</Text>
+            </View>
+            <Feather name="chevron-right" size={24} color="#888" />
+          </TouchableOpacity>
         </View>
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Account</Text>
@@ -434,24 +374,19 @@ const SettingsScreen = ({ navigation }) => {
                 { 
                   text: 'Delete', 
                   style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      await authService.deleteAccount();
-                      navigation.reset({
-                        index: 0,
-                        routes: [{ name: 'Login' }],
-                      });
-                    } catch (error) {
-                      console.error('Error deleting account:', error);
-                      Alert.alert('Error', 'Failed to delete your account');
-                    }
+                  onPress: () => {
+                    // Navigate to login after confirmation
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'Login' }],
+                    });
                   }
                 }
               ]
             );
           }}
         >
-          <MaterialIcons name="delete-forever" size={24} color="#FF0000" />
+                <MaterialIcons name="delete-forever" size={24} color="#FF0000" />
           <Text style={styles.dangerButtonText}>Delete Account</Text>
         </TouchableOpacity>
         
@@ -465,17 +400,12 @@ const SettingsScreen = ({ navigation }) => {
                 { text: 'Cancel', style: 'cancel' },
                 { 
                   text: 'Logout', 
-                  onPress: async () => {
-                    try {
-                      await authService.logout();
-                      navigation.reset({
-                        index: 0,
-                        routes: [{ name: 'Login' }],
-                      });
-                    } catch (error) {
-                      console.error('Logout error:', error);
-                      Alert.alert('Error', 'Failed to log out');
-                    }
+                  onPress: () => {
+                    // Navigate to login screen
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'Login' }],
+                    });
                   }
                 }
               ]
@@ -493,16 +423,6 @@ const SettingsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: 'white',
-    marginTop: 10,
-    fontSize: 16,
   },
   header: {
     flexDirection: 'row',
@@ -651,4 +571,3 @@ const styles = StyleSheet.create({
 });
 
 export default SettingsScreen;
-

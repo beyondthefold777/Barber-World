@@ -16,6 +16,7 @@ try {
 
 // Try to import routes with detailed error handling
 let appointmentRoutes, authRoutes, shopRoutes, expenseRoutes, taxRoutes, userRoutes;
+let emailRoutes, accountRoutes;
 
 try {
   appointmentRoutes = require('./routes/appointments');
@@ -29,6 +30,20 @@ try {
   console.log('Auth routes loaded successfully');
 } catch (err) {
   console.error('Error loading auth routes:', err);
+}
+
+try {
+  emailRoutes = require('./routes/emailRoutes');
+  console.log('Email routes loaded successfully');
+} catch (err) {
+  console.error('Error loading email routes:', err);
+}
+
+try {
+  accountRoutes = require('./routes/accountRoutes');
+  console.log('Account routes loaded successfully');
+} catch (err) {
+  console.error('Error loading account routes:', err);
 }
 
 try {
@@ -64,7 +79,6 @@ try {
 
 // Import controllers and middleware for direct routes
 let authMiddleware, shopController;
-
 try {
   authMiddleware = require('./middleware/auth');
   console.log('Auth middleware loaded successfully');
@@ -120,6 +134,16 @@ if (authRoutes) {
   console.log('Auth routes mounted');
 }
 
+if (emailRoutes) {
+  app.use('/api/email', emailRoutes);
+  console.log('Email routes mounted');
+}
+
+if (accountRoutes) {
+  app.use('/api/account', accountRoutes);
+  console.log('Account routes mounted');
+}
+
 if (expenseRoutes) {
   app.use('/api/expenses', expenseRoutes);
   console.log('Expense routes mounted');
@@ -146,6 +170,7 @@ app.get('/api/debug/shop/all', (req, res) => {
     controllerMethods: shopController ? Object.keys(shopController) : []
   });
 });
+
 
 // Add shop model debugging route
 app.get('/api/debug/shop-model', async (req, res) => {

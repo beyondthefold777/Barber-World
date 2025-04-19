@@ -5,63 +5,106 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   TextInput,
   Alert,
   ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { authService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AccountDetailsScreen = ({ navigation }) => {
+  const { token, user: authUser, logout } = useAuth();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
-  const [profileImage, setProfileImage] = useState(null);
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    username: '',
     email: '',
-    phone: '',
+    phoneNumber: '',
     address: '',
     city: '',
     state: '',
     zipCode: '',
   });
 
+  // Debug AuthContext data
   useEffect(() => {
-    fetchUserData();
-  }, []);
+    console.log('AuthContext user data:', authUser);
+    if (authUser) {
+      console.log('AuthContext user keys:', Object.keys(authUser));
+      console.log('Phone number in AuthContext:', authUser.phoneNumber);
+    }
+  }, [authUser]);
 
-  const fetchUserData = async () => {
+  useEffect(() => {
+    console.log('AccountDetailsScreen mounted, calling loadUserData()');
+    loadUserData();
+  }, [token]); // Re-fetch when token changes
+
+  const loadUserData = async () => {
+    console.log('Starting loadUserData()');
+    setLoading(true);
+    
     try {
-      setLoading(true);
-      const userData = await authService.getUserProfile();
-      setUser(userData);
-      setProfileImage(userData.profileImage || null);
-      
-      // Initialize form data with user data
-      setFormData({
-        firstName: userData.firstName || '',
-        lastName: userData.lastName || '',
-        email: userData.email || '',
-        phone: userData.phone || '',
-        address: userData.address?.street || '',
-        city: userData.address?.city || '',
-        state: userData.address?.state || '',
-        zipCode: userData.address?.zip || '',
-      });
+      // Use data from AuthContext
+      if (authUser) {
+        console.log('Using user data from AuthContext');
+        console.log('Auth user data:', authUser);
+        setUser(authUser);
+        
+        // Initialize form with AuthContext data
+        setFormData({
+          username: authUser.username || '',
+          email: authUser.email || '',
+          phoneNumber: authUser.phoneNumber || '',
+          address: authUser.address || '',
+          city: authUser.city || '',
+          state: authUser.state || '',
+          zipCode: authUser.zipCode || '',
+        });
+      } else {
+        // Try to get cached data if no authUser
+        try {
+          const userDataString = await AsyncStorage.getItem('userData');
+          if (userDataString) {
+            const cachedData = JSON.parse(userDataString);
+            console.log('Found cached user data:', cachedData);
+            setUser(cachedData);
+            
+            // Initialize form with cached data
+            setFormData({
+              username: cachedData.username || '',
+              email: cachedData.email || '',
+              phoneNumber: cachedData.phoneNumber || '',
+              address: cachedData.address || '',
+              city: cachedData.city || '',
+              state: cachedData.state || '',
+              zipCode: cachedData.zipCode || '',
+            });
+          } else {
+            // No cached data and no authUser
+            console.log('No user data available');
+            Alert.alert('Session Expired', 'Please login again');
+            navigation.navigate('Login');
+          }
+        } catch (cacheError) {
+          console.error('Error retrieving cached user data:', cacheError);
+          Alert.alert('Error', 'Failed to load your profile information');
+          navigation.navigate('Login');
+        }
+      }
     } catch (error) {
-      console.error('Error fetching user data:', error);
-      Alert.alert('Error', 'Failed to load your profile information');
+      console.error('Error in loadUserData:', error);
+      Alert.alert('Error', 'An unexpected error occurred while loading your profile');
     } finally {
       setLoading(false);
     }
   };
 
   const handleInputChange = (field, value) => {
+    console.log(`Updating form field: ${field} to: ${value}`);
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -69,69 +112,69 @@ const AccountDetailsScreen = ({ navigation }) => {
   };
 
   const handleSaveProfile = async () => {
+    console.log('Starting handleSaveProfile()');
+    setLoading(true);
+    
     try {
-      setLoading(true);
-      
-      // Format the data for the API
-      const updatedUserData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
-        address: {
-          street: formData.address,
-          city: formData.city,
-          state: formData.state,
-          zip: formData.zipCode,
-        }
+      // Update local state with form data
+      const updatedUser = {
+        ...user,
+        username: formData.username,
+        phoneNumber: formData.phoneNumber,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zipCode: formData.zipCode,
       };
       
-      // If profile image was changed, upload it
-      if (profileImage && profileImage !== user.profileImage) {
-        const imageResponse = await authService.uploadProfileImage(profileImage);
-        updatedUserData.profileImage = imageResponse.imageUrl;
-      }
+      console.log('Updating user data:', updatedUser);
       
-      // Update user profile
-      const response = await authService.updateUserProfile(updatedUserData);
+      // Update local state
+      setUser(updatedUser);
       
-      setUser(response);
+      // Save to AsyncStorage
+      await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
+      
       setEditMode(false);
       Alert.alert('Success', 'Your profile has been updated successfully');
+      
+      // Note: These changes are only saved locally
+      // You'll need to implement server sync later if needed
     } catch (error) {
-      console.error('Error updating profile:', error);
-      Alert.alert('Error', 'Failed to update your profile');
+      console.error('Error in handleSaveProfile:', error);
+      Alert.alert('Error', 'An unexpected error occurred while updating your profile');
     } finally {
       setLoading(false);
     }
   };
 
-  const pickImage = async () => {
+  const handleLogout = async () => {
+    console.log('Handling logout');
     try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      // Use the logout function from AuthContext
+      const success = await logout();
       
-      if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'You need to grant permission to access your photos');
-        return;
-      }
-      
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-      
-      if (!result.canceled) {
-        setProfileImage(result.assets[0].uri);
+      if (success) {
+        // Clear local user data
+        await AsyncStorage.removeItem('userData');
+        
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      } else {
+        Alert.alert('Error', 'Failed to logout. Please try again.');
       }
     } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to select image');
+      console.error('Error during logout:', error);
+      Alert.alert('Error', 'Failed to logout');
     }
   };
 
+  console.log('Rendering AccountDetailsScreen');
+  console.log('Current state - loading:', loading, 'user:', user ? 'exists' : 'null');
   if (loading && !user) {
+    console.log('Rendering loading screen');
     return (
       <LinearGradient
         colors={['#000000', '#333333']}
@@ -143,6 +186,7 @@ const AccountDetailsScreen = ({ navigation }) => {
     );
   }
 
+  console.log('Rendering main screen content');
   return (
     <LinearGradient
       colors={['#000000', '#333333']}
@@ -158,38 +202,22 @@ const AccountDetailsScreen = ({ navigation }) => {
         <Text style={styles.headerTitle}>Account Details</Text>
         <TouchableOpacity 
           style={styles.editButton}
-          onPress={() => setEditMode(!editMode)}
+          onPress={() => {
+            console.log('Toggle edit mode:', !editMode);
+            setEditMode(!editMode);
+          }}
         >
           <Feather name={editMode ? "check" : "edit-2"} size={24} color="white" />
         </TouchableOpacity>
       </View>
-
       <ScrollView style={styles.content}>
         <View style={styles.profileSection}>
-          <TouchableOpacity 
-            style={styles.profileImageContainer}
-            onPress={editMode ? pickImage : null}
-            disabled={!editMode}
-          >
-            {profileImage ? (
-              <Image 
-                source={{ uri: profileImage }} 
-                style={styles.profileImage} 
-              />
-            ) : (
-              <View style={styles.profileImagePlaceholder}>
-                <Feather name="user" size={60} color="#666" />
-              </View>
-            )}
-            {editMode && (
-              <View style={styles.editImageOverlay}>
-                <Feather name="camera" size={24} color="white" />
-              </View>
-            )}
-          </TouchableOpacity>
+          <View style={styles.profileIcon}>
+            <Feather name="user" size={60} color="#FF0000" />
+          </View>
           
           <Text style={styles.profileName}>
-            {user?.firstName} {user?.lastName}
+            {user?.username || 'User'}
           </Text>
           <Text style={styles.profileEmail}>{user?.email}</Text>
           
@@ -207,76 +235,71 @@ const AccountDetailsScreen = ({ navigation }) => {
             </TouchableOpacity>
           ) : null}
         </View>
-
         <View style={styles.infoSection}>
           <Text style={styles.sectionTitle}>Personal Information</Text>
           
           <View style={styles.infoField}>
-            <Text style={styles.fieldLabel}>First Name</Text>
+            <Text style={styles.fieldLabel}>Username</Text>
             {editMode ? (
               <TextInput
                 style={styles.input}
-                value={formData.firstName}
-                onChangeText={(text) => handleInputChange('firstName', text)}
-                placeholder="Enter first name"
+                value={formData.username}
+                onChangeText={(text) => handleInputChange('username', text)}
+                placeholder="Enter username"
                 placeholderTextColor="#999"
               />
             ) : (
-              <Text style={styles.fieldValue}>{user?.firstName || 'Not provided'}</Text>
-            )}
-          </View>
-          
-          <View style={styles.infoField}>
-            <Text style={styles.fieldLabel}>Last Name</Text>
-            {editMode ? (
-              <TextInput
-                style={styles.input}
-                value={formData.lastName}
-                onChangeText={(text) => handleInputChange('lastName', text)}
-                placeholder="Enter last name"
-                placeholderTextColor="#999"
-              />
-            ) : (
-              <Text style={styles.fieldValue}>{user?.lastName || 'Not provided'}</Text>
+              <Text style={styles.fieldValue}>{user?.username || 'Not provided'}</Text>
             )}
           </View>
           
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>Email</Text>
-            {editMode ? (
-              <TextInput
-                style={styles.input}
-                value={formData.email}
-                onChangeText={(text) => handleInputChange('email', text)}
-                placeholder="Enter email"
-                placeholderTextColor="#999"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            ) : (
-              <Text style={styles.fieldValue}>{user?.email || 'Not provided'}</Text>
-            )}
+            <Text style={styles.fieldValue}>{user?.email || 'Not provided'}</Text>
           </View>
+        </View>
+        
+        <View style={styles.infoSection}>
+          <Text style={styles.sectionTitle}>Contact Information</Text>
           
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>Phone Number</Text>
             {editMode ? (
               <TextInput
-                style={styles.input}
-                value={formData.phone}
-                onChangeText={(text) => handleInputChange('phone', text)}
-                placeholder="Enter phone number"
+                style={[styles.input, styles.requiredField]}
+                value={formData.phoneNumber}
+                onChangeText={(text) => handleInputChange('phoneNumber', text)}
+                placeholder="Enter your phone number"
                 placeholderTextColor="#999"
                 keyboardType="phone-pad"
               />
             ) : (
-              <Text style={styles.fieldValue}>{user?.phone || 'Not provided'}</Text>
+              <Text style={styles.fieldValue}>{user?.phoneNumber || 'Not provided'}</Text>
+            )}
+            {editMode && (
+              <Text style={styles.fieldHint}>
+                Please provide your phone number for appointment notifications
+              </Text>
             )}
           </View>
         </View>
-
+        
+        {(user?.role === 'barbershop' || user?.role === 'mainBarbershop') && (
+          <View style={styles.infoSection}>
+            <Text style={styles.sectionTitle}>Business Information</Text>
+            
+            <View style={styles.infoField}>
+              <Text style={styles.fieldLabel}>Business Name</Text>
+              <Text style={styles.fieldValue}>{user?.businessName || 'Not provided'}</Text>
+            </View>
+          </View>
+        )}
+        
         <View style={styles.infoSection}>
-          <Text style={styles.sectionTitle}>Address</Text>
+          <Text style={styles.sectionTitle}>Billing Address (Optional)</Text>
+          <Text style={styles.fieldDescription}>
+            You can add a billing address for future payments if needed.
+          </Text>
           
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>Street Address</Text>
@@ -285,11 +308,11 @@ const AccountDetailsScreen = ({ navigation }) => {
                 style={styles.input}
                 value={formData.address}
                 onChangeText={(text) => handleInputChange('address', text)}
-                placeholder="Enter street address"
+                placeholder="Enter street address (optional)"
                 placeholderTextColor="#999"
               />
             ) : (
-              <Text style={styles.fieldValue}>{user?.address?.street || 'Not provided'}</Text>
+              <Text style={styles.fieldValue}>{user?.address || 'Not provided'}</Text>
             )}
           </View>
           
@@ -300,11 +323,11 @@ const AccountDetailsScreen = ({ navigation }) => {
                 style={styles.input}
                 value={formData.city}
                 onChangeText={(text) => handleInputChange('city', text)}
-                placeholder="Enter city"
+                placeholder="Enter city (optional)"
                 placeholderTextColor="#999"
               />
             ) : (
-              <Text style={styles.fieldValue}>{user?.address?.city || 'Not provided'}</Text>
+              <Text style={styles.fieldValue}>{user?.city || 'Not provided'}</Text>
             )}
           </View>
           
@@ -315,12 +338,12 @@ const AccountDetailsScreen = ({ navigation }) => {
                 style={styles.input}
                 value={formData.state}
                 onChangeText={(text) => handleInputChange('state', text)}
-                placeholder="Enter state"
+                placeholder="Enter state (optional)"
                 placeholderTextColor="#999"
                 maxLength={2}
               />
             ) : (
-              <Text style={styles.fieldValue}>{user?.address?.state || 'Not provided'}</Text>
+              <Text style={styles.fieldValue}>{user?.state || 'Not provided'}</Text>
             )}
           </View>
           
@@ -331,16 +354,23 @@ const AccountDetailsScreen = ({ navigation }) => {
                 style={styles.input}
                 value={formData.zipCode}
                 onChangeText={(text) => handleInputChange('zipCode', text)}
-                placeholder="Enter ZIP code"
+                placeholder="Enter ZIP code (optional)"
                 placeholderTextColor="#999"
                 keyboardType="numeric"
                 maxLength={5}
               />
             ) : (
-              <Text style={styles.fieldValue}>{user?.address?.zip || 'Not provided'}</Text>
+              <Text style={styles.fieldValue}>{user?.zipCode || 'Not provided'}</Text>
             )}
           </View>
         </View>
+        
+        <TouchableOpacity 
+          style={styles.logoutButton}
+          onPress={handleLogout}
+        >
+          <Text style={styles.logoutButtonText}>Logout</Text>
+        </TouchableOpacity>
       </ScrollView>
     </LinearGradient>
   );
@@ -389,36 +419,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
   },
-  profileImageContainer: {
+  profileIcon: {
     width: 120,
     height: 120,
     borderRadius: 60,
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 15,
-    position: 'relative',
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: '#FF0000',
-    overflow: 'hidden',
-  },
-  profileImage: {
-    width: '100%',
-    height: '100%',
-  },
-  profileImagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#222',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  editImageOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   profileName: {
     color: 'white',
@@ -473,6 +483,34 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     padding: 12,
     fontSize: 16,
+  },
+  requiredField: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF0000',
+  },
+  fieldHint: {
+    color: '#999',
+    fontSize: 12,
+    marginTop: 5,
+    fontStyle: 'italic',
+  },
+  fieldDescription: {
+    color: '#BBB',
+    fontSize: 14,
+    marginBottom: 15,
+    fontStyle: 'italic',
+  },
+  logoutButton: {
+    backgroundColor: '#333',
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  logoutButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

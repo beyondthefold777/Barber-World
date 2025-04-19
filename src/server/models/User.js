@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: function() { return this.role === 'barbershop' || this.role === 'mainBarbershop'; }
   },
-  // New location fields
+  // Location fields
   address: {
     type: String,
     required: function() { return this.role === 'barbershop' || this.role === 'mainBarbershop'; }
@@ -55,6 +55,61 @@ const userSchema = new mongoose.Schema({
     default: 'inactive'
   },
   subscriptionEndDate: Date,
+  
+  // Email verification fields
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  verificationToken: {
+    type: String
+  },
+  verificationTokenExpires: {
+    type: Date
+  },
+  
+  // Password reset fields
+  resetPasswordToken: {
+    type: String
+  },
+  resetPasswordExpires: {
+    type: Date
+  },
+  
+  // Profile fields
+  bio: {
+    type: String,
+    default: ''
+  },
+  profileImage: {
+    type: String,
+    default: ''
+  },
+  
+  // Account preferences/settings
+  preferences: {
+    notifications: {
+      email: {
+        marketing: { type: Boolean, default: true },
+        appointments: { type: Boolean, default: true },
+        reminders: { type: Boolean, default: true }
+      },
+      push: {
+        marketing: { type: Boolean, default: true },
+        appointments: { type: Boolean, default: true },
+        reminders: { type: Boolean, default: true }
+      }
+    },
+    privacy: {
+      showProfile: { type: Boolean, default: true },
+      showReviews: { type: Boolean, default: true }
+    },
+    theme: {
+      darkMode: { type: Boolean, default: false },
+      colorScheme: { type: String, default: 'default' }
+    }
+  },
+  
   createdAt: {
     type: Date,
     default: Date.now
