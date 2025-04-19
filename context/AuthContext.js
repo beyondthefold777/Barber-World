@@ -32,12 +32,11 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
       }
     };
-
     loadToken();
   }, []);
 
   // Login function - store token in AsyncStorage and state
-  const login = async (newToken) => {
+  const login = async (newToken, userData) => {
     try {
       if (!newToken) {
         console.error('No token provided to login function');
@@ -48,9 +47,36 @@ export const AuthProvider = ({ children }) => {
       await AsyncStorage.setItem('userToken', newToken);
       setToken(newToken);
       
+      // If user data is provided, store it too
+      if (userData) {
+        console.log('Storing user data in AuthContext:', userData);
+        await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        setUser(userData);
+      }
+      
       return true;
     } catch (error) {
       console.error('Failed to save auth token', error);
+      return false;
+    }
+  };
+
+  // Update user data function
+  const updateUser = async (updatedUserData) => {
+    try {
+      // Merge with existing user data
+      const newUserData = { ...user, ...updatedUserData };
+      console.log('Updating user data in AuthContext:', newUserData);
+      
+      // Save to AsyncStorage
+      await AsyncStorage.setItem('userData', JSON.stringify(newUserData));
+      
+      // Update state
+      setUser(newUserData);
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to update user data', error);
       return false;
     }
   };
@@ -76,7 +102,8 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     login,
-    logout
+    logout,
+    updateUser
   };
 
   return (

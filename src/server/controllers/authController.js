@@ -7,21 +7,18 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
     console.log('Login attempt for:', email);
-
     const user = await User.findOne({ email });
     
     if (!user || !(await bcrypt.compare(password, user.password))) {
       console.log('Invalid login attempt for:', email);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-
     const token = jwt.sign(
       { userId: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
     console.log('Login successful for:', email);
-
     res.json({
       token,
       user: {
@@ -29,6 +26,11 @@ exports.login = async (req, res) => {
         email: user.email,
         username: user.username,
         businessName: user.businessName,
+        phoneNumber: user.phoneNumber, // Add this line
+        address: user.address,         // Add these address fields
+        city: user.city,
+        state: user.state,
+        zipCode: user.zipCode,
         role: user.role
       }
     });
@@ -169,12 +171,9 @@ exports.registerMainBarbershop = async (req, res) => {
       user: {
         id: user._id,
         email: user.email,
-        businessName: user.businessName,
-        role: user.role,
-        address,
-        city,
-        state,
-        zipCode
+        username: user.username,
+        phoneNumber: user.phoneNumber, // Add this line
+        role: user.role
       }
     });
   } catch (error) {

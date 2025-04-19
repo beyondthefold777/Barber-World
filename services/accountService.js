@@ -45,6 +45,7 @@ const accountService = {
   
   /**
    * Update the user's profile
+   * @param {Object} updateData - Data to update (username, phoneNumber, address, etc.)
    */
   updateProfile: async (updateData) => {
     try {
@@ -56,10 +57,27 @@ const accountService = {
         return { success: false, message: 'No auth token found' };
       }
       
-      console.log('accountService: Making API request to update profile');
+      // Ensure we're only sending allowed fields to the API
+      const sanitizedData = {
+        username: updateData.username,
+        phoneNumber: updateData.phoneNumber,
+        address: updateData.address,
+        city: updateData.city,
+        state: updateData.state,
+        zipCode: updateData.zipCode,
+        bio: updateData.bio,
+        profileImage: updateData.profileImage
+      };
+      
+      // Remove undefined fields
+      Object.keys(sanitizedData).forEach(key => 
+        sanitizedData[key] === undefined && delete sanitizedData[key]
+      );
+      
+      console.log('accountService: Making API request to update profile with sanitized data:', sanitizedData);
       const response = await axios.put(
         `${API_URL}/account/profile`,
-        updateData,
+        sanitizedData,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -71,7 +89,21 @@ const accountService = {
       
       if (response.data.success) {
         // Update the cached user data
-        await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
+        const cachedData = await AsyncStorage.getItem('userData');
+        let userData = {};
+        
+        if (cachedData) {
+          userData = JSON.parse(cachedData);
+        }
+        
+        // Merge the updated data with existing cached data
+        const updatedUserData = {
+          ...userData,
+          ...response.data.user
+        };
+        
+        await AsyncStorage.setItem('userData', JSON.stringify(updatedUserData));
+        console.log('accountService: Updated cached user data');
       }
       
       return response.data;
@@ -82,6 +114,40 @@ const accountService = {
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to update profile'
+      };
+    }
+  },
+  
+  /**
+   * Update user's phone number
+   * @param {string} phoneNumber - The new phone number
+   */
+  updatePhoneNumber: async (phoneNumber) => {
+    try {
+      console.log('accountService: Updating phone number to:', phoneNumber);
+      return await accountService.updateProfile({ phoneNumber });
+    } catch (error) {
+      console.error('accountService: Error updating phone number:', error);
+      return {
+        success: false,
+        message: 'Failed to update phone number'
+      };
+    }
+  },
+  
+  /**
+   * Update user's address information
+   * @param {Object} addressData - Address data (address, city, state, zipCode)
+   */
+  updateAddress: async (addressData) => {
+    try {
+      console.log('accountService: Updating address information:', addressData);
+      return await accountService.updateProfile(addressData);
+    } catch (error) {
+      console.error('accountService: Error updating address:', error);
+      return {
+        success: false,
+        message: 'Failed to update address'
       };
     }
   },
@@ -104,6 +170,34 @@ const accountService = {
     } catch (error) {
       console.error('accountService: Error getting cached user data:', error);
       return null;
+    }
+  },
+  
+  /**
+   * Update cached user data
+   * @param {Object} userData - User data to cache
+   */
+  updateCachedUserData: async (userData) => {
+    try {
+      console.log('accountService: Updating cached user data');
+      const currentDataString = await AsyncStorage.getItem('userData');
+      let currentData = {};
+      
+      if (currentDataString) {
+        currentData = JSON.parse(currentDataString);
+      }
+      
+      const updatedData = {
+        ...currentData,
+        ...userData
+      };
+      
+      await AsyncStorage.setItem('userData', JSON.stringify(updatedData));
+      console.log('accountService: Cached user data updated successfully');
+      return true;
+    } catch (error) {
+      console.error('accountService: Error updating cached user data:', error);
+      return false;
     }
   },
   
