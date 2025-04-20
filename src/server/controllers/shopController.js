@@ -302,6 +302,30 @@ const shopController = {
     }
   },
 
+  // Get shop ID and name for appointment booking
+  getShopForAppointment: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      console.log('Getting shop for appointment:', id);
+      
+      if (!isValidObjectId(id)) {
+        return res.status(400).json({ success: false, message: 'Invalid shop ID' });
+      }
+      
+      const shop = await Shop.findById(id).select('_id name location');
+      if (!shop) {
+        return res.status(404).json({ success: false, message: 'Shop not found' });
+      }
+      
+      console.log('Found shop for appointment:', shop._id);
+      res.json({ success: true, shop });
+    } catch (error) {
+      console.error('Error getting shop for appointment:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  },
+
+
   // Get all shops (for marketplace/search)
   getAllShops: async (req, res, next) => {
     try {
