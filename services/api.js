@@ -236,37 +236,47 @@ export const appointmentService = {
       if (appointmentData.shopId) {
         requestBody.shopId = appointmentData.shopId;
         console.log('Including shopId in request:', appointmentData.shopId);
-      }
-      
-      // Include clientId if it exists in the appointment data
-      if (appointmentData.clientId) {
-        requestBody.clientId = appointmentData.clientId;
-        console.log('Including clientId in request:', appointmentData.clientId);
-      }
-      
-      // If we don't have clientId in the appointment data, try to get it from user info
-      if (!appointmentData.clientId && userToken) {
-        try {
-          // Make a lightweight request to get user info
-          const userResponse = await fetch(`${API_URL}/api/auth/me`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${userToken}`,
-              'Accept': 'application/json'
+        
+        // If we have a shopId but no shopName, try to fetch the shop name
+        if (!appointmentData.shopName && userToken) {
+          try {
+            const shopResponse = await fetch(`${API_URL}/api/shop/${appointmentData.shopId}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${userToken}`,
+                'Accept': 'application/json'
+              }
+            });
+            
+            if (shopResponse.ok) {
+              const shopData = await shopResponse.json();
+              if (shopData && shopData.shop && shopData.shop.name) {
+                appointmentData.shopName = shopData.shop.name;
+                console.log('Retrieved shop name for appointment:', appointmentData.shopName);
+              }
             }
-          });
-          
-          if (userResponse.ok) {
-            const userInfo = await userResponse.json();
-            if (userInfo && userInfo._id) {
-              requestBody.clientId = userInfo._id;
-              console.log('Retrieved and including clientId in request:', userInfo._id);
-            }
+          } catch (shopError) {
+            console.log('Error fetching shop details:', shopError);
           }
-        } catch (userError) {
-          // If we can't get the user ID, just continue without it
-          console.log('Could not retrieve user ID, continuing without it:', userError.message);
         }
+      }
+      
+      // Get the current user's ID from AsyncStorage
+      let currentUserId = null;
+      try {
+        const userData = await AsyncStorage.getItem('userData');
+        if (userData) {
+          const parsedUserData = JSON.parse(userData);
+          currentUserId = parsedUserData.id;
+          console.log('Found current user ID from AsyncStorage:', currentUserId);
+          
+          // Include userId in the request
+          if (currentUserId) {
+            requestBody.userId = currentUserId;
+          }
+        }
+      } catch (userDataError) {
+        console.log('Error getting userData from AsyncStorage:', userDataError);
       }
       
       console.log('Final request body:', requestBody);
@@ -300,6 +310,7 @@ export const appointmentService = {
         const enhancedAppointment = {
           ...data,
           shopName: appointmentData.shopName || 'Barbershop',
+          userId: currentUserId // Store the user ID explicitly
         };
         
         // Ensure shopId is stored in the appointment
@@ -309,16 +320,10 @@ export const appointmentService = {
           enhancedAppointment.shopId = data.shopId;
         }
         
-        // Ensure clientId is stored in the appointment
-        if (requestBody.clientId) {
-          enhancedAppointment.clientId = requestBody.clientId;
-        } else if (data.clientId) {
-          enhancedAppointment.clientId = data.clientId;
-        }
-        
         console.log('Enhanced appointment with IDs:', {
+          userId: enhancedAppointment.userId,
           shopId: enhancedAppointment.shopId,
-          clientId: enhancedAppointment.clientId
+          shopName: enhancedAppointment.shopName
         });
         
         // Add the new appointment to the array
@@ -357,76 +362,190 @@ export const appointmentService = {
   
   getUserAppointments: async (userToken) => {
     try {
-      // Try to get appointments from AsyncStorage
+      console.log('Getting user appointments with token:', userToken ? 'Yes (token exists)' : 'No token');
+      
+      // Get the current user's ID from AsyncStorage
+      let currentUserId = null;
+      try {
+        const userData = await AsyncStorage.getItem('userData');
+        if (userData) {
+          const parsedUserData = JSON.parse(userData);
+          currentUserId = parsedUserData.id;
+          console.log('Found current user ID from AsyncStorage:', currentUserId);
+        }
+      } catch (userDataError) {
+        console.log('Error getting userData from AsyncStorage:', userDataError);
+      }
+      
+      // Try to get all appointments from AsyncStorage first
       const storedAppointments = await AsyncStorage.getItem('userAppointments');
       if (storedAppointments) {
-        const appointments = JSON.parse(storedAppointments);
-        console.log('Retrieved appointments from AsyncStorage:', appointments.length);
+        let appointments = JSON.parse(storedAppointments);
+        console.log('Retrieved all appointments from AsyncStorage:', appointments.length);
+        
+        // Check if we need to fetch shop names for any appointments
+        const needShopNames = appointments.some(app => 
+          app.shopId && (!app.shopName || app.shopName === 'N/A' || app.shopName === 'Barbershop')
+        );
+        
+        if (needShopNames) {
+          console.log('Some appointments need shop names, fetching them...');
+          
+          // Create a map to store shop names by shopId to avoid duplicate requests
+          const shopNamesMap = {};
+          
+          // Enhanced appointments with shop names
+          const enhancedAppointments = await Promise.all(
+            appointments.map(async (appointment) => {
+              // If this appointment already has a valid shop name, return it as is
+              if (appointment.shopName && appointment.shopName !== 'N/A' && appointment.shopName !== 'Barbershop') {
+                return appointment;
+              }
+              
+              // If this appointment has a shopId, try to get the shop name
+              if (appointment.shopId) {
+                // Check if we've already fetched this shop's name
+                if (shopNamesMap[appointment.shopId]) {
+                  return {
+                    ...appointment,
+                    shopName: shopNamesMap[appointment.shopId]
+                  };
+                }
+                
+                try {
+                  const shopResponse = await fetch(`${API_URL}/api/shop/${appointment.shopId}`, {
+                    method: 'GET',
+                    headers: {
+                      'Authorization': `Bearer ${userToken}`,
+                      'Accept': 'application/json'
+                    }
+                  });
+                  
+                  if (shopResponse.ok) {
+                    const shopData = await shopResponse.json();
+                    if (shopData && shopData.shop && shopData.shop.name) {
+                      // Store the shop name in our map for future use
+                      shopNamesMap[appointment.shopId] = shopData.shop.name;
+                      
+                      return {
+                        ...appointment,
+                        shopName: shopData.shop.name
+                      };
+                    }
+                  }
+                } catch (shopError) {
+                  console.log(`Error fetching shop details for appointment ${appointment._id}:`, shopError);
+                }
+              }
+              
+              // If we couldn't get a shop name, return the appointment with default name
+              return {
+                ...appointment,
+                shopName: 'Barbershop'
+              };
+            })
+          );
+          
+          // Update AsyncStorage with the enhanced appointments
+          await AsyncStorage.setItem('userAppointments', JSON.stringify(enhancedAppointments));
+          console.log('Updated appointments in AsyncStorage with shop names');
+          
+          return enhancedAppointments;
+        }
+        
         return appointments;
       }
       
-      // If nothing in AsyncStorage, try the server
-      try {
-        const response = await fetch(`${API_URL}/api/appointments/user`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${userToken}`,
-            'Accept': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          console.log(`Error fetching appointments: ${response.status}`);
-          return []; // Return empty array instead of throwing
+      // If nothing in AsyncStorage, fetch from server
+      console.log('No appointments in AsyncStorage, fetching from server');
+      
+      // Use a generic endpoint that will return all appointments for the authenticated user
+      const response = await fetch(`${API_URL}/api/appointments/user`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
         }
+      });
+      
+      if (!response.ok) {
+        console.log(`Error fetching appointments: ${response.status}`);
+        return []; // Return empty array instead of throwing
+      }
+      
+      const data = await response.json();
+      console.log('Server response for appointments:', typeof data, Array.isArray(data) ? data.length : 'not array');
+      
+      // Store the fetched appointments in AsyncStorage for future use
+      if (data && (data.appointments || Array.isArray(data))) {
+        const appointmentsToStore = data.appointments || data;
         
-        const data = await response.json();
+        // Create a map to store shop names by shopId to avoid duplicate requests
+        const shopNamesMap = {};
         
-        // Store the fetched appointments in AsyncStorage for future use
-        if (data && (data.appointments || Array.isArray(data))) {
-          const appointmentsToStore = data.appointments || data;
-          
-          // Ensure each appointment has shopId and clientId if available
-          const enhancedAppointments = appointmentsToStore.map(appointment => {
+        // Enhanced appointments with shop names
+        const enhancedAppointments = await Promise.all(
+          appointmentsToStore.map(async (appointment) => {
             const enhanced = { ...appointment };
             
-            // Make sure shopId is preserved
+            // If this appointment has a shopId, try to get the shop name
             if (appointment.shopId) {
-              enhanced.shopId = appointment.shopId;
-            }
-            
-                     // Make sure clientId is preserved
-                     if (appointment.clientId) {
-                      enhanced.clientId = appointment.clientId;
+              // Check if we've already fetched this shop's name
+              if (shopNamesMap[appointment.shopId]) {
+                enhanced.shopName = shopNamesMap[appointment.shopId];
+              } else {
+                try {
+                  const shopResponse = await fetch(`${API_URL}/api/shop/${appointment.shopId}`, {
+                    method: 'GET',
+                    headers: {
+                      'Authorization': `Bearer ${userToken}`,
+                      'Accept': 'application/json'
                     }
-                    
-                    // Add shop name if available
-                    if (appointment.shop && appointment.shop.name) {
-                      enhanced.shopName = appointment.shop.name;
-                    } else if (appointment.shopData && appointment.shopData.name) {
-                      enhanced.shopName = appointment.shopData.name;
-                    }
-                    
-                    return enhanced;
                   });
                   
-                  await AsyncStorage.setItem('userAppointments', JSON.stringify(enhancedAppointments));
-                  console.log('Stored enhanced appointments in AsyncStorage:', enhancedAppointments.length);
-                  
-                  return enhancedAppointments;
+                  if (shopResponse.ok) {
+                    const shopData = await shopResponse.json();
+                    if (shopData && shopData.shop && shopData.shop.name) {
+                      // Store the shop name in our map for future use
+                      shopNamesMap[appointment.shopId] = shopData.shop.name;
+                      enhanced.shopName = shopData.shop.name;
+                      console.log(`Found shop name for appointment ${appointment._id}: ${enhanced.shopName}`);
+                    }
+                  }
+                } catch (shopError) {
+                  console.log(`Error fetching shop details for appointment ${appointment._id}:`, shopError);
                 }
-                
-                return data;
-              } catch (serverError) {
-                console.error('Error fetching user appointments from server:', serverError);
-                // Return empty array if both AsyncStorage and server fail
-                return [];
               }
-            } catch (error) {
-              console.error('Error in getUserAppointments:', error);
-              return [];
             }
-          },
+            
+            // If we couldn't get a shop name, use a default
+            if (!enhanced.shopName) {
+              enhanced.shopName = 'Barbershop';
+            }
+            
+            // Store the user ID with the appointment
+            if (currentUserId) {
+              enhanced.userId = currentUserId;
+            }
+            
+            return enhanced;
+          })
+        );
+        
+        // Store appointments in AsyncStorage
+        await AsyncStorage.setItem('userAppointments', JSON.stringify(enhancedAppointments));
+        console.log('Stored enhanced appointments in AsyncStorage:', enhancedAppointments.length);
+        
+        return enhancedAppointments;
+      }
+      
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.error('Error in getUserAppointments:', error);
+      return [];
+    }
+  },
+  
         
           cancelAppointment: async (appointmentId, userToken) => {
             try {
@@ -469,6 +588,8 @@ export const appointmentService = {
             }
           }
         };
+
+        
         
 
 export const authService = {
