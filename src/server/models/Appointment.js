@@ -1,13 +1,15 @@
 const mongoose = require('mongoose');
+
 const appointmentSchema = new mongoose.Schema({
   clientId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
+  // Using shopId as the field name to match your routes
   shopId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Shop',
+    ref: 'Shop', // This should match the model name in shop.model.js
     required: true
   },
   date: {
@@ -33,8 +35,7 @@ const appointmentSchema = new mongoose.Schema({
   }
 });
 
-// Add index for querying appointments by date
 appointmentSchema.index({ date: 1, status: 1 });
-appointmentSchema.index({ shopId: 1 }); // Add index for shop queries
+appointmentSchema.index({ shopId: 1 });
 
 module.exports = mongoose.model('Appointment', appointmentSchema);

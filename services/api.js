@@ -5,24 +5,271 @@ const API_URL = config.apiUrl;
 
 export const appointmentService = {
   getBarbershopAppointments: async (userToken) => {
+    console.log('\n========== APPOINTMENT SERVICE: GET BARBERSHOP APPOINTMENTS ==========');
+    console.log('1. Function called at:', new Date().toISOString());
+    
+    if (!userToken) {
+      console.log('2. ERROR: No user token provided');
+      console.log('========== APPOINTMENT SERVICE: ENDING WITH ERROR ==========\n');
+      throw new Error('No authentication token provided');
+    }
+    
+    console.log('2. User token available:', userToken ? `${userToken.substring(0, 5)}...${userToken.substring(userToken.length - 5)}` : 'null');
+    
     try {
-      const response = await fetch(`${API_URL}/api/appointments`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${userToken}`,
-          'Accept': 'application/json'
+      // First, get the user info to determine role and ID
+      console.log('3. Fetching user info to determine role and ID...');
+      let userInfo;
+      
+      try {
+        const userResponse = await fetch(`${API_URL}/api/auth/me`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${userToken}`,
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!userResponse.ok) {
+          console.log(`4. Failed to get user info: ${userResponse.status}`);
+          throw new Error('Failed to get user information');
         }
-      });
-      return await response.json();
+        
+        userInfo = await userResponse.json();
+        console.log('4. User info retrieved successfully');
+        console.log(`   User role: ${userInfo.role}`);
+        console.log(`   User ID: ${userInfo._id}`);
+      } catch (userError) {
+        console.log('4. ERROR getting user info:', userError.message);
+        console.log('   Proceeding with generic appointments endpoint');
+        userInfo = null;
+      }
+      
+      // Determine the appropriate endpoint based on user role
+      let endpoint = `${API_URL}/api/appointments`;
+      
+      if (userInfo) {
+        if (userInfo.role === 'barbershop' || userInfo.role === 'mainBarbershop') {
+          // For barbershop users, get appointments for their shop
+          console.log('5. User is a barbershop, fetching shop-specific appointments');
+          endpoint = `${API_URL}/api/appointments/shop/${userInfo._id}`;
+        } else if (userInfo.role === 'client') {
+          // For client users, get their own appointments
+          console.log('5. User is a client, fetching user-specific appointments');
+          endpoint = `${API_URL}/api/appointments/user/${userInfo._id}`;
+        } else {
+          console.log(`5. Unknown user role: ${userInfo.role}, using default endpoint`);
+        }
+      } else {
+        console.log('5. No user info available, using default endpoint');
+      }
+      
+      console.log(`6. Using endpoint: ${endpoint}`);
+      
+      console.log('7. Initiating fetch request...');
+      const fetchStartTime = Date.now();
+      
+      let response;
+      try {
+        response = await fetch(endpoint, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${userToken}`,
+            'Accept': 'application/json'
+          }
+        });
+        
+        const fetchEndTime = Date.now();
+        console.log(`8. Fetch completed in ${fetchEndTime - fetchStartTime}ms`);
+        console.log(`9. Response status: ${response.status} ${response.statusText}`);
+        
+      } catch (fetchError) {
+        console.log('8. FETCH ERROR:', fetchError.message);
+        console.log('   Error details:', fetchError);
+        console.log('========== APPOINTMENT SERVICE: ENDING WITH FETCH ERROR ==========\n');
+        throw new Error(`Network error: ${fetchError.message}`);
+      }
+      
+      // Check if response is ok
+      if (!response.ok) {
+        console.log('10. ERROR: Response not OK');
+        
+        let errorText = '';
+        try {
+          errorText = await response.text();
+          console.log('11. Error response body:', errorText);
+        } catch (textError) {
+          console.log('11. Could not read error response body:', textError.message);
+        }
+        
+        console.log('========== APPOINTMENT SERVICE: ENDING WITH HTTP ERROR ==========\n');
+        throw new Error(`Failed to fetch appointments: ${response.status} ${errorText}`);
+      }
+      
+      console.log('10. Response OK, attempting to parse JSON...');
+      
+      let data;
+      try {
+        data = await response.json();
+        console.log('11. JSON parsing successful');
+      } catch (jsonError) {
+        console.log('11. JSON PARSE ERROR:', jsonError.message);
+        console.log('    Error details:', jsonError);
+        
+        // Try to get the raw text to see what's wrong
+        try {
+          const rawText = await response.text();
+          console.log('    Raw response text (first 500 chars):', rawText.substring(0, 500));
+        } catch (textError) {
+          console.log('    Could not get raw text:', textError.message);
+        }
+        
+        console.log('========== APPOINTMENT SERVICE: ENDING WITH JSON PARSE ERROR ==========\n');
+        throw new Error(`Invalid JSON response: ${jsonError.message}`);
+      }
+      
+      console.log('12. Examining parsed data:');
+      console.log(`    Data type: ${typeof data}`);
+      console.log(`    Is array: ${Array.isArray(data)}`);
+      
+      // Handle different response formats
+      let appointments = data;
+      
+      // If data is an object with an appointments property, use that
+      if (!Array.isArray(data) && data && typeof data === 'object' && Array.isArray(data.appointments)) {
+        console.log('13. Data contains appointments property, using that');
+        appointments = data.appointments;
+      }
+      
+      // Ensure appointments is an array
+      if (!Array.isArray(appointments)) {
+        console.log('13. Data is not in expected format, converting to empty array');
+        appointments = [];
+      }
+      
+      console.log(`14. Final appointments count: ${appointments.length}`);
+      
+      if (appointments.length > 0) {
+        console.log('15. First appointment details:');
+        const firstItem = appointments[0];
+        
+        console.log(`    ID: ${firstItem._id || 'undefined'}`);
+        console.log(`    Date: ${firstItem.date || 'undefined'}`);
+        console.log(`    Service: ${firstItem.service || 'undefined'}`);
+        
+        // Check if we need to populate shop information
+        if (firstItem.shopId && typeof firstItem.shopId !== 'object') {
+          console.log('16. Shop information needs to be populated');
+          console.log(`    ShopId: ${firstItem.shopId}`);
+          
+          // Try to populate shop information for each appointment
+          try {
+            console.log('17. Attempting to populate shop information for appointments...');
+            const populatedAppointments = await Promise.all(
+              appointments.map(async (appointment) => {
+                if (appointment.shopId && typeof appointment.shopId !== 'object') {
+                  try {
+                    const shopResponse = await fetch(`${API_URL}/api/shop/${appointment.shopId}`, {
+                      method: 'GET',
+                      headers: {
+                        'Authorization': `Bearer ${userToken}`,
+                        'Accept': 'application/json'
+                      }
+                    });
+                    
+                    if (shopResponse.ok) {
+                      const shopData = await shopResponse.json();
+                      if (shopData && shopData.shop) {
+                        return {
+                          ...appointment,
+                          shopData: shopData.shop
+                        };
+                      }
+                    }
+                  } catch (shopError) {
+                    console.log(`    Error fetching shop data for appointment ${appointment._id}:`, shopError.message);
+                  }
+                }
+                return appointment;
+              })
+            );
+            
+            appointments = populatedAppointments;
+            console.log('18. Shop information population completed');
+          } catch (populationError) {
+            console.log('17. ERROR during shop information population:', populationError.message);
+            // Continue with unpopulated appointments
+          }
+        } else {
+          console.log('16. Shop information already populated or not available');
+        }
+      } else {
+        console.log('15. No appointments found');
+      }
+      
+      console.log('19. Returning appointments to caller');
+      console.log('========== APPOINTMENT SERVICE: COMPLETED SUCCESSFULLY ==========\n');
+      return appointments;
+      
     } catch (error) {
-      console.error('Error fetching appointments:', error);
+      console.log(`ERROR in getBarbershopAppointments: ${error.message}`);
+      console.log('Error object:', error);
+      console.log('Error stack:', error.stack);
+      console.log('========== APPOINTMENT SERVICE: ENDING WITH ERROR ==========\n');
       throw error;
     }
   },
-
+  
   bookAppointment: async (appointmentData, userToken) => {
     try {
       console.log('Making appointment request with data:', appointmentData);
+      
+      // Create the request body with the essential fields
+      const requestBody = {
+        date: appointmentData.date,
+        timeSlot: appointmentData.timeSlot,
+        service: appointmentData.service,
+        status: 'confirmed'
+      };
+      
+      // Include shopId if it exists in the appointment data
+      if (appointmentData.shopId) {
+        requestBody.shopId = appointmentData.shopId;
+        console.log('Including shopId in request:', appointmentData.shopId);
+      }
+      
+      // Include clientId if it exists in the appointment data
+      if (appointmentData.clientId) {
+        requestBody.clientId = appointmentData.clientId;
+        console.log('Including clientId in request:', appointmentData.clientId);
+      }
+      
+      // If we don't have clientId in the appointment data, try to get it from user info
+      if (!appointmentData.clientId && userToken) {
+        try {
+          // Make a lightweight request to get user info
+          const userResponse = await fetch(`${API_URL}/api/auth/me`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${userToken}`,
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (userResponse.ok) {
+            const userInfo = await userResponse.json();
+            if (userInfo && userInfo._id) {
+              requestBody.clientId = userInfo._id;
+              console.log('Retrieved and including clientId in request:', userInfo._id);
+            }
+          }
+        } catch (userError) {
+          // If we can't get the user ID, just continue without it
+          console.log('Could not retrieve user ID, continuing without it:', userError.message);
+        }
+      }
+      
+      console.log('Final request body:', requestBody);
       
       const response = await fetch(`${API_URL}/api/appointments`, {
         method: 'POST',
@@ -31,19 +278,13 @@ export const appointmentService = {
           'Accept': 'application/json',
           'Authorization': `Bearer ${userToken}`
         },
-        body: JSON.stringify({
-          shopId: appointmentData.shopId, // Include the shop ID
-          date: appointmentData.date,
-          timeSlot: appointmentData.timeSlot,
-          service: appointmentData.service,
-          status: 'confirmed'
-        })
+        body: JSON.stringify(requestBody)
       });
-
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
+      
       const data = await response.json();
       console.log('Server response:', data);
       
@@ -58,6 +299,15 @@ export const appointmentService = {
           ...data,
           shopName: appointmentData.shopName || 'Barbershop',
         };
+        
+        // Include shopId and clientId in the stored appointment if they exist
+        if (appointmentData.shopId) {
+          enhancedAppointment.shopId = appointmentData.shopId;
+        }
+        
+        if (requestBody.clientId) {
+          enhancedAppointment.clientId = requestBody.clientId;
+        }
         
         // Add the new appointment to the array
         appointments.push(enhancedAppointment);
@@ -75,6 +325,7 @@ export const appointmentService = {
       throw error;
     }
   },
+  
   getTimeSlots: async (date, shopId) => {
     try {
       // Include shopId in the request to get shop-specific time slots

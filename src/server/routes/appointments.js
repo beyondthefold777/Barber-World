@@ -44,11 +44,9 @@ router.post('/', async (req, res) => {
     status: 'confirmed'
   });
   
-  console.log('Created appointment object:', appointment);
-  
   try {
     const newAppointment = await appointment.save();
-    console.log('Successfully saved appointment:', newAppointment);
+    console.log('Successfully saved appointment');
     res.status(201).json(newAppointment);
   } catch (error) {
     console.log('Error saving appointment:', error);
@@ -59,11 +57,8 @@ router.post('/', async (req, res) => {
 // Get all appointments (for testing)
 router.get('/', async (req, res) => {
   try {
-    const appointments = await Appointment.find()
-      .populate('shopId', 'name')
-      .populate('clientId', 'name email');
-    
-    console.log('All appointments:', appointments);
+    const appointments = await Appointment.find();
+    console.log(`Retrieved ${appointments.length} appointments`);
     res.json(appointments);
   } catch (error) {
     console.log('Error fetching appointments:', error);
@@ -75,9 +70,9 @@ router.get('/', async (req, res) => {
 router.get('/shop/:shopId', async (req, res) => {
   try {
     const appointments = await Appointment.find({ shopId: req.params.shopId })
-      .populate('clientId', 'name email')
       .sort({ date: 1, timeSlot: 1 });
     
+    console.log(`Found ${appointments.length} appointments for shop ${req.params.shopId}`);
     res.json(appointments);
   } catch (error) {
     console.log('Error fetching shop appointments:', error);
@@ -89,9 +84,9 @@ router.get('/shop/:shopId', async (req, res) => {
 router.get('/client/:clientId', async (req, res) => {
   try {
     const appointments = await Appointment.find({ clientId: req.params.clientId })
-      .populate('shopId', 'name')
       .sort({ date: -1 });
     
+    console.log(`Found ${appointments.length} appointments for client ${req.params.clientId}`);
     res.json(appointments);
   } catch (error) {
     console.log('Error fetching client appointments:', error);
@@ -99,17 +94,43 @@ router.get('/client/:clientId', async (req, res) => {
   }
 });
 
-// Simple user appointments route
+// Get appointments for the logged-in user
 router.get('/user', async (req, res) => {
   try {
-    const userId = req.query.userId || '64f5e3c2e4b1234567890123';
+    // Get userId from token or query parameter
+    const userId = req.user ? req.user.id : req.query.userId || '64f5e3c2e4b1234567890123';
+    
+    console.log(`Fetching appointments for user: ${userId}`);
+    
+    // Find appointments for this user
     const appointments = await Appointment.find({ clientId: userId })
-      .populate('shopId', 'name')
       .sort({ date: -1 });
     
-    res.json(appointments);
+    console.log(`Found ${appointments.length} appointments for user ${userId}`);
+    
+    // Try to populate shop information manually
+    const populatedAppointments = [];
+    
+    for (const appointment of appointments) {
+      try {
+        const shopData = await Shop.findById(appointment.shopId).lean();
+        
+        populatedAppointments.push({
+          ...appointment.toObject(),
+          shopData: shopData || { name: 'Unknown Shop' }
+        });
+      } catch (err) {
+        console.log(`Error populating shop for appointment ${appointment._id}:`, err);
+        populatedAppointments.push({
+          ...appointment.toObject(),
+          shopData: { name: 'Unknown Shop' }
+        });
+      }
+    }
+    
+    res.json(populatedAppointments);
   } catch (error) {
-    console.log('Error fetching user appointments:', error);
+    console.error('Error fetching user appointments:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -117,13 +138,58 @@ router.get('/user', async (req, res) => {
 // Get shop details for appointment booking
 router.get('/shop-details/:shopId', async (req, res) => {
   try {
-    const shop = await Shop.findById(req.params.shopId).select('name location');
+    const shop = await Shop.findById(req.params.shopId);
     if (!shop) {
       return res.status(404).json({ message: 'Shop not found' });
     }
+    console.log(`Retrieved shop details for ${req.params.shopId}`);
     res.json({ shop });
   } catch (error) {
     console.log('Error fetching shop details:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Update appointment status
+router.patch('/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!status) {
+      return res.status(400).json({ message: 'Status is required' });
+    }
+    
+    const appointment = await Appointment.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    );
+    
+    if (!appointment) {
+      return res.status(404).json({ message: 'Appointment not found' });
+    }
+    
+    console.log(`Updated appointment ${req.params.id} status to ${status}`);
+    res.json(appointment);
+  } catch (error) {
+    console.log('Error updating appointment status:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete appointment
+router.delete('/:id', async (req, res) => {
+  try {
+    const appointment = await Appointment.findByIdAndDelete(req.params.id);
+    
+    if (!appointment) {
+      return res.status(404).json({ message: 'Appointment not found' });
+    }
+    
+    console.log(`Deleted appointment ${req.params.id}`);
+    res.json({ message: 'Appointment deleted' });
+  } catch (error) {
+    console.log('Error deleting appointment:', error);
     res.status(500).json({ message: error.message });
   }
 });
