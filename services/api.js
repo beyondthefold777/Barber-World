@@ -282,6 +282,8 @@ export const appointmentService = {
       });
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.log('Error response from server:', errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
@@ -300,14 +302,24 @@ export const appointmentService = {
           shopName: appointmentData.shopName || 'Barbershop',
         };
         
-        // Include shopId and clientId in the stored appointment if they exist
+        // Ensure shopId is stored in the appointment
         if (appointmentData.shopId) {
           enhancedAppointment.shopId = appointmentData.shopId;
+        } else if (data.shopId) {
+          enhancedAppointment.shopId = data.shopId;
         }
         
+        // Ensure clientId is stored in the appointment
         if (requestBody.clientId) {
           enhancedAppointment.clientId = requestBody.clientId;
+        } else if (data.clientId) {
+          enhancedAppointment.clientId = data.clientId;
         }
+        
+        console.log('Enhanced appointment with IDs:', {
+          shopId: enhancedAppointment.shopId,
+          clientId: enhancedAppointment.clientId
+        });
         
         // Add the new appointment to the array
         appointments.push(enhancedAppointment);
@@ -364,7 +376,8 @@ export const appointmentService = {
         });
         
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          console.log(`Error fetching appointments: ${response.status}`);
+          return []; // Return empty array instead of throwing
         }
         
         const data = await response.json();
@@ -372,59 +385,91 @@ export const appointmentService = {
         // Store the fetched appointments in AsyncStorage for future use
         if (data && (data.appointments || Array.isArray(data))) {
           const appointmentsToStore = data.appointments || data;
-          await AsyncStorage.setItem('userAppointments', JSON.stringify(appointmentsToStore));
-        }
+          
+          // Ensure each appointment has shopId and clientId if available
+          const enhancedAppointments = appointmentsToStore.map(appointment => {
+            const enhanced = { ...appointment };
+            
+            // Make sure shopId is preserved
+            if (appointment.shopId) {
+              enhanced.shopId = appointment.shopId;
+            }
+            
+                     // Make sure clientId is preserved
+                     if (appointment.clientId) {
+                      enhanced.clientId = appointment.clientId;
+                    }
+                    
+                    // Add shop name if available
+                    if (appointment.shop && appointment.shop.name) {
+                      enhanced.shopName = appointment.shop.name;
+                    } else if (appointment.shopData && appointment.shopData.name) {
+                      enhanced.shopName = appointment.shopData.name;
+                    }
+                    
+                    return enhanced;
+                  });
+                  
+                  await AsyncStorage.setItem('userAppointments', JSON.stringify(enhancedAppointments));
+                  console.log('Stored enhanced appointments in AsyncStorage:', enhancedAppointments.length);
+                  
+                  return enhancedAppointments;
+                }
+                
+                return data;
+              } catch (serverError) {
+                console.error('Error fetching user appointments from server:', serverError);
+                // Return empty array if both AsyncStorage and server fail
+                return [];
+              }
+            } catch (error) {
+              console.error('Error in getUserAppointments:', error);
+              return [];
+            }
+          },
         
-        return data;
-      } catch (serverError) {
-        console.error('Error fetching user appointments from server:', serverError);
-        // Return empty array if both AsyncStorage and server fail
-        return [];
-      }
-    } catch (error) {
-      console.error('Error in getUserAppointments:', error);
-      return [];
-    }
-  },
-  cancelAppointment: async (appointmentId, userToken) => {
-    try {
-      const response = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${userToken}`,
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      // Update the appointment in AsyncStorage
-      try {
-        const storedAppointments = await AsyncStorage.getItem('userAppointments');
-        if (storedAppointments) {
-          let appointments = JSON.parse(storedAppointments);
-          
-          // Update the status of the canceled appointment
-          appointments = appointments.map(app => 
-            app._id === appointmentId ? {...app, status: 'canceled'} : app
-          );
-          
-          await AsyncStorage.setItem('userAppointments', JSON.stringify(appointments));
-          console.log('Updated appointment status in AsyncStorage');
-        }
-      } catch (storageError) {
-        console.log('Error updating appointment in AsyncStorage:', storageError);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error canceling appointment:', error);
-      throw error;
-    }
-  }
-};
+          cancelAppointment: async (appointmentId, userToken) => {
+            try {
+              const response = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': `Bearer ${userToken}`,
+                  'Accept': 'application/json'
+                }
+              });
+              
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.log(`Error canceling appointment: ${response.status}`, errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              
+              // Update the appointment in AsyncStorage
+              try {
+                const storedAppointments = await AsyncStorage.getItem('userAppointments');
+                if (storedAppointments) {
+                  let appointments = JSON.parse(storedAppointments);
+                  
+                  // Update the status of the canceled appointment
+                  appointments = appointments.map(app => 
+                    app._id === appointmentId ? {...app, status: 'canceled'} : app
+                  );
+                  
+                  await AsyncStorage.setItem('userAppointments', JSON.stringify(appointments));
+                  console.log('Updated appointment status in AsyncStorage');
+                }
+              } catch (storageError) {
+                console.log('Error updating appointment in AsyncStorage:', storageError);
+              }
+              
+              return await response.json();
+            } catch (error) {
+              console.error('Error canceling appointment:', error);
+              throw error;
+            }
+          }
+        };
+        
 
 export const authService = {
   login: async (email, password, role) => {
