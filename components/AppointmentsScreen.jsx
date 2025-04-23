@@ -6,7 +6,9 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Alert
+  Alert,
+  Modal,
+  ScrollView
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -25,6 +27,9 @@ const AppointmentsScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const { userToken, userId } = useAuth();
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [selectedShop, setSelectedShop] = useState(null);
+  const [userShops, setUserShops] = useState([]);
 
   // Function to get user data from AsyncStorage
   const getUserData = async () => {
@@ -146,49 +151,49 @@ const AppointmentsScreen = ({ navigation }) => {
       
       logScreen(`API Response received, type: ${typeof response}`);
       
+      let appointmentsData = [];
+      
       if (response && response.appointments) {
         logScreen(`Found ${response.appointments.length} appointments in response.appointments`);
-        
-        // Log each appointment's client ID and shop details
-        response.appointments.forEach(app => {
-          logScreen(`Appointment ${app._id}: clientId=${app.clientId}, shopName=${app.shopName || 'N/A'}, shopId=${JSON.stringify(app.shopId || 'N/A')}`);
-        });
-        
-        setAppointments(response.appointments);
-        
-        // Cache the appointments
-        await AsyncStorage.setItem('appointments', JSON.stringify(response.appointments));
-        logScreen("Appointments saved to AsyncStorage");
+        appointmentsData = response.appointments;
       } else if (response && Array.isArray(response)) {
         // If the response is directly an array of appointments
         logScreen(`Found ${response.length} appointments in array response`);
-        
-        // Log each appointment's client ID and shop details
-        response.forEach(app => {
-          logScreen(`Appointment ${app._id}: clientId=${app.clientId}, shopName=${app.shopName || 'N/A'}, shopId=${JSON.stringify(app.shopId || 'N/A')}`);
-        });
-        
-        setAppointments(response);
-        
-        // Cache the appointments
-        await AsyncStorage.setItem('appointments', JSON.stringify(response));
-        logScreen("Appointments saved to AsyncStorage");
+        appointmentsData = response;
       } else {
         // If no appointments are found or response format is unexpected
         logScreen(`Unexpected response format: ${JSON.stringify(response)}`);
-        // Keep existing appointments if we have them, otherwise set to empty array
-        if (appointments.length === 0) {
-          setAppointments([]);
-        }
+        appointmentsData = [];
       }
       
+      // Extract unique shop names for filtering
+      const shops = new Set();
+      appointmentsData.forEach(app => {
+        const shopName = getShopName(app);
+        if (shopName) shops.add(shopName);
+      });
+      
+      const userShopsList = Array.from(shops).sort();
+      setUserShops(userShopsList);
+      
+      // If we have shops and no shop is selected yet, select the first one
+      if (userShopsList.length > 0 && !selectedShop) {
+        setSelectedShop(userShopsList[0]);
+      }
+      
+      setAppointments(appointmentsData);
+      
+      // Cache the appointments
+      await AsyncStorage.setItem('appointments', JSON.stringify(appointmentsData));
+      logScreen("Appointments saved to AsyncStorage");
+      
       // Log the first appointment for debugging if available
-      if (appointments.length > 0) {
-        const firstAppointment = appointments[0];
+      if (appointmentsData.length > 0) {
+        const firstAppointment = appointmentsData[0];
         logScreen("First appointment details:");
         logScreen(`- ID: ${firstAppointment._id}`);
         logScreen(`- Client ID: ${firstAppointment.clientId}`);
-        logScreen(`- Shop: ${firstAppointment.shopName || (firstAppointment.shopId && typeof firstAppointment.shopId === 'object' ? firstAppointment.shopId.name : 'Unknown')}`);
+        logScreen(`- Shop: ${getShopName(firstAppointment)}`);
         logScreen(`- Status: ${firstAppointment.status}`);
         logScreen(`- Date: ${firstAppointment.date}`);
       } else {
@@ -262,7 +267,7 @@ const AppointmentsScreen = ({ navigation }) => {
               const cachedAppointments = await AsyncStorage.getItem('appointments');
               if (cachedAppointments) {
                 const parsedAppointments = JSON.parse(cachedAppointments);
-                const updatedAppointments = parsedAppointments.map(app => 
+                const updatedAppointments = parsedAppointments.map(app =>
                   app._id === appointmentId ? {...app, status: 'canceled'} : app
                 );
                 await AsyncStorage.setItem('appointments', JSON.stringify(updatedAppointments));
@@ -329,6 +334,11 @@ const AppointmentsScreen = ({ navigation }) => {
     return null;
   };
 
+  // Filter appointments based on selected shop
+  const filteredAppointments = selectedShop 
+    ? appointments.filter(app => getShopName(app) === selectedShop)
+    : [];
+
   const renderAppointmentItem = ({ item }) => {
     // Log each appointment as it's rendered
     const shopName = getShopName(item);
@@ -379,223 +389,360 @@ const AppointmentsScreen = ({ navigation }) => {
           <TouchableOpacity 
             style={styles.cancelButton}
             onPress={() => handleCancelAppointment(item._id)}
-            >
-              <Text style={styles.cancelButtonText}>Cancel Appointment</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      );
-    };
-  
-    return (
-      <LinearGradient
-        colors={['#000000', '#333333']}
-        style={styles.container}
-      >
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
           >
-            <Feather name="arrow-left" size={24} color="white" />
+            <Text style={styles.cancelButtonText}>Cancel Appointment</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>My Appointments</Text>
-        </View>
-        
-        {loading && !refreshing ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF0000" />
-            <Text style={styles.loadingText}>Loading appointments...</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={appointments}
-            renderItem={renderAppointmentItem}
-            keyExtractor={(item) => item._id || Math.random().toString()}
-            contentContainerStyle={styles.listContainer}
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Feather name="calendar" size={50} color="#666" />
-                <Text style={styles.emptyText}>No appointments found</Text>
-                <TouchableOpacity 
-                  style={styles.bookButton}
-                  onPress={() => {
-                    logScreen("Navigate to GuestLandingPage to find barbershop");
-                    navigation.navigate('GuestLandingPage');
-                  }}
-                >
-                  <Text style={styles.bookButtonText}>Find a Barbershop</Text>
+        )}
+      </View>
+       );
+      };
+      
+      // Filter modal component
+      const FilterModal = () => (
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={filterModalVisible}
+          onRequestClose={() => setFilterModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Barbershop</Text>
+                <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
+                  <Feather name="x" size={24} color="white" />
                 </TouchableOpacity>
               </View>
-            }
-          />
-        )}
-        
-        <TouchableOpacity 
-          style={styles.newAppointmentButton}
-          onPress={() => {
-            logScreen("Navigate to GuestLandingPage to book new appointment");
-            navigation.navigate('GuestLandingPage');
-          }}
+              
+              <ScrollView style={styles.shopList}>
+                {userShops.map((shop, index) => (
+                  <TouchableOpacity 
+                    key={index}
+                    style={[
+                      styles.shopItem, 
+                      selectedShop === shop && styles.selectedShopItem
+                    ]}
+                    onPress={() => {
+                      setSelectedShop(shop);
+                      setFilterModalVisible(false);
+                    }}
+                  >
+                    <Text style={styles.shopItemText}>{shop}</Text>
+                    {selectedShop === shop && (
+                      <Feather name="check" size={20} color="#FF0000" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      );
+      
+      return (
+        <LinearGradient
+          colors={['#000000', '#333333']}
+          style={styles.container}
         >
-          <Feather name="plus" size={24} color="white" />
-          <Text style={styles.newAppointmentText}>Book New Appointment</Text>
-        </TouchableOpacity>
-      </LinearGradient>
-    );
-  };
-  
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingTop: 50,
-      paddingBottom: 20,
-      paddingHorizontal: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: '#444',
-    },
-    backButton: {
-      padding: 8,
-    },
-    headerTitle: {
-      color: 'white',
-      fontSize: 20,
-      fontWeight: 'bold',
-      marginLeft: 15,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    loadingText: {
-      color: '#999',
-      marginTop: 10,
-      fontSize: 16,
-    },
-    listContainer: {
-      padding: 20,
-      paddingBottom: 100,
-    },
-    appointmentCard: {
-      backgroundColor: '#222',
-      borderRadius: 10,
-      padding: 15,
-      marginBottom: 15,
-      borderLeftWidth: 4,
-      borderLeftColor: '#FF0000',
-    },
-    appointmentHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 10,
-    },
-    shopName: {
-      color: 'white',
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    statusBadge: {
-      paddingVertical: 4,
-      paddingHorizontal: 8,
-      borderRadius: 4,
-    },
-    confirmedStatus: {
-      backgroundColor: '#4CAF50',
-    },
-    canceledStatus: {
-      backgroundColor: '#F44336',
-    },
-    completedStatus: {
-      backgroundColor: '#2196F3',
-    },
-    pendingStatus: {
-      backgroundColor: '#FF9800',
-    },
-    statusText: {
-      color: 'white',
-      fontSize: 12,
-      fontWeight: 'bold',
-    },
-    appointmentDetails: {
-      marginBottom: 15,
-    },
-    detailRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    detailText: {
-      color: '#CCC',
-      marginLeft: 10,
-      fontSize: 16,
-    },
-    cancelButton: {
-      backgroundColor: '#333',
-      padding: 10,
-      borderRadius: 5,
-      alignItems: 'center',
-      marginTop: 5,
-      borderWidth: 1,
-      borderColor: '#F44336',
-    },
-    cancelButtonText: {
-      color: '#F44336',
-      fontWeight: 'bold',
-    },
-    emptyContainer: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 40,
-    },
-    emptyText: {
-      color: '#999',
-      fontSize: 18,
-      marginTop: 15,
-      marginBottom: 20,
-      textAlign: 'center',
-    },
-    bookButton: {
-      backgroundColor: '#FF0000',
-      paddingVertical: 12,
-      paddingHorizontal: 20,
-      borderRadius: 8,
-      marginTop: 10,
-    },
-    bookButtonText: {
-      color: 'white',
-      fontWeight: 'bold',
-      fontSize: 16,
-    },
-    newAppointmentButton: {
-      position: 'absolute',
-      bottom: 20,
-      right: 20,
-      backgroundColor: '#FF0000',
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 12,
-      paddingHorizontal: 20,
-      borderRadius: 30,
-      elevation: 5,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 3,
-    },
-    newAppointmentText: {
-      color: 'white',
-      fontWeight: 'bold',
-      marginLeft: 8,
-    },
-  });
-  
-  export default AppointmentsScreen;
-  
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Feather name="arrow-left" size={24} color="white" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>My Appointments</Text>
+          </View>
+          
+          {/* Shop selector */}
+          {userShops.length > 0 && (
+            <View style={styles.filterContainer}>
+              <TouchableOpacity 
+                style={styles.filterButton}
+                onPress={() => setFilterModalVisible(true)}
+              >
+                <Feather name="map-pin" size={18} color="white" />
+                <Text style={styles.filterButtonText}>
+                  {selectedShop || 'Select a barbershop'}
+                </Text>
+                <Feather name="chevron-down" size={18} color="white" style={styles.dropdownIcon} />
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {loading && !refreshing ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FF0000" />
+              <Text style={styles.loadingText}>Loading appointments...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredAppointments}
+              renderItem={renderAppointmentItem}
+              keyExtractor={(item) => item._id || Math.random().toString()}
+              contentContainerStyle={styles.listContainer}
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Feather name="calendar" size={50} color="#666" />
+                  <Text style={styles.emptyText}>
+                    {userShops.length === 0 
+                      ? "You don't have any appointments yet" 
+                      : `No appointments found for ${selectedShop}`}
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.bookButton}
+                    onPress={() => {
+                      logScreen("Navigate to GuestLandingPage to find barbershop");
+                      navigation.navigate('GuestLandingPage');
+                    }}
+                  >
+                    <Text style={styles.bookButtonText}>Book an Appointment</Text>
+                  </TouchableOpacity>
+                </View>
+              }
+            />
+          )}
+          
+          <TouchableOpacity 
+            style={styles.newAppointmentButton}
+            onPress={() => {
+              logScreen("Navigate to GuestLandingPage to book new appointment");
+              navigation.navigate('GuestLandingPage');
+            }}
+          >
+            <Feather name="plus" size={24} color="white" />
+            <Text style={styles.newAppointmentText}>Book New Appointment</Text>
+          </TouchableOpacity>
+          
+          <FilterModal />
+        </LinearGradient>
+      );
+    };
+    
+    const styles = StyleSheet.create({
+      container: {
+        flex: 1,
+      },
+      header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingTop: 50,
+        paddingBottom: 20,
+        paddingHorizontal: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#444',
+      },
+      backButton: {
+        padding: 8,
+      },
+      headerTitle: {
+        color: 'white',
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginLeft: 15,
+      },
+      filterContainer: {
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#444',
+      },
+      filterButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#333',
+        paddingVertical: 10,
+        paddingHorizontal: 15,
+        borderRadius: 8,
+        alignSelf: 'stretch',
+      },
+      filterButtonText: {
+        color: 'white',
+        marginLeft: 8,
+        fontSize: 16,
+        flex: 1,
+      },
+      dropdownIcon: {
+        marginLeft: 5,
+      },
+      loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+      loadingText: {
+        color: '#999',
+        marginTop: 10,
+        fontSize: 16,
+      },
+      listContainer: {
+        padding: 20,
+        paddingBottom: 100,
+      },
+      appointmentCard: {
+        backgroundColor: '#222',
+        borderRadius: 10,
+        padding: 15,
+        marginBottom: 15,
+        borderLeftWidth: 4,
+        borderLeftColor: '#FF0000',
+      },
+      appointmentHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+      },
+      shopName: {
+        color: 'white',
+        fontSize: 18,
+        fontWeight: 'bold',
+      },
+      statusBadge: {
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 4,
+      },
+      confirmedStatus: {
+        backgroundColor: '#4CAF50',
+      },
+      canceledStatus: {
+        backgroundColor: '#F44336',
+      },
+      completedStatus: {
+        backgroundColor: '#2196F3',
+      },
+      pendingStatus: {
+        backgroundColor: '#FF9800',
+      },
+      statusText: {
+        color: 'white',
+        fontSize: 12,
+        fontWeight: 'bold',
+      },
+      appointmentDetails: {
+        marginBottom: 15,
+      },
+      detailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+      },
+      detailText: {
+        color: '#CCC',
+        marginLeft: 10,
+        fontSize: 16,
+      },
+      cancelButton: {
+        backgroundColor: '#333',
+        padding: 10,
+        borderRadius: 5,
+        alignItems: 'center',
+        marginTop: 5,
+        borderWidth: 1,
+        borderColor: '#F44336',
+      },
+      cancelButtonText: {
+        color: '#F44336',
+        fontWeight: 'bold',
+      },
+      emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 40,
+      },
+      emptyText: {
+        color: '#999',
+        fontSize: 18,
+        marginTop: 15,
+        marginBottom: 20,
+        textAlign: 'center',
+      },
+      bookButton: {
+        backgroundColor: '#FF0000',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        marginTop: 10,
+      },
+      bookButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 16,
+      },
+      newAppointmentButton: {
+        position: 'absolute',
+        bottom: 20,
+        right: 20,
+        backgroundColor: '#FF0000',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 30,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+      },
+      newAppointmentText: {
+        color: 'white',
+        fontWeight: 'bold',
+        marginLeft: 8,
+      },
+      // Modal styles
+      modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+      modalContent: {
+        width: '80%',
+        maxHeight: '70%',
+        backgroundColor: '#222',
+        borderRadius: 10,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: '#444',
+      },
+      modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#444',
+        paddingBottom: 10,
+      },
+      modalTitle: {
+        color: 'white',
+        fontSize: 18,
+        fontWeight: 'bold',
+      },
+      shopList: {
+        maxHeight: 400,
+      },
+      shopItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+      },
+      selectedShopItem: {
+        backgroundColor: 'rgba(255, 0, 0, 0.1)',
+      },
+      shopItemText: {
+        color: 'white',
+        fontSize: 16,
+      },
+    });
+    
+    export default AppointmentsScreen;
+    
