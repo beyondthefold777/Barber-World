@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,16 +13,18 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ContactSupportScreen = ({ navigation }) => {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [category, setCategory] = useState('');
-  const [attachments, setAttachments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  
   const categories = [
     'Account Issues',
     'Payment Problems',
@@ -32,72 +34,87 @@ const ContactSupportScreen = ({ navigation }) => {
     'Other'
   ];
 
+  // Fetch user data when component mounts
+  useEffect(() => {
+    const getUserData = async () => {
+      try {
+        const userEmail = await AsyncStorage.getItem('userEmail');
+        const userName = await AsyncStorage.getItem('userName');
+        
+        if (userEmail) setEmail(userEmail);
+        if (userName) setName(userName);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+    
+    getUserData();
+  }, []);
+
   const handleSubmit = async () => {
     if (!subject.trim()) {
       Alert.alert('Error', 'Please enter a subject');
       return;
     }
-
     if (!message.trim()) {
       Alert.alert('Error', 'Please enter a message');
       return;
     }
-
     if (!category) {
       Alert.alert('Error', 'Please select a category');
+      return;
+    }
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email address');
       return;
     }
 
     try {
       setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // In a real app, you would send the support request to your backend
-      // await supportService.submitRequest({ subject, message, category, attachments });
+      // Get token from AsyncStorage for authenticated requests
+      const token = await AsyncStorage.getItem('userToken');
       
-      Alert.alert(
-        'Request Submitted',
-        'Your support request has been submitted. We\'ll get back to you as soon as possible.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      // Prepare headers based on authentication status
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Send support request to backend
+      const response = await axios.post(
+        'https://barber-world.fly.dev/api/contact-support',
+        {
+          name,
+          email,
+          category,
+          subject,
+          message
+        },
+        { headers }
       );
+      
+      if (response.data.success) {
+        Alert.alert(
+          'Request Submitted',
+          'Your support request has been submitted. We\'ll get back to you as soon as possible.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+      } else {
+        throw new Error(response.data.message || 'Failed to submit your request');
+      }
     } catch (error) {
       console.error('Error submitting support request:', error);
-      Alert.alert('Error', 'Failed to submit your request. Please try again.');
+      Alert.alert(
+        'Error', 
+        error.response?.data?.message || error.message || 'Failed to submit your request. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
-  };
-
-  const pickImage = async () => {
-    if (attachments.length >= 3) {
-      Alert.alert('Limit Reached', 'You can only attach up to 3 images');
-      return;
-    }
-
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to upload images!');
-      return;
-    }
-
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setAttachments([...attachments, result.assets[0].uri]);
-    }
-  };
-
-  const removeAttachment = (index) => {
-    const newAttachments = [...attachments];
-    newAttachments.splice(index, 1);
-    setAttachments(newAttachments);
   };
 
   return (
@@ -119,13 +136,24 @@ const ContactSupportScreen = ({ navigation }) => {
           <Text style={styles.headerTitle}>Contact Support</Text>
           <View style={{ width: 44 }} />
         </View>
-
         <ScrollView style={styles.content}>
           <Text style={styles.description}>
             Need help? Fill out the form below and our support team will get back to you as soon as possible.
           </Text>
-
           <View style={styles.formContainer}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Your Email</Text>
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Enter your email address"
+                placeholderTextColor="#999"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+            
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Category</Text>
               <TouchableOpacity 
@@ -159,7 +187,6 @@ const ContactSupportScreen = ({ navigation }) => {
                 </View>
               )}
             </View>
-
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Subject</Text>
               <TextInput
@@ -170,7 +197,6 @@ const ContactSupportScreen = ({ navigation }) => {
                 placeholderTextColor="#999"
               />
             </View>
-
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Message</Text>
               <TextInput
@@ -183,36 +209,7 @@ const ContactSupportScreen = ({ navigation }) => {
                 textAlignVertical="top"
               />
             </View>
-
-            <View style={styles.attachmentsContainer}>
-              <Text style={styles.inputLabel}>Attachments (Optional)</Text>
-              <Text style={styles.attachmentHint}>Add screenshots or images to help explain your issue (max 3)</Text>
-              
-              <View style={styles.attachmentsList}>
-                {attachments.map((uri, index) => (
-                  <View key={index} style={styles.attachmentItem}>
-                    <Image source={{ uri }} style={styles.attachmentImage} />
-                    <TouchableOpacity 
-                      style={styles.removeAttachmentButton}
-                      onPress={() => removeAttachment(index)}
-                    >
-                      <Feather name="x" size={16} color="white" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                
-                {attachments.length < 3 && (
-                  <TouchableOpacity 
-                    style={styles.addAttachmentButton}
-                    onPress={pickImage}
-                  >
-                    <Feather name="plus" size={24} color="#FF0000" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
           </View>
-
           <TouchableOpacity 
             style={styles.submitButton}
             onPress={handleSubmit}
@@ -224,7 +221,6 @@ const ContactSupportScreen = ({ navigation }) => {
               <Text style={styles.submitButtonText}>Submit Request</Text>
             )}
           </TouchableOpacity>
-
           <View style={styles.alternativeContactContainer}>
             <Text style={styles.alternativeContactTitle}>Other ways to contact us</Text>
             
@@ -234,7 +230,7 @@ const ContactSupportScreen = ({ navigation }) => {
               </View>
               <View style={styles.contactDetails}>
                 <Text style={styles.contactLabel}>Email</Text>
-                <Text style={styles.contactValue}>support@barbershopapp.com</Text>
+                <Text style={styles.contactValue}>support@barberworld.com</Text>
               </View>
             </View>
             
@@ -355,54 +351,6 @@ const styles = StyleSheet.create({
   dropdownItemText: {
     color: 'white',
     fontSize: 16,
-  },
-  attachmentsContainer: {
-    marginBottom: 20,
-  },
-  attachmentHint: {
-    color: '#999',
-    fontSize: 12,
-    marginBottom: 10,
-  },
-  attachmentsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  attachmentItem: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    marginRight: 10,
-    marginBottom: 10,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  attachmentImage: {
-    width: '100%',
-    height: '100%',
-  },
-  removeAttachmentButton: {
-    position: 'absolute',
-    top: 5,
-    right: 5,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addAttachmentButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FF0000',
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-    marginBottom: 10,
   },
   submitButton: {
     backgroundColor: '#FF0000',

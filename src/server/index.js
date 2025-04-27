@@ -4,6 +4,16 @@ const path = require('path');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+
+// Configure nodemailer
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER || 'nexphase1989@gmail.com',
+    pass: process.env.EMAIL_PASS
+  }
+});
 
 // Log available route files
 try {
@@ -19,30 +29,35 @@ try {
 // Try to import routes with detailed error handling
 let appointmentRoutes, authRoutes, shopRoutes, expenseRoutes, taxRoutes, userRoutes;
 let emailRoutes, accountRoutes;
+
 try {
   appointmentRoutes = require('./routes/appointments');
   console.log('Appointment routes loaded successfully');
 } catch (err) {
   console.error('Error loading appointment routes:', err);
 }
+
 try {
   authRoutes = require('./routes/Authroutes');
   console.log('Auth routes loaded successfully');
 } catch (err) {
   console.error('Error loading auth routes:', err);
 }
+
 try {
   emailRoutes = require('./routes/emailRoutes');
   console.log('Email routes loaded successfully');
 } catch (err) {
   console.error('Error loading email routes:', err);
 }
+
 try {
   accountRoutes = require('./routes/accountRoutes');
   console.log('Account routes loaded successfully');
 } catch (err) {
   console.error('Error loading account routes:', err);
 }
+
 try {
   console.log('Attempting to load shop routes from:', path.resolve(__dirname, './routes/shop.routes.js'));
   shopRoutes = require('./routes/shop.routes');
@@ -52,18 +67,21 @@ try {
 } catch (err) {
   console.error('Error loading shop routes:', err);
 }
+
 try {
   expenseRoutes = require('./routes/expenseRoutes');
   console.log('Expense routes loaded successfully');
 } catch (err) {
   console.error('Error loading expense routes:', err);
 }
+
 try {
   taxRoutes = require('./routes/tax.routes');
   console.log('Tax routes loaded successfully');
 } catch (err) {
   console.error('Error loading tax routes:', err);
 }
+
 try {
   userRoutes = require('./routes/user.routes');
   console.log('User routes loaded successfully');
@@ -73,12 +91,14 @@ try {
 
 // Import controllers and middleware for direct routes
 let authMiddleware, shopController;
+
 try {
   authMiddleware = require('./middleware/auth');
   console.log('Auth middleware loaded successfully');
 } catch (err) {
   console.error('Error loading auth middleware:', err);
 }
+
 try {
   shopController = require('./controllers/shopController');
   console.log('Shop controller loaded successfully');
@@ -121,26 +141,32 @@ if (appointmentRoutes) {
   app.use('/api/appointments', appointmentRoutes);
   console.log('Appointment routes mounted');
 }
+
 if (authRoutes) {
   app.use('/api/auth', authRoutes);
   console.log('Auth routes mounted');
 }
+
 if (emailRoutes) {
   app.use('/api/email', emailRoutes);
   console.log('Email routes mounted');
 }
+
 if (accountRoutes) {
   app.use('/api/account', accountRoutes);
   console.log('Account routes mounted');
 }
+
 if (expenseRoutes) {
   app.use('/api/expenses', expenseRoutes);
   console.log('Expense routes mounted');
 }
+
 if (taxRoutes) {
   app.use('/api/tax', taxRoutes);
   console.log('Tax routes mounted');
 }
+
 if (userRoutes) {
   app.use('/api/users', userRoutes);
   console.log('User routes mounted');
@@ -235,17 +261,17 @@ app.get('/api/shop/location-search', (req, res) => {
       })
       .catch(err => {
         console.error('Error in direct location search:', err);
-        res.status(500).json({
-           success: false,
-           message: 'Error searching shops by location'
-         });
+        res.status(500).json({ 
+          success: false, 
+          message: 'Error searching shops by location' 
+        });
       });
   } catch (error) {
     console.error('Exception in location search route:', error);
-    res.status(500).json({
-       success: false,
-       message: 'Server error in location search'
-     });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error in location search' 
+    });
   }
 });
 
@@ -438,14 +464,15 @@ if (authMiddleware && shopController) {
   });
   
   // Routes with shopId parameter
-app.post('/api/shop/:shopId/reviews', (req, res, next) => {
-  console.log('Direct add review route hit');
-  if (typeof shopController.addReview === 'function') {
-    shopController.addReview(req, res, next);
-  } else {
-    res.status(500).json({ error: 'Add review controller method not found' });
-  }
-});
+  app.post('/api/shop/:shopId/reviews', (req, res, next) => {
+    console.log('Direct add review route hit');
+    if (typeof shopController.addReview === 'function') {
+      shopController.addReview(req, res, next);
+    } else {
+      res.status(500).json({ error: 'Add review controller method not found' });
+    }
+  });
+  
   app.get('/api/shop/:shopId/reviews', (req, res, next) => {
     console.log('Direct get shop reviews route hit');
     if (typeof shopController.getShopReviews === 'function') {
@@ -510,7 +537,6 @@ app.post('/api/change-password', authMiddleware, async (req, res) => {
     }
     
     // Check if current password is correct
-    const bcrypt = require('bcryptjs');
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
       return res.status(400).json({ success: false, message: 'Current password is incorrect' });
@@ -554,7 +580,6 @@ app.post('/api/request-password-reset', async (req, res) => {
     }
     
     // Generate reset token
-    const jwt = require('jsonwebtoken');
     const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
     
     // Store reset token and expiry in user document
@@ -562,11 +587,48 @@ app.post('/api/request-password-reset', async (req, res) => {
     user.resetTokenExpiry = Date.now() + 3600000; // 1 hour from now
     await user.save();
     
-    // In a real application, you would send an email with the reset link
-    // For this example, we'll just log the token
-    console.log(`Password reset requested for ${email}. Reset token: ${resetToken}`);
+    // Send password reset email using Nodemailer
+    const resetUrl = `https://barber-world.fly.dev/reset-password?token=${resetToken}`;
     
-    res.status(200).json({ 
+    const mailOptions = {
+      from: `"Barber World" <${process.env.EMAIL_USER || 'nexphase1989@gmail.com'}>`,
+      to: email,
+      subject: 'Password Reset Request',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+          <h2 style="color: #FF0000; border-bottom: 1px solid #eee; padding-bottom: 10px;">Password Reset Request</h2>
+          
+          <p>Hello,</p>
+          
+          <p>We received a request to reset your password for your Barber World account. Click the button below to reset your password:</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}" style="background-color: #FF0000; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">Reset Password</a>
+          </div>
+          
+          <p>If you didn't request a password reset, you can safely ignore this email.</p>
+          
+          <p>This link will expire in 1 hour for security reasons.</p>
+          
+          <p>Best regards,<br>The Barber World Team</p>
+          
+          <div style="margin-top: 20px; font-size: 12px; color: #777; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
+            <p>If the button doesn't work, copy and paste this URL into your browser:</p>
+            <p style="word-break: break-all;">${resetUrl}</p>
+          </div>
+        </div>
+      `
+    };
+    
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log(`Password reset email sent to ${email}`);
+    } catch (emailError) {
+      console.error('Error sending password reset email:', emailError);
+      // Continue execution even if email fails - don't reveal email sending issues to client
+    }
+    
+    res.status(200).json({
       success: true,
       message: 'If your email exists in our system, you will receive a password reset link'
     });
@@ -591,7 +653,6 @@ app.post('/api/reset-password', async (req, res) => {
     }
     
     // Verify token
-    const jwt = require('jsonwebtoken');
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -612,7 +673,6 @@ app.post('/api/reset-password', async (req, res) => {
     }
     
     // Hash new password
-    const bcrypt = require('bcryptjs');
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
     
@@ -622,6 +682,34 @@ app.post('/api/reset-password', async (req, res) => {
     user.resetTokenExpiry = undefined;
     await user.save();
     
+    // Send password change confirmation email
+    const mailOptions = {
+      from: `"Barber World" <${process.env.EMAIL_USER || 'nexphase1989@gmail.com'}>`,
+      to: user.email,
+      subject: 'Your Password Has Been Reset',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+          <h2 style="color: #FF0000; border-bottom: 1px solid #eee; padding-bottom: 10px;">Password Reset Successful</h2>
+          
+          <p>Hello,</p>
+          
+          <p>Your password for Barber World has been successfully reset.</p>
+          
+          <p>If you did not request this change, please contact our support team immediately.</p>
+          
+          <p>Best regards,<br>The Barber World Team</p>
+        </div>
+      `
+    };
+    
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log(`Password reset confirmation email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error('Error sending password reset confirmation email:', emailError);
+      // Continue execution even if email fails
+    }
+    
     console.log(`Password has been reset successfully for user ${user._id}`);
     res.status(200).json({ success: true, message: 'Password has been reset successfully' });
   } catch (error) {
@@ -630,54 +718,181 @@ app.post('/api/reset-password', async (req, res) => {
   }
 });
 
-// Test route to verify server is working
-app.get('/', (req, res) => {
-  res.send('Barber World API is running!');
-});
-
-// Route for checking all registered routes
-app.get('/api/routes', (req, res) => {
-  const routes = [];
-  app._router.stack.forEach(middleware => {
-    if (middleware.route) {
-      // Routes registered directly on the app
-      routes.push({
-        path: middleware.route.path,
-        method: Object.keys(middleware.route.methods)[0]
+// Contact support endpoint
+app.post('/api/contact-support', async (req, res) => {
+  try {
+    const { name, email, category, subject, message } = req.body;
+    
+    // Validation
+    if (!email || !subject || !message || !category) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Please provide email, category, subject, and message' 
       });
-    } else if (middleware.name === 'router') {
-      // Router middleware
-      middleware.handle.stack.forEach(handler => {
-        if (handler.route) {
-          routes.push({
-            path: middleware.regexp.toString() + handler.route.path,
-            method: Object.keys(handler.route.methods)[0]
-          });
+    }
+    
+    // Get user info if authenticated
+    let userId = null;
+    let userName = name || 'User';
+    
+    if (req.headers.authorization) {
+      const token = req.headers.authorization.split(' ')[1];
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        userId = decoded.id;
+        
+        // Get user details if available
+        const User = require('./models/User');
+        const user = await User.findById(userId);
+        if (user) {
+          userName = user.name || userName;
         }
+      } catch (err) {
+        console.log('Invalid token in contact support, continuing as guest');
+      }
+    }
+    
+    // Prepare email to support team
+    const supportMailOptions = {
+      from: `"Barber World Support" <${process.env.EMAIL_USER || 'nexphase1989@gmail.com'}>`,
+      to: process.env.SUPPORT_EMAIL || 'nexphase1989@gmail.com',
+      subject: `Support Request: ${subject}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+          <h2 style="color: #FF0000; border-bottom: 1px solid #eee; padding-bottom: 10px;">New Support Request</h2>
+          
+          <p><strong>From:</strong> ${userName} (${email})</p>
+          <p><strong>Category:</strong> ${category}</p>
+          <p><strong>Subject:</strong> ${subject}</p>
+          
+          <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p><strong>Message:</strong></p>
+            <p>${message.replace(/\n/g, '<br>')}</p>
+          </div>
+          
+          ${userId ? `<p><strong>User ID:</strong> ${userId}</p>` : ''}
+          <p><strong>Submitted:</strong> ${new Date().toLocaleString()}</p>
+        </div>
+      `
+    };
+    
+       // Prepare confirmation email to user
+       const userConfirmationMailOptions = {
+        from: `"Barber World Support" <${process.env.EMAIL_USER || 'nexphase1989@gmail.com'}>`,
+        to: email,
+        subject: `Your Support Request: ${subject}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+            <h2 style="color: #FF0000; border-bottom: 1px solid #eee; padding-bottom: 10px;">Support Request Received</h2>
+            
+            <p>Hello ${userName},</p>
+            
+            <p>We've received your support request with the following details:</p>
+            
+            <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+              <p><strong>Category:</strong> ${category}</p>
+              <p><strong>Subject:</strong> ${subject}</p>
+              <p><strong>Message:</strong></p>
+              <p>${message.replace(/\n/g, '<br>')}</p>
+            </div>
+            
+            <p>Our support team will review your request and get back to you as soon as possible. Please allow 24-48 hours for a response.</p>
+            
+            <p>Best regards,<br>The Barber World Support Team</p>
+          </div>
+        `
+      };
+      
+      // Send emails
+      try {
+        await transporter.sendMail(supportMailOptions);
+        console.log(`Support request email sent to support team from ${email}`);
+        
+        await transporter.sendMail(userConfirmationMailOptions);
+        console.log(`Confirmation email sent to user at ${email}`);
+      } catch (emailError) {
+        console.error('Error sending support emails:', emailError);
+        // Continue execution even if email fails - don't reveal email sending issues to client
+      }
+      
+      res.status(200).json({
+        success: true,
+        message: 'Your support request has been submitted successfully'
+      });
+    } catch (error) {
+      console.error('Error processing support request:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Server error while processing your support request' 
       });
     }
   });
-  res.json(routes);
-});
-
-// Global error handler
-app.use((err, req, res, next) => {
-  const errorDetails = {
-    timestamp: new Date().toISOString(),
-    error: err.message,
-    stack: err.stack,
-    path: req.path,
-    method: req.method
-  };
   
-  console.log('Error occurred:', errorDetails);
-  
-  res.status(500).json({
-    error: err.message,
-    path: req.path
+  // Test route to verify server is working
+  app.get('/', (req, res) => {
+    res.send('Barber World API is running!');
   });
-});
-
-app.listen(PORT, HOST, () => {
-  console.log(`Server running on ${HOST}:${PORT}`);
-});
+  
+  // Route for checking all registered routes
+  app.get('/api/routes', (req, res) => {
+    const routes = [];
+    app._router.stack.forEach(middleware => {
+      if (middleware.route) {
+        // Routes registered directly on the app
+        routes.push({
+          path: middleware.route.path,
+          method: Object.keys(middleware.route.methods)[0]
+        });
+      } else if (middleware.name === 'router') {
+        // Router middleware
+        middleware.handle.stack.forEach(handler => {
+          if (handler.route) {
+            routes.push({
+              path: middleware.regexp.toString() + handler.route.path,
+              method: Object.keys(handler.route.methods)[0]
+            });
+          }
+        });
+      }
+    });
+    res.json(routes);
+  });
+  
+  // Global error handler
+  app.use((err, req, res, next) => {
+    const errorDetails = {
+      timestamp: new Date().toISOString(),
+      error: err.message,
+      stack: err.stack,
+      path: req.path,
+      method: req.method
+    };
+    
+    console.log('Error occurred:', errorDetails);
+    
+    res.status(500).json({
+      error: err.message,
+      path: req.path
+    });
+  });
+  
+  // Create the server instance
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`Server running on ${HOST}:${PORT}`);
+  });
+  
+  // Handle graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    server.close(() => {
+      console.log('HTTP server closed');
+    });
+  });
+  
+  process.on('SIGINT', () => {
+    console.log('SIGINT signal received: closing HTTP server');
+    server.close(() => {
+      console.log('HTTP server closed');
+    });
+  });
+  
