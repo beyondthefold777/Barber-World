@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { authService } from '../../services/api';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ChangePasswordScreen = ({ navigation }) => {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -27,12 +28,10 @@ const ChangePasswordScreen = ({ navigation }) => {
       Alert.alert('Error', 'All fields are required');
       return;
     }
-
     if (newPassword !== confirmPassword) {
       Alert.alert('Error', 'New password and confirmation do not match');
       return;
     }
-
     if (newPassword.length < 8) {
       Alert.alert('Error', 'New password must be at least 8 characters long');
       return;
@@ -40,12 +39,39 @@ const ChangePasswordScreen = ({ navigation }) => {
 
     try {
       setLoading(true);
-      await authService.changePassword(currentPassword, newPassword);
-      Alert.alert(
-        'Success', 
-        'Your password has been changed successfully',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      
+      // Get token from AsyncStorage
+      const token = await AsyncStorage.getItem('userToken');
+      
+      if (!token) {
+        Alert.alert('Error', 'You need to be logged in to change your password');
+        return;
+      }
+      
+      // Make API call
+      const response = await axios.post(
+        'https://barber-world.fly.dev/api/change-password',
+        {
+          currentPassword,
+          newPassword
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
       );
+      
+      if (response.data.success) {
+        Alert.alert(
+          'Success', 
+          'Your password has been changed successfully',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+      } else {
+        throw new Error(response.data.message || 'Failed to change password');
+      }
     } catch (error) {
       console.error('Error changing password:', error);
       Alert.alert('Error', error.message || 'Failed to change password');
@@ -69,12 +95,10 @@ const ChangePasswordScreen = ({ navigation }) => {
         <Text style={styles.headerTitle}>Change Password</Text>
         <View style={{ width: 44 }} />
       </View>
-
       <View style={styles.content}>
         <Text style={styles.description}>
           Create a new password that is at least 8 characters long. A strong password contains a combination of letters, numbers, and special characters.
         </Text>
-
         <View style={styles.formSection}>
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Current Password</Text>
@@ -93,14 +117,13 @@ const ChangePasswordScreen = ({ navigation }) => {
                 onPress={() => setShowCurrentPassword(!showCurrentPassword)}
               >
                 <Feather 
-                  name={showCurrentPassword ? "eye" : "eye-off"} 
-                  size={20} 
-                  color="#999" 
+                  name={showCurrentPassword ? "eye" : "eye-off"}
+                  size={20}
+                  color="#999"
                 />
               </TouchableOpacity>
             </View>
           </View>
-
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>New Password</Text>
             <View style={styles.passwordInputWrapper}>
@@ -118,14 +141,13 @@ const ChangePasswordScreen = ({ navigation }) => {
                 onPress={() => setShowNewPassword(!showNewPassword)}
               >
                 <Feather 
-                  name={showNewPassword ? "eye" : "eye-off"} 
-                  size={20} 
-                  color="#999" 
+                  name={showNewPassword ? "eye" : "eye-off"}
+                  size={20}
+                  color="#999"
                 />
               </TouchableOpacity>
             </View>
           </View>
-
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Confirm New Password</Text>
             <View style={styles.passwordInputWrapper}>
@@ -143,15 +165,14 @@ const ChangePasswordScreen = ({ navigation }) => {
                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
               >
                 <Feather 
-                  name={showConfirmPassword ? "eye" : "eye-off"} 
-                  size={20} 
-                  color="#999" 
+                  name={showConfirmPassword ? "eye" : "eye-off"}
+                  size={20}
+                  color="#999"
                 />
               </TouchableOpacity>
             </View>
           </View>
         </View>
-
         <TouchableOpacity 
           style={styles.changeButton}
           onPress={handleChangePassword}
@@ -163,7 +184,6 @@ const ChangePasswordScreen = ({ navigation }) => {
             <Text style={styles.changeButtonText}>Change Password</Text>
           )}
         </TouchableOpacity>
-
         <TouchableOpacity 
           style={styles.forgotPasswordLink}
           onPress={() => navigation.navigate('ForgotPassword')}

@@ -2,6 +2,8 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 // Log available route files
 try {
@@ -17,35 +19,30 @@ try {
 // Try to import routes with detailed error handling
 let appointmentRoutes, authRoutes, shopRoutes, expenseRoutes, taxRoutes, userRoutes;
 let emailRoutes, accountRoutes;
-
 try {
   appointmentRoutes = require('./routes/appointments');
   console.log('Appointment routes loaded successfully');
 } catch (err) {
   console.error('Error loading appointment routes:', err);
 }
-
 try {
   authRoutes = require('./routes/Authroutes');
   console.log('Auth routes loaded successfully');
 } catch (err) {
   console.error('Error loading auth routes:', err);
 }
-
 try {
   emailRoutes = require('./routes/emailRoutes');
   console.log('Email routes loaded successfully');
 } catch (err) {
   console.error('Error loading email routes:', err);
 }
-
 try {
   accountRoutes = require('./routes/accountRoutes');
   console.log('Account routes loaded successfully');
 } catch (err) {
   console.error('Error loading account routes:', err);
 }
-
 try {
   console.log('Attempting to load shop routes from:', path.resolve(__dirname, './routes/shop.routes.js'));
   shopRoutes = require('./routes/shop.routes');
@@ -55,21 +52,18 @@ try {
 } catch (err) {
   console.error('Error loading shop routes:', err);
 }
-
 try {
   expenseRoutes = require('./routes/expenseRoutes');
   console.log('Expense routes loaded successfully');
 } catch (err) {
   console.error('Error loading expense routes:', err);
 }
-
 try {
   taxRoutes = require('./routes/tax.routes');
   console.log('Tax routes loaded successfully');
 } catch (err) {
   console.error('Error loading tax routes:', err);
 }
-
 try {
   userRoutes = require('./routes/user.routes');
   console.log('User routes loaded successfully');
@@ -85,7 +79,6 @@ try {
 } catch (err) {
   console.error('Error loading auth middleware:', err);
 }
-
 try {
   shopController = require('./controllers/shopController');
   console.log('Shop controller loaded successfully');
@@ -128,32 +121,26 @@ if (appointmentRoutes) {
   app.use('/api/appointments', appointmentRoutes);
   console.log('Appointment routes mounted');
 }
-
 if (authRoutes) {
   app.use('/api/auth', authRoutes);
   console.log('Auth routes mounted');
 }
-
 if (emailRoutes) {
   app.use('/api/email', emailRoutes);
   console.log('Email routes mounted');
 }
-
 if (accountRoutes) {
   app.use('/api/account', accountRoutes);
   console.log('Account routes mounted');
 }
-
 if (expenseRoutes) {
   app.use('/api/expenses', expenseRoutes);
   console.log('Expense routes mounted');
 }
-
 if (taxRoutes) {
   app.use('/api/tax', taxRoutes);
   console.log('Tax routes mounted');
 }
-
 if (userRoutes) {
   app.use('/api/users', userRoutes);
   console.log('User routes mounted');
@@ -170,7 +157,6 @@ app.get('/api/debug/shop/all', (req, res) => {
     controllerMethods: shopController ? Object.keys(shopController) : []
   });
 });
-
 
 // Add shop model debugging route
 app.get('/api/debug/shop-model', async (req, res) => {
@@ -249,17 +235,17 @@ app.get('/api/shop/location-search', (req, res) => {
       })
       .catch(err => {
         console.error('Error in direct location search:', err);
-        res.status(500).json({ 
-          success: false, 
-          message: 'Error searching shops by location' 
-        });
+        res.status(500).json({
+           success: false,
+           message: 'Error searching shops by location'
+         });
       });
   } catch (error) {
     console.error('Exception in location search route:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error in location search' 
-    });
+    res.status(500).json({
+       success: false,
+       message: 'Server error in location search'
+     });
   }
 });
 
@@ -460,7 +446,6 @@ app.post('/api/shop/:shopId/reviews', (req, res, next) => {
     res.status(500).json({ error: 'Add review controller method not found' });
   }
 });
-
   app.get('/api/shop/:shopId/reviews', (req, res, next) => {
     console.log('Direct get shop reviews route hit');
     if (typeof shopController.getShopReviews === 'function') {
@@ -498,6 +483,152 @@ if (shopController) {
     }
   });
 }
+
+// Password change functionality
+app.post('/api/change-password', authMiddleware, async (req, res) => {
+  try {
+    // Get user ID from the authenticated request
+    const userId = req.user.id;
+    
+    // Get request data
+    const { currentPassword, newPassword } = req.body;
+    
+    // Validation
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Please provide both current and new password' });
+    }
+    
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long' });
+    }
+    
+    // Get user from database
+    const User = require('./models/User'); // Adjust path if needed
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    // Check if current password is correct
+    const bcrypt = require('bcryptjs');
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+    }
+    
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    
+    // Update password in database
+    user.password = hashedPassword;
+    await user.save();
+    
+    console.log(`Password updated successfully for user ${userId}`);
+    res.status(200).json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({ success: false, message: 'Server error during password change' });
+  }
+});
+
+// Password reset request functionality
+app.post('/api/request-password-reset', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    // Validation
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Please provide an email address' });
+    }
+    
+    // Find user by email
+    const User = require('./models/User'); // Adjust path if needed
+    const user = await User.findOne({ email });
+    if (!user) {
+      // For security reasons, don't reveal that the user doesn't exist
+      return res.status(200).json({ 
+        success: true,
+        message: 'If your email exists in our system, you will receive a password reset link' 
+      });
+    }
+    
+    // Generate reset token
+    const jwt = require('jsonwebtoken');
+    const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    
+    // Store reset token and expiry in user document
+    user.resetToken = resetToken;
+    user.resetTokenExpiry = Date.now() + 3600000; // 1 hour from now
+    await user.save();
+    
+    // In a real application, you would send an email with the reset link
+    // For this example, we'll just log the token
+    console.log(`Password reset requested for ${email}. Reset token: ${resetToken}`);
+    
+    res.status(200).json({ 
+      success: true,
+      message: 'If your email exists in our system, you will receive a password reset link'
+    });
+  } catch (error) {
+    console.error('Error requesting password reset:', error);
+    res.status(500).json({ success: false, message: 'Server error during password reset request' });
+  }
+});
+
+// Password reset functionality
+app.post('/api/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    
+    // Validation
+    if (!token || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Please provide both token and new password' });
+    }
+    
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long' });
+    }
+    
+    // Verify token
+    const jwt = require('jsonwebtoken');
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired token' });
+    }
+    
+    // Find user by id and check if reset token is valid
+    const User = require('./models/User'); // Adjust path if needed
+    const user = await User.findOne({ 
+      _id: decoded.id,
+      resetToken: token,
+      resetTokenExpiry: { $gt: Date.now() }
+    });
+    
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired token' });
+    }
+    
+    // Hash new password
+    const bcrypt = require('bcryptjs');
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    
+    // Update password and clear reset token fields
+    user.password = hashedPassword;
+    user.resetToken = undefined;
+    user.resetTokenExpiry = undefined;
+    await user.save();
+    
+    console.log(`Password has been reset successfully for user ${user._id}`);
+    res.status(200).json({ success: true, message: 'Password has been reset successfully' });
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    res.status(500).json({ success: false, message: 'Server error during password reset' });
+  }
+});
 
 // Test route to verify server is working
 app.get('/', (req, res) => {
