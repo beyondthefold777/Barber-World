@@ -1,7 +1,18 @@
 import config from '../config/environment';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import jwtDecode from 'jwt-decode';
 
 const API_URL = config.apiUrl;
+
+// Helper function to decode JWT token
+const decodeToken = (token) => {
+  try {
+    return jwtDecode(token);
+  } catch (error) {
+    console.error('Error decoding token:', error);
+    return null;
+  }
+};
 
 export const appointmentService = {
   getBarbershopAppointments: async (userToken) => {
@@ -17,61 +28,90 @@ export const appointmentService = {
     console.log('2. User token available:', userToken ? `${userToken.substring(0, 5)}...${userToken.substring(userToken.length - 5)}` : 'null');
     
     try {
-      // First, get the user info to determine role and ID
-      console.log('3. Fetching user info to determine role and ID...');
-      let userInfo;
+      // First, try to get user info from AsyncStorage
+      console.log('3. Attempting to get user info from AsyncStorage...');
+      let userInfo = null;
       
       try {
-        const userResponse = await fetch(`${API_URL}/api/auth/me`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${userToken}`,
-            'Accept': 'application/json'
+        const userDataString = await AsyncStorage.getItem('userData');
+        if (userDataString) {
+          userInfo = JSON.parse(userDataString);
+          console.log('4. User info retrieved from AsyncStorage');
+          console.log(`   User role: ${userInfo.role}`);
+          console.log(`   User ID: ${userInfo.id || userInfo._id}`);
+        } else {
+          console.log('4. No user info in AsyncStorage');
+        }
+      } catch (storageError) {
+        console.log('4. ERROR getting user info from AsyncStorage:', storageError.message);
+      }
+      
+      // If no user info in AsyncStorage, try to decode from token
+      if (!userInfo) {
+        console.log('5. Attempting to decode user info from token...');
+        try {
+          const decoded = decodeToken(userToken);
+          if (decoded && decoded.id) {
+            userInfo = {
+              _id: decoded.id,
+              id: decoded.id,
+              role: decoded.role
+            };
+            console.log('6. User info decoded from token');
+            console.log(`   User role: ${userInfo.role}`);
+            console.log(`   User ID: ${userInfo._id || userInfo.id}`);
+          } else {
+            console.log('6. Failed to decode valid user info from token');
           }
-        });
-        
-        if (!userResponse.ok) {
-          console.log(`4. Failed to get user info: ${userResponse.status}`);
+        } catch (decodeError) {
+          console.log('6. ERROR decoding token:', decodeError.message);
+        }
+      }
+      
+      // If still no user info, try to fetch from API
+      if (!userInfo) {
+        console.log('7. Fetching user info from API...');
+        try {
+          const userResponse = await fetch(`${API_URL}/api/auth/me`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${userToken}`,
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (!userResponse.ok) {
+            console.log(`8. Failed to get user info from API: ${userResponse.status}`);
+            throw new Error('Failed to get user information');
+          }
+          
+          userInfo = await userResponse.json();
+          console.log('8. User info retrieved successfully from API');
+          console.log(`   User role: ${userInfo.role}`);
+          console.log(`   User ID: ${userInfo._id || userInfo.id}`);
+          
+          // Save to AsyncStorage for future use
+          await AsyncStorage.setItem('userData', JSON.stringify(userInfo));
+          console.log('   User info saved to AsyncStorage');
+        } catch (userError) {
+          console.log('8. ERROR getting user info from API:', userError.message);
+          console.log('   Cannot proceed without user information');
           throw new Error('Failed to get user information');
         }
-        
-        userInfo = await userResponse.json();
-        console.log('4. User info retrieved successfully');
-        console.log(`   User role: ${userInfo.role}`);
-        console.log(`   User ID: ${userInfo._id}`);
-      } catch (userError) {
-        console.log('4. ERROR getting user info:', userError.message);
-        console.log('   Proceeding with generic appointments endpoint');
-        userInfo = null;
       }
       
-      // Determine the appropriate endpoint based on user role
-      let endpoint = `${API_URL}/api/appointments`;
-      
-      if (userInfo) {
-        if (userInfo.role === 'barbershop' || userInfo.role === 'mainBarbershop') {
-          // For barbershop users, get appointments for their shop
-          console.log('5. User is a barbershop, fetching shop-specific appointments');
-          endpoint = `${API_URL}/api/appointments/shop/${userInfo._id}`;
-        } else if (userInfo.role === 'client') {
-          // For client users, get their own appointments
-          console.log('5. User is a client, fetching user-specific appointments');
-          endpoint = `${API_URL}/api/appointments/user/${userInfo._id}`;
-        } else {
-          console.log(`5. Unknown user role: ${userInfo.role}, using default endpoint`);
-        }
-      } else {
-        console.log('5. No user info available, using default endpoint');
+      // Ensure we have user info and it's a barbershop
+      if (!userInfo || (userInfo.role !== 'barbershop' && userInfo.role !== 'mainBarbershop')) {
+        console.log('9. User is not a barbershop, cannot fetch barbershop appointments');
+        throw new Error('User is not a barbershop');
       }
       
-      console.log(`6. Using endpoint: ${endpoint}`);
+      // Try to get shop data from API
+      console.log('10. Fetching shop data from API...');
+      let shopId = null;
       
-      console.log('7. Initiating fetch request...');
-      const fetchStartTime = Date.now();
-      
-      let response;
       try {
-        response = await fetch(endpoint, {
+        const shopResponse = await fetch(`${API_URL}/api/shops/user/${userInfo.id || userInfo._id}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${userToken}`,
@@ -79,97 +119,164 @@ export const appointmentService = {
           }
         });
         
-        const fetchEndTime = Date.now();
-        console.log(`8. Fetch completed in ${fetchEndTime - fetchStartTime}ms`);
-        console.log(`9. Response status: ${response.status} ${response.statusText}`);
-        
-      } catch (fetchError) {
-        console.log('8. FETCH ERROR:', fetchError.message);
-        console.log('   Error details:', fetchError);
-        console.log('========== APPOINTMENT SERVICE: ENDING WITH FETCH ERROR ==========\n');
-        throw new Error(`Network error: ${fetchError.message}`);
-      }
-      
-      // Check if response is ok
-      if (!response.ok) {
-        console.log('10. ERROR: Response not OK');
-        
-        let errorText = '';
-        try {
-          errorText = await response.text();
-          console.log('11. Error response body:', errorText);
-        } catch (textError) {
-          console.log('11. Could not read error response body:', textError.message);
-        }
-        
-        console.log('========== APPOINTMENT SERVICE: ENDING WITH HTTP ERROR ==========\n');
-        throw new Error(`Failed to fetch appointments: ${response.status} ${errorText}`);
-      }
-      
-      console.log('10. Response OK, attempting to parse JSON...');
-      
-      let data;
-      try {
-        data = await response.json();
-        console.log('11. JSON parsing successful');
-      } catch (jsonError) {
-        console.log('11. JSON PARSE ERROR:', jsonError.message);
-        console.log('    Error details:', jsonError);
-        
-        // Try to get the raw text to see what's wrong
-        try {
-          const rawText = await response.text();
-          console.log('    Raw response text (first 500 chars):', rawText.substring(0, 500));
-        } catch (textError) {
-          console.log('    Could not get raw text:', textError.message);
-        }
-        
-        console.log('========== APPOINTMENT SERVICE: ENDING WITH JSON PARSE ERROR ==========\n');
-        throw new Error(`Invalid JSON response: ${jsonError.message}`);
-      }
-      
-      console.log('12. Examining parsed data:');
-      console.log(`    Data type: ${typeof data}`);
-      console.log(`    Is array: ${Array.isArray(data)}`);
-      
-      // Handle different response formats
-      let appointments = data;
-      
-      // If data is an object with an appointments property, use that
-      if (!Array.isArray(data) && data && typeof data === 'object' && Array.isArray(data.appointments)) {
-        console.log('13. Data contains appointments property, using that');
-        appointments = data.appointments;
-      }
-      
-      // Ensure appointments is an array
-      if (!Array.isArray(appointments)) {
-        console.log('13. Data is not in expected format, converting to empty array');
-        appointments = [];
-      }
-      
-      console.log(`14. Final appointments count: ${appointments.length}`);
-      
-      if (appointments.length > 0) {
-        console.log('15. First appointment details:');
-        const firstItem = appointments[0];
-        
-        console.log(`    ID: ${firstItem._id || 'undefined'}`);
-        console.log(`    Date: ${firstItem.date || 'undefined'}`);
-        console.log(`    Service: ${firstItem.service || 'undefined'}`);
-        
-        // Check if we need to populate shop information
-        if (firstItem.shopId && typeof firstItem.shopId !== 'object') {
-          console.log('16. Shop information needs to be populated');
-          console.log(`    ShopId: ${firstItem.shopId}`);
+        if (shopResponse.ok) {
+          const shopData = await shopResponse.json();
+          console.log('11. Shop data response:', JSON.stringify(shopData).substring(0, 100) + '...');
           
-          // Try to populate shop information for each appointment
-          try {
-            console.log('17. Attempting to populate shop information for appointments...');
-            const populatedAppointments = await Promise.all(
-              appointments.map(async (appointment) => {
-                if (appointment.shopId && typeof appointment.shopId !== 'object') {
+          if (Array.isArray(shopData) && shopData.length > 0) {
+            shopId = shopData[0]._id;
+            console.log(`12. Found shop ID from array: ${shopId}`);
+          } else if (shopData && shopData._id) {
+            shopId = shopData._id;
+            console.log(`12. Found shop ID from object: ${shopId}`);
+          } else if (shopData && shopData.shop && shopData.shop._id) {
+            shopId = shopData.shop._id;
+            console.log(`12. Found shop ID from nested object: ${shopId}`);
+          } else {
+            console.log('12. Could not find shop ID in response');
+          }
+        } else {
+          console.log(`11. Failed to get shop data: ${shopResponse.status}`);
+        }
+      } catch (shopError) {
+        console.log('11. ERROR fetching shop data:', shopError.message);
+      }
+      
+      // If we couldn't get the shop ID, try alternative endpoints
+      if (!shopId) {
+        console.log('13. Trying alternative shop endpoint...');
+        try {
+          const altShopResponse = await fetch(`${API_URL}/api/shop`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${userToken}`,
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (altShopResponse.ok) {
+            const altShopData = await altShopResponse.json();
+            console.log('14. Alternative shop data response:', JSON.stringify(altShopData).substring(0, 100) + '...');
+            
+            if (altShopData && altShopData._id) {
+              shopId = altShopData._id;
+              console.log(`15. Found shop ID from alt endpoint: ${shopId}`);
+            } else if (altShopData && altShopData.shop && altShopData.shop._id) {
+              shopId = altShopData.shop._id;
+              console.log(`15. Found shop ID from nested alt object: ${shopId}`);
+            } else {
+              console.log('15. Could not find shop ID in alt response');
+            }
+          } else {
+            console.log(`14. Failed to get alt shop data: ${altShopResponse.status}`);
+          }
+        } catch (altShopError) {
+          console.log('14. ERROR fetching alt shop data:', altShopError.message);
+        }
+      }
+      
+      // If we still don't have a shop ID, use the user ID as fallback
+      if (!shopId) {
+        console.log('16. No shop ID found, fetching all appointments and filtering by user ID');
+        shopId = userInfo.id || userInfo._id;
+        console.log(`    Using user ID as fallback: ${shopId}`);
+      }
+      
+      // Check if we have cached appointments
+      const cacheKey = `appointments_shop_${shopId}`;
+      
+      console.log('17. Checking for cached appointments...');
+      try {
+        const cachedData = await AsyncStorage.getItem(cacheKey);
+        if (cachedData) {
+          const { appointments, timestamp } = JSON.parse(cachedData);
+          const cacheAge = Date.now() - timestamp;
+          
+          // Use cache if it's less than 5 minutes old
+          if (cacheAge < 5 * 60 * 1000) {
+            console.log(`18. Using cached appointments (${appointments.length} items, ${Math.round(cacheAge/1000)}s old)`);
+            console.log('========== APPOINTMENT SERVICE: COMPLETED FROM CACHE ==========\n');
+            return appointments;
+          }
+          console.log(`18. Cache expired (${Math.round(cacheAge/1000)}s old), fetching fresh data`);
+        } else {
+          console.log('18. No cached appointments found');
+        }
+      } catch (cacheError) {
+        console.log('18. ERROR checking cache:', cacheError.message);
+      }
+      
+      // Clear cache for testing
+      console.log('19. Clearing appointment cache for testing...');
+      await AsyncStorage.removeItem(cacheKey);
+      console.log('    Cache cleared');
+      
+      // Fetch all appointments and filter
+      console.log('20. Fetching all appointments...');
+      
+      let appointments = [];
+      
+      try {
+        const allAppointmentsResponse = await fetch(`${API_URL}/api/appointments`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${userToken}`,
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (allAppointmentsResponse.ok) {
+          const allAppointmentsData = await allAppointmentsResponse.json();
+          let allAppointments = Array.isArray(allAppointmentsData) ? allAppointmentsData : 
+            (allAppointmentsData && allAppointmentsData.appointments ? allAppointmentsData.appointments : []);
+          
+          console.log(`21. Found ${allAppointments.length} total appointments in the system`);
+          
+          if (allAppointments.length > 0) {
+            // Log all appointment shop IDs for debugging
+            console.log('22. All appointment shop IDs:');
+            allAppointments.forEach((appointment, index) => {
+              const appointmentShopId = typeof appointment.shopId === 'object' ? 
+                (appointment.shopId._id || appointment.shopId.id) : appointment.shopId;
+              console.log(`    Appointment ${index + 1}: Shop ID = ${appointmentShopId}`);
+            });
+            
+            // Filter for our specific shop ID
+            console.log(`23. Filtering for shop ID: ${shopId}`);
+            
+            // Use string comparison for IDs to handle ObjectId vs string issues
+            const shopAppointments = allAppointments.filter(appointment => {
+              const appointmentShopId = typeof appointment.shopId === 'object' ? 
+                (appointment.shopId._id || appointment.shopId.id) : appointment.shopId;
+              
+              // Convert both to strings for comparison
+              const shopIdStr = String(shopId);
+              const appointmentShopIdStr = String(appointmentShopId);
+              
+              const isMatch = shopIdStr === appointmentShopIdStr;
+              console.log(`    Comparing: ${shopIdStr} vs ${appointmentShopIdStr} = ${isMatch}`);
+              
+              return isMatch;
+            });
+            
+            console.log(`24. Found ${shopAppointments.length} appointments for this shop`);
+            
+            if (shopAppointments.length > 0) {
+              appointments = shopAppointments;
+              
+              // Process appointments for client information
+              console.log('25. Processing appointments for client information');
+              
+              appointments = await Promise.all(appointments.map(async appointment => {
+                // If client information is already populated, use it
+                if (appointment.clientData || (appointment.clientId && typeof appointment.clientId === 'object')) {
+                  return appointment;
+                }
+                
+                // Try to fetch client information
+                if (appointment.clientId && typeof appointment.clientId !== 'object') {
                   try {
-                    const shopResponse = await fetch(`${API_URL}/api/shop/${appointment.shopId}`, {
+                    const clientResponse = await fetch(`${API_URL}/api/users/${appointment.clientId}`, {
                       method: 'GET',
                       headers: {
                         'Authorization': `Bearer ${userToken}`,
@@ -177,37 +284,51 @@ export const appointmentService = {
                       }
                     });
                     
-                    if (shopResponse.ok) {
-                      const shopData = await shopResponse.json();
-                      if (shopData && shopData.shop) {
+                    if (clientResponse.ok) {
+                      const clientData = await clientResponse.json();
+                      if (clientData && clientData.user) {
                         return {
                           ...appointment,
-                          shopData: shopData.shop
+                          clientData: clientData.user
                         };
                       }
                     }
-                  } catch (shopError) {
-                    console.log(`    Error fetching shop data for appointment ${appointment._id}:`, shopError.message);
+                  } catch (clientError) {
+                    console.log(`    Error fetching client data for appointment ${appointment._id}:`, clientError.message);
                   }
                 }
-                return appointment;
-              })
-            );
-            
-            appointments = populatedAppointments;
-            console.log('18. Shop information population completed');
-          } catch (populationError) {
-            console.log('17. ERROR during shop information population:', populationError.message);
-            // Continue with unpopulated appointments
+                
+                // Otherwise, create a basic structure with available info
+                return {
+                  ...appointment,
+                  clientData: appointment.clientId ? {
+                    _id: typeof appointment.clientId === 'object' ? appointment.clientId._id : appointment.clientId,
+                    firstName: 'Client',
+                    lastName: '',
+                  } : { firstName: 'Client', lastName: '' }
+                };
+              }));
+            }
           }
-        } else {
-          console.log('16. Shop information already populated or not available');
         }
-      } else {
-        console.log('15. No appointments found');
+      } catch (allAppointmentsError) {
+        console.log('21. ERROR fetching all appointments:', allAppointmentsError.message);
       }
       
-      console.log('19. Returning appointments to caller');
+      // Store appointments in AsyncStorage for future use
+      try {
+        await AsyncStorage.setItem(cacheKey, JSON.stringify({
+          appointments,
+          timestamp: Date.now()
+        }));
+        console.log(`26. Appointments saved to AsyncStorage with key: ${cacheKey}`);
+        console.log(`    Saved ${appointments.length} appointments`);
+      } catch (storageError) {
+        console.log('26. ERROR saving appointments to AsyncStorage:', storageError.message);
+      }
+      
+      console.log('27. Returning appointments to caller');
+      console.log(`    Returning ${appointments.length} appointments`);
       console.log('========== APPOINTMENT SERVICE: COMPLETED SUCCESSFULLY ==========\n');
       return appointments;
       
@@ -220,6 +341,40 @@ export const appointmentService = {
     }
   },
   
+// Add a method to get shop data
+getShopData: async (userToken) => {
+  try {
+    // First check if we have shop data in AsyncStorage
+    const shopDataString = await AsyncStorage.getItem('shopData');
+    if (shopDataString) {
+      return JSON.parse(shopDataString);
+    }
+    
+    // Fetch shop data from API
+    const response = await fetch(`${API_URL}/api/shop`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${userToken}`,
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to get shop information');
+    }
+    
+    const shopData = await response.json();
+    
+    // Save to AsyncStorage for future use
+    await AsyncStorage.setItem('shopData', JSON.stringify(shopData));
+    
+    return shopData;
+  } catch (error) {
+    console.error('Error getting shop data:', error);
+    throw error;
+  }
+},
+
   bookAppointment: async (appointmentData, userToken) => {
     try {
       console.log('Making appointment request with data:', appointmentData);
