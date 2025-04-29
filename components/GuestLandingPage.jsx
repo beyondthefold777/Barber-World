@@ -13,7 +13,7 @@ import {
   Dimensions
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather, MaterialIcons } from '@expo/vector-icons';
+import { Feather, MaterialIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
 import { authService } from '../services/api';
 
 const GuestLandingPage = ({ navigation }) => {
@@ -48,10 +48,10 @@ const GuestLandingPage = ({ navigation }) => {
   const handleSearch = async () => {
     setLoading(true);
     try {
-      const searchParams = searchType === 'location' 
-        ? { city, state }
+      const searchParams = searchType === 'location'
+         ? { city, state }
         : { zipCode };
-      
+        
       // Use the existing searchBarbershops method from authService
       const results = await authService.searchBarbershops(searchParams);
       console.log('Search results received:', results.length);
@@ -64,8 +64,8 @@ const GuestLandingPage = ({ navigation }) => {
     }
   };
 
-  // Updated renderBarbershop function with proper address handling
-  const renderBarbershop = ({ item }) => {
+  // Updated renderBarbershop function with enhanced styling
+  const renderBarbershop = ({ item, index }) => {
     // Make sure item has an _id before trying to use it
     if (!item || !item._id) {
       console.log('Invalid shop item:', item);
@@ -87,7 +87,7 @@ const GuestLandingPage = ({ navigation }) => {
       let city = '';
       let state = '';
       let zip = '';
-      
+        
       // Try to get values from both possible locations
       if (item.address && typeof item.address === 'object') {
         city = item.address.city || item.city || '';
@@ -98,40 +98,87 @@ const GuestLandingPage = ({ navigation }) => {
         state = item.state || '';
         zip = item.zipCode || '';
       }
-      
+        
       let location = '';
-      
+        
       if (city) {
         location += city;
       }
-      
+        
       if (city && state) {
         location += ', ';
       }
-      
+        
       if (state) {
         location += state;
       }
-      
+        
       if ((city || state) && zip) {
         location += ' ';
       }
-      
+        
       if (zip) {
         location += zip;
       }
-      
+        
       return location || '';
     };
+
+    // Generate a random rating for demo purposes
+    const rating = (Math.random() * 2 + 3).toFixed(1); // Random rating between 3.0 and 5.0
+    const distance = (Math.random() * 10).toFixed(1); // Random distance between 0 and 10 miles
     
     return (
       <TouchableOpacity 
-        style={styles.barbershopCard}
+        style={[styles.barbershopCard, index % 2 === 0 ? styles.barbershopCardEven : styles.barbershopCardOdd]}
         onPress={() => navigation.navigate('BarbershopDetail', { shopId: item._id })}
       >
-        <Text style={styles.barbershopName}>{item.name || item.businessName || 'Unnamed Barbershop'}</Text>
-        <Text style={styles.barbershopAddress}>{formatAddress()}</Text>
-        <Text style={styles.barbershopLocation}>{formatLocation()}</Text>
+        <LinearGradient
+          colors={index % 2 === 0 ? ['#000000', '#222222'] : ['#111111', '#333333']}
+          style={styles.cardGradient}
+        >
+          <View style={styles.cardHeader}>
+            <View style={styles.shopIconContainer}>
+              <FontAwesome name="scissors" size={24} color="#FF0000" />
+            </View>
+            <View style={styles.shopInfoContainer}>
+              <Text style={styles.barbershopName}>{item.name || item.businessName || 'Unnamed Barbershop'}</Text>
+              <View style={styles.ratingContainer}>
+                <FontAwesome name="star" size={16} color="#FFD700" />
+                <Text style={styles.ratingText}>{rating}</Text>
+                <View style={styles.distanceContainer}>
+                  <Ionicons name="location" size={16} color="#FF0000" />
+                  <Text style={styles.distanceText}>{distance} mi</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+          
+          <View style={styles.cardDivider} />
+          
+          <View style={styles.cardBody}>
+            <View style={styles.addressRow}>
+              <Feather name="map-pin" size={16} color="#BBBBBB" style={styles.addressIcon} />
+              <Text style={styles.barbershopAddress}>{formatAddress()}</Text>
+            </View>
+            <Text style={styles.barbershopLocation}>{formatLocation()}</Text>
+            
+            <View style={styles.servicesContainer}>
+              <Text style={styles.servicesText}>
+                {['Haircut', 'Beard Trim', 'Shave', 'Lineup'].slice(0, Math.floor(Math.random() * 4) + 1).join(' • ')}
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.cardFooter}>
+            <TouchableOpacity style={styles.bookButton}>
+              <Text style={styles.bookButtonText}>Book Now</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.detailsButton}>
+              <Text style={styles.detailsButtonText}>Details</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
       </TouchableOpacity>
     );
   };
@@ -232,6 +279,10 @@ const GuestLandingPage = ({ navigation }) => {
               ]}
               onPress={() => setSearchType('location')}
             >
+              <Image 
+                source={require('../assets/scissors.png')}
+                style={styles.buttonIcon}
+              />
               <Text style={styles.searchTypeText}>City & State</Text>
             </TouchableOpacity>
             
@@ -245,6 +296,7 @@ const GuestLandingPage = ({ navigation }) => {
               <Text style={styles.searchTypeText}>ZIP Code</Text>
             </TouchableOpacity>
           </View>
+          
           {searchType === 'location' ? (
             <View style={styles.locationInputs}>
               <TextInput
@@ -284,18 +336,48 @@ const GuestLandingPage = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
         </View>
-        <FlatList
-          data={searchResults}
-          renderItem={renderBarbershop}
-          keyExtractor={(item) => item._id?.toString() || Math.random().toString()}
-          style={styles.resultsList}
-          contentContainerStyle={styles.resultsContent}
-          ListEmptyComponent={
+        
+        {/* Results Section with Title */}
+        {searchResults.length > 0 && (
+          <View style={styles.resultsSection}>
+            <View style={styles.resultsTitleContainer}>
+              <Text style={styles.resultsTitle}>Barbershops Near You</Text>
+              <Text style={styles.resultsCount}>{searchResults.length} found</Text>
+            </View>
+            
+            <FlatList
+              data={searchResults}
+              renderItem={renderBarbershop}
+              keyExtractor={(item) => item._id?.toString() || Math.random().toString()}
+              style={styles.resultsList}
+              contentContainerStyle={styles.resultsContent}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={false} // Disable scrolling on FlatList since it's inside ScrollView
+            />
+          </View>
+        )}
+        
+        {/* No Results Message */}
+        {searchResults.length === 0 && !loading && (
+          <View style={styles.noResultsContainer}>
+            <FontAwesome name="search" size={50} color="#444" />
             <Text style={styles.noResults}>
-              {loading ? 'Searching for barbershops...' : 'No barbershops found'}
+              No barbershops found
             </Text>
-          }
-        />
+            <Text style={styles.noResultsSubtext}>
+              Try a different location or ZIP code
+            </Text>
+          </View>
+        )}
+        
+        {/* Loading Indicator */}
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <FontAwesome name="spinner" size={40} color="#FF0000" />
+            <Text style={styles.loadingText}>Searching for barbershops...</Text>
+          </View>
+        )}
+        
         <TouchableOpacity 
           style={styles.barberSignup}
           onPress={() => navigation.navigate('Register')}
@@ -453,12 +535,19 @@ const styles = StyleSheet.create({
   },
   searchTypeButton: {
     flex: 1,
+    flexDirection: 'row',
     padding: 10,
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 6,
   },
   activeSearchType: {
     backgroundColor: '#FF0000',
+  },
+  buttonIcon: {
+    width: 30,
+    height: 30,
+    marginRight: 8,
   },
   searchTypeText: {
     color: 'white',
@@ -493,58 +582,201 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  // New enhanced results section styles
+  resultsSection: {
+    marginBottom: 20,
+  },
+  resultsTitleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  resultsTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  resultsCount: {
+    color: '#FF0000',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   resultsList: {
     marginBottom: 20,
   },
   resultsContent: {
-    padding: 20,
+    paddingBottom: 10,
   },
   barbershopCard: {
-    backgroundColor: '#000000',
-    padding: 18,
-    borderRadius: 12,
     marginBottom: 15,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    borderRadius: 12,
+    overflow: 'hidden',
     elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  barbershopCardEven: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF0000',
+  },
+  barbershopCardOdd: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#0000FF',
+  },
+  cardGradient: {
+    padding: 15,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  shopIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 0, 0, 0.3)',
+  },
+  shopInfoContainer: {
+    flex: 1,
   },
   barbershopName: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 8,
-    textShadowColor: 'rgba(255, 255, 255, 0.5)',
+    marginBottom: 5,
+    textShadowColor: 'rgba(255, 255, 255, 0.2)',
     textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 1,
   },
-  barbershopAddress: {
-    color: '#E0E0E0',
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  barbershopLocation: {
-    color: '#BBBBBB',
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  servicesText: {
-    color: '#FF0000',
-    fontSize: 14,
-    marginTop: 5,
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   ratingText: {
     color: '#FFD700',
     fontSize: 14,
-    marginTop: 3,
+    marginLeft: 5,
+    fontWeight: 'bold',
+  },
+  distanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 15,
+  },
+  distanceText: {
+    color: '#BBBBBB',
+    fontSize: 14,
+    marginLeft: 5,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginVertical: 10,
+  },
+  cardBody: {
+    marginBottom: 10,
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 5,
+  },
+  addressIcon: {
+    marginRight: 5,
+    marginTop: 2,
+  },
+  barbershopAddress: {
+    color: '#E0E0E0',
+    fontSize: 15,
+    flex: 1,
+  },
+  barbershopLocation: {
+    color: '#BBBBBB',
+    fontSize: 14,
+    marginBottom: 8,
+    marginLeft: 21, // To align with the address text
+  },
+  servicesContainer: {
+    marginTop: 5,
+  },
+  servicesText: {
+    color: '#FF0000',
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 5,
+  },
+  bookButton: {
+    backgroundColor: '#FF0000',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+    flex: 1,
+    marginRight: 10,
+    alignItems: 'center',
+  },
+  bookButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  detailsButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+    flex: 1,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  detailsButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  noResultsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 10,
+    marginVertical: 20,
   },
   noResults: {
-    color: '#999',
+    color: '#BBBBBB',
     textAlign: 'center',
-    marginTop: 20,
+    marginTop: 15,
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  noResultsSubtext: {
+    color: '#888888',
+    textAlign: 'center',
+    marginTop: 10,
+    fontSize: 14,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    marginVertical: 20,
+  },
+  loadingText: {
+    color: '#BBBBBB',
+    textAlign: 'center',
+    marginTop: 15,
     fontSize: 16,
   },
   barberSignup: {

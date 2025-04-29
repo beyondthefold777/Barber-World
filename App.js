@@ -5,8 +5,6 @@ import { useState, useEffect } from 'react';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { PaperProvider } from 'react-native-paper';
 import { View, Text } from 'react-native';
-// Keep this import for manual deep linking in components
-import * as Linking from 'expo-linking';
 
 // Import AuthProvider
 import { AuthProvider } from './context/AuthContext';
@@ -62,11 +60,6 @@ import ResetPasswordScreen from './components/ResetPasswordScreen';
 
 const Stack = createStackNavigator();
 
-// Simple linking configuration - just define the prefixes
-const linking = {
-  prefixes: ['barberworld://', 'https://barber-world.fly.dev']
-};
-
 const App = () => {
   const [isReady, setIsReady] = useState(false);
 
@@ -92,7 +85,7 @@ const App = () => {
   return (
     <AuthProvider>
       <PaperProvider>
-        <NavigationContainer linking={linking}>
+        <NavigationContainer>
           <Stack.Navigator 
             initialRouteName="Splash"
             screenOptions={{
@@ -182,7 +175,6 @@ const App = () => {
               component={BarbershopDetail}
               options={{ headerShown: false }}
             />
-
             {/* Financial Hub Screens */}
             <Stack.Screen name="TaxForms" component={TaxFormsScreen} options={{ headerShown: true }} />
             <Stack.Screen name="WriteOffs" component={WriteOffsScreen} options={{ headerShown: true }} />
@@ -190,7 +182,6 @@ const App = () => {
             <Stack.Screen name="PaySchedule" component={PayScheduleScreen} options={{ headerShown: true }} />
             <Stack.Screen name="ProjectedIncome" component={ProjectedIncomeScreen} options={{ headerShown: true }} />
             <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ headerShown: true }} />
-
             {/* Shop Settings Screens */}
             <Stack.Screen 
               name="CustomizeShop"
@@ -200,7 +191,6 @@ const App = () => {
                 title: 'Customize Shop'
               }}
             />
-
             {/* Settings Screens */}
             <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
             <Stack.Screen name="PaymentMethod" component={PaymentMethodScreen} options={{ headerShown: true, title: 'Payment Methods' }} />

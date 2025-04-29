@@ -29,13 +29,9 @@ const RegisterScreen = ({ navigation }) => {
       Alert.alert('Error', 'Username and phone number are required for guests');
       return;
     }
-    if ((formData.role === 'barbershop' || formData.role === 'mainBarbershop') && 
+    if (formData.role === 'barbershop' &&
         (!formData.businessName || !formData.address || !formData.city || !formData.state || !formData.zipCode)) {
       Alert.alert('Error', 'All business information is required for barbershops');
-      return;
-    }
-    if (formData.role === 'mainBarbershop' && !formData.adminCode) {
-      Alert.alert('Error', 'Admin code is required for main barbershop registration');
       return;
     }
 
@@ -79,7 +75,7 @@ const RegisterScreen = ({ navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Create an Account</Text>
         <View style={styles.roleContainer}>
-          {['client', 'barbershop', 'mainBarbershop'].map((role) => (
+          {['client', 'barbershop'].map((role) => (
             <TouchableOpacity 
               key={role}
               style={[
@@ -89,9 +85,8 @@ const RegisterScreen = ({ navigation }) => {
               onPress={() => updateFormData('role', role)}
             >
               <Text style={styles.roleText}>
-                {role === 'mainBarbershop' ? 'Admin' :
-                  role === 'client' ? 'New Guests' :
-                 role.charAt(0).toUpperCase() + role.slice(1)}
+                {role === 'client' ? 'New Guests' :
+                role.charAt(0).toUpperCase() + role.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -134,7 +129,7 @@ const RegisterScreen = ({ navigation }) => {
             onChangeText={(value) => updateFormData('password', value)}
             secureTextEntry
           />
-          {(formData.role === 'barbershop' || formData.role === 'mainBarbershop') && (
+          {formData.role === 'barbershop' && (
             <>
               <TextInput
                 style={styles.input}
@@ -173,16 +168,6 @@ const RegisterScreen = ({ navigation }) => {
                 keyboardType="numeric"
               />
             </>
-          )}
-          {formData.role === 'mainBarbershop' && (
-            <TextInput
-              style={styles.input}
-              placeholder="Admin Code"
-              placeholderTextColor="#999"
-              value={formData.adminCode}
-              onChangeText={(value) => updateFormData('adminCode', value)}
-              secureTextEntry
-            />
           )}
         </View>
         <TouchableOpacity 

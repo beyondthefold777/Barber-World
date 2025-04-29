@@ -3,19 +3,24 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
-  RefreshControl,
-  Alert
+  ActivityIndicator,
+  Alert,
+  RefreshControl
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { appointmentService } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 
 const AppointmentList = () => {
   const [appointments, setAppointments] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
+  const navigation = useNavigation();
 
   // Function to get user info from AsyncStorage
   const getUserInfo = async () => {
@@ -83,6 +88,7 @@ const AppointmentList = () => {
       );
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -90,255 +96,332 @@ const AppointmentList = () => {
     fetchAppointments();
   }, []);
 
-  const formatDate = (dateString) => {
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchAppointments();
+  };
+
+  const formatAppointmentDate = (dateString) => {
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric'
-      });
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        console.log(`Invalid date format: ${dateString}`);
+        return 'Invalid date';
+      }
+      
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      return date.toLocaleDateString('en-US', options);
     } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Invalid date';
+      console.log(`Error formatting date: ${error.message}`);
+      return dateString || 'N/A';
     }
+  };
+
+  // Helper function to get shop name from appointment
+  const getShopName = (appointment) => {
+    // Try different possible locations for shop name
+    if (appointment.shopName) {
+      return appointment.shopName;
+    } else if (appointment.shopId) {
+      if (typeof appointment.shopId === 'object' && appointment.shopId.name) {
+        return appointment.shopId.name;
+      } else if (typeof appointment.shopId === 'string') {
+        // If shopId is just a string ID, we can't get the name directly
+        return 'Barbershop';
+      }
+    }
+    return 'Barbershop';
+  };
+
+  // Helper function to get barber name from appointment
+  const getBarberName = (appointment) => {
+    if (appointment.barberName) {
+      return appointment.barberName;
+    } else if (appointment.barberId) {
+      if (typeof appointment.barberId === 'object' && appointment.barberId.name) {
+        return appointment.barberId.name;
+      }
+    }
+    return null;
+  };
+
+  const handleCancelAppointment = async (appointmentId) => {
+    console.log(`Cancel appointment requested for ID: ${appointmentId}`);
+    
+    Alert.alert(
+      'Cancel Appointment',
+      'Are you sure you want to cancel this appointment?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              console.log(`Proceeding with cancellation of appointment: ${appointmentId}`);
+              
+              // Get token from AsyncStorage
+              const token = await AsyncStorage.getItem('userToken');
+              console.log(`Token for cancellation from AsyncStorage: ${token ? 'Found' : 'Not found'}`);
+              
+              // Use appointmentService for cancellation
+              await appointmentService.cancelAppointment(appointmentId, token);
+              console.log("Cancellation API call successful");
+              
+              // Update the local state after successful cancellation
+              setAppointments(appointments.map(app => 
+                app._id === appointmentId ? {...app, status: 'canceled'} : app
+              ));
+              
+              Alert.alert('Success', 'Your appointment has been canceled.');
+            } catch (error) {
+              console.log(`ERROR canceling appointment: ${error.message}`);
+              console.log(`Error stack: ${error.stack}`);
+              
+              console.error('Error canceling appointment:', error);
+              Alert.alert('Error', 'Failed to cancel appointment. Please try again.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const renderAppointmentItem = ({ item }) => {
+    // Log each appointment as it's rendered
+    const shopName = getShopName(item);
+    const barberName = getBarberName(item);
+    
+    console.log(`Rendering appointment: ${item._id}, status: ${item.status}, shopName: ${shopName}`);
+    
+    return (
+      <View style={styles.appointmentCard}>
+        <View style={styles.appointmentHeader}>
+          <Text style={styles.shopName}>Appointment</Text>
+          <View style={[styles.statusBadge, 
+            item.status === 'confirmed' ? styles.confirmedStatus :
+            item.status === 'canceled' ? styles.canceledStatus :
+            item.status === 'completed' ? styles.completedStatus : styles.pendingStatus
+          ]}>
+            <Text style={styles.statusText}>
+              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+            </Text>
+          </View>
+        </View>
+        
+        <View style={styles.appointmentDetails}>
+          <View style={styles.detailRow}>
+            <Feather name="calendar" size={14} color="#999" />
+            <Text style={styles.detailText}>{formatAppointmentDate(item.date)}</Text>
+          </View>
+          
+          <View style={styles.detailRow}>
+            <Feather name="clock" size={14} color="#999" />
+            <Text style={styles.detailText}>{item.timeSlot || 'No time specified'}</Text>
+          </View>
+          
+          <View style={styles.detailRow}>
+            <Feather name="scissors" size={14} color="#999" />
+            <Text style={styles.detailText}>{item.service || 'No service specified'}</Text>
+          </View>
+          
+          <View style={styles.detailRow}>
+            <Feather name="home" size={14} color="#999" />
+            <Text style={styles.detailText}>{shopName}</Text>
+          </View>
+          
+          {barberName && (
+            <View style={styles.detailRow}>
+              <Feather name="user" size={14} color="#999" />
+              <Text style={styles.detailText}>{barberName}</Text>
+            </View>
+          )}
+        </View>
+        
+        {item.status === 'confirmed' && (
+          <TouchableOpacity 
+            style={styles.cancelButton}
+            onPress={() => handleCancelAppointment(item._id)}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
   };
 
   const isBarbershop = userInfo && (userInfo.role === 'barbershop' || userInfo.role === 'mainBarbershop');
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={fetchAppointments} />
-      }
+    <LinearGradient
+      colors={['#000000', '#333333']}
+      style={styles.gradientContainer}
     >
-      <Text style={styles.title}>
-        {isBarbershop ? 'Shop Appointments' : 'My Appointments'}
-      </Text>
-      
-      {appointments.length === 0 && !loading ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.noAppointments}>
-            {isBarbershop ? 'No upcoming appointments for your shop' : 'No upcoming appointments'}
-          </Text>
-          {!isBarbershop && (
-            <TouchableOpacity 
-              style={styles.bookButton}
-              onPress={() => {
-                // Navigate to booking screen
-                Alert.alert("Book Appointment", "Navigate to booking screen");
-              }}
-              >
-              <Text style={styles.bookButtonText}>Book an Appointment</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : (
-        appointments.map((appointment) => {
-          // Determine what information to display based on user role
-          const isBarbershop = userInfo && (userInfo.role === 'barbershop' || userInfo.role === 'mainBarbershop');
-          
-          return (
-            <View key={appointment._id} style={styles.appointmentCard}>
-              <View style={styles.dateContainer}>
-                <Text style={styles.date}>{formatDate(appointment.date)}</Text>
-                <Text style={styles.time}>{appointment.timeSlot}</Text>
-              </View>
-              
-              <View style={styles.detailsContainer}>
-                <Text style={styles.service}>{appointment.service}</Text>
-                
-                {/* Display client or shop info based on user role */}
-                {isBarbershop ? (
-                  // For barbershop users, show client info
-                  <Text style={styles.clientName}>
-                    Client: {appointment.clientData ? 
-                      `${appointment.clientData.firstName} ${appointment.clientData.lastName}` : 
-                      (appointment.clientId || 'Unknown Client')}
-                  </Text>
-                ) : (
-                  // For clients, show shop info
-                  <Text style={styles.shopName}>
-                    at {appointment.shopData ? 
-                      appointment.shopData.name : 
-                      (typeof appointment.shopId === 'object' ? 
-                        appointment.shopId.name || 'Unnamed Shop' : 
-                        'Barbershop')}
-                  </Text>
+      <View style={styles.container}>
+        {loading && !refreshing ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FF0000" />
+            <Text style={styles.loadingText}>Loading appointments...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={appointments}
+            renderItem={renderAppointmentItem}
+            keyExtractor={(item) => item._id || Math.random().toString()}
+            contentContainerStyle={styles.listContainer}
+            refreshControl={
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={handleRefresh}
+                colors={["#FF0000"]}
+                tintColor="#FF0000"
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Feather name="calendar" size={50} color="#666" />
+                <Text style={styles.emptyText}>
+                  {isBarbershop 
+                    ? "No upcoming appointments for your shop" 
+                    : "You don't have any appointments yet"}
+                </Text>
+                {!isBarbershop && (
+                  <TouchableOpacity 
+                    style={styles.bookButton}
+                    onPress={() => {
+                      console.log("Navigate to booking screen");
+                      navigation.navigate('GuestLandingPage');
+                    }}
+                  >
+                    <Text style={styles.bookButtonText}>Book an Appointment</Text>
+                  </TouchableOpacity>
                 )}
-                
-                <View style={styles.statusContainer}>
-                  <View style={[styles.statusDot, {
-                    backgroundColor:
-                      appointment.status === 'confirmed' ? '#00FF00' :
-                      appointment.status === 'cancelled' || appointment.status === 'canceled' ? '#FF0000' :
-                      appointment.status === 'completed' ? '#0000FF' : '#FFD700'
-                  }]} />
-                  <Text style={styles.status}>
-                    {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-                  </Text>
-                </View>
               </View>
-              
-              <TouchableOpacity 
-                style={styles.moreButton}
-                onPress={() => {
-                  Alert.alert(
-                    "Appointment Options",
-                    "What would you like to do?",
-                    [
-                      {
-                        text: "View Details",
-                        onPress: () => Alert.alert("Details", JSON.stringify(appointment, null, 2))
-                      },
-                      {
-                        text: isBarbershop ? "Update Status" : "Cancel Appointment",
-                        style: isBarbershop ? "default" : "destructive",
-                        onPress: () => {
-                          if (isBarbershop) {
-                            // Show status update options for barbershop
-                            Alert.alert(
-                              "Update Status",
-                              "Select new status:",
-                              [
-                                { text: "Confirmed", onPress: () => console.log("Status updated to confirmed") },
-                                { text: "Completed", onPress: () => console.log("Status updated to completed") },
-                                { text: "Cancelled", onPress: () => console.log("Status updated to cancelled") },
-                                { text: "Cancel", style: "cancel" }
-                              ]
-                            );
-                          } else {
-                            // Show cancellation confirmation for clients
-                            Alert.alert(
-                              "Cancel Appointment",
-                              "Are you sure you want to cancel this appointment?",
-                              [
-                                { 
-                                  text: "Yes, Cancel", 
-                                  style: "destructive",
-                                  onPress: async () => {
-                                    try {
-                                      const userToken = await AsyncStorage.getItem('userToken');
-                                      if (userToken) {
-                                        await appointmentService.cancelAppointment(appointment._id, userToken);
-                                        fetchAppointments(); // Refresh the list
-                                      }
-                                    } catch (error) {
-                                      console.error("Error cancelling appointment:", error);
-                                      Alert.alert("Error", "Failed to cancel appointment");
-                                    }
-                                  }
-                                },
-                                { text: "No, Keep It", style: "cancel" }
-                              ]
-                            );
-                          }
-                        }
-                      },
-                      { text: "Close", style: "cancel" }
-                    ]
-                  );
-                }}
-              >
-                <Feather name="more-vertical" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          );
-        })
-      )}
-    </ScrollView>
+            }
+          />
+        )}
+      </View>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
+  gradientContainer: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     padding: 16,
   },
-  title: {
-    fontSize: 24,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#999',
+    marginTop: 10,
+    fontSize: 16,
+  },
+  listContainer: {
+    paddingBottom: 20,
+    paddingTop: 10,
+  },
+  appointmentCard: {
+    backgroundColor: '#222',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF0000',
+  },
+  appointmentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  shopName: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 16,
+  },
+  statusBadge: {
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+  },
+  confirmedStatus: {
+    backgroundColor: '#4CAF50',
+  },
+  canceledStatus: {
+    backgroundColor: '#F44336',
+  },
+  completedStatus: {
+    backgroundColor: '#2196F3',
+  },
+  pendingStatus: {
+    backgroundColor: '#FF9800',
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  appointmentDetails: {
+    marginBottom: 10,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  detailText: {
+    color: '#CCC',
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  cancelButton: {
+    backgroundColor: '#333',
+    padding: 8,
+    borderRadius: 5,
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    marginTop: 2,
+    borderWidth: 1,
+    borderColor: '#F44336',
+    paddingHorizontal: 15,
+  },
+  cancelButtonText: {
+    color: '#F44336',
+    fontWeight: 'bold',
+    fontSize: 13,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 50,
+    padding: 40,
   },
-  noAppointments: {
-    color: '#CCCCCC',
-    fontSize: 16,
-    textAlign: 'center',
+  emptyText: {
+    color: '#999',
+    fontSize: 18,
+    marginTop: 15,
     marginBottom: 20,
+    textAlign: 'center',
   },
   bookButton: {
     backgroundColor: '#FF0000',
+    paddingVertical: 12,
     paddingHorizontal: 20,
-    paddingVertical: 10,
     borderRadius: 8,
+    marginTop: 10,
   },
   bookButtonText: {
-    color: '#FFFFFF',
+    color: 'white',
     fontWeight: 'bold',
-  },
-  appointmentCard: {
-    backgroundColor: '#333333',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dateContainer: {
-    flex: 1,
-  },
-  date: {
-    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: 'bold',
-  },
-  time: {
-    color: '#FF0000',
-    fontSize: 14,
-    marginTop: 4,
-  },
-  detailsContainer: {
-    flex: 2,
-    marginLeft: 16,
-  },
-  service: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  shopName: {
-    color: '#AAAAAA',
-    fontSize: 14,
-    marginTop: 2,
-  },
-  clientName: {
-    color: '#AAAAAA',
-    fontSize: 14,
-    marginTop: 2,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  status: {
-    color: '#CCCCCC',
-    fontSize: 14,
-  },
-  moreButton: {
-    padding: 8,
   },
 });
 
