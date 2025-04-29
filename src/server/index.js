@@ -29,35 +29,30 @@ try {
 // Try to import routes with detailed error handling
 let appointmentRoutes, authRoutes, shopRoutes, expenseRoutes, taxRoutes, userRoutes;
 let emailRoutes, accountRoutes;
-
 try {
   appointmentRoutes = require('./routes/appointments');
   console.log('Appointment routes loaded successfully');
 } catch (err) {
   console.error('Error loading appointment routes:', err);
 }
-
 try {
   authRoutes = require('./routes/Authroutes');
   console.log('Auth routes loaded successfully');
 } catch (err) {
   console.error('Error loading auth routes:', err);
 }
-
 try {
   emailRoutes = require('./routes/emailRoutes');
   console.log('Email routes loaded successfully');
 } catch (err) {
   console.error('Error loading email routes:', err);
 }
-
 try {
   accountRoutes = require('./routes/accountRoutes');
   console.log('Account routes loaded successfully');
 } catch (err) {
   console.error('Error loading account routes:', err);
 }
-
 try {
   console.log('Attempting to load shop routes from:', path.resolve(__dirname, './routes/shop.routes.js'));
   shopRoutes = require('./routes/shop.routes');
@@ -67,21 +62,18 @@ try {
 } catch (err) {
   console.error('Error loading shop routes:', err);
 }
-
 try {
   expenseRoutes = require('./routes/expenseRoutes');
   console.log('Expense routes loaded successfully');
 } catch (err) {
   console.error('Error loading expense routes:', err);
 }
-
 try {
   taxRoutes = require('./routes/tax.routes');
   console.log('Tax routes loaded successfully');
 } catch (err) {
   console.error('Error loading tax routes:', err);
 }
-
 try {
   userRoutes = require('./routes/user.routes');
   console.log('User routes loaded successfully');
@@ -91,14 +83,12 @@ try {
 
 // Import controllers and middleware for direct routes
 let authMiddleware, shopController;
-
 try {
   authMiddleware = require('./middleware/auth');
   console.log('Auth middleware loaded successfully');
 } catch (err) {
   console.error('Error loading auth middleware:', err);
 }
-
 try {
   shopController = require('./controllers/shopController');
   console.log('Shop controller loaded successfully');
@@ -111,6 +101,8 @@ const connectDB = require('../../config/db');
 require('dotenv').config();
 
 const app = express();
+
+// Define port and host explicitly for Fly.io
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
 
@@ -141,32 +133,26 @@ if (appointmentRoutes) {
   app.use('/api/appointments', appointmentRoutes);
   console.log('Appointment routes mounted');
 }
-
 if (authRoutes) {
   app.use('/api/auth', authRoutes);
   console.log('Auth routes mounted');
 }
-
 if (emailRoutes) {
   app.use('/api/email', emailRoutes);
   console.log('Email routes mounted');
 }
-
 if (accountRoutes) {
   app.use('/api/account', accountRoutes);
   console.log('Account routes mounted');
 }
-
 if (expenseRoutes) {
   app.use('/api/expenses', expenseRoutes);
   console.log('Expense routes mounted');
 }
-
 if (taxRoutes) {
   app.use('/api/tax', taxRoutes);
   console.log('Tax routes mounted');
 }
-
 if (userRoutes) {
   app.use('/api/users', userRoutes);
   console.log('User routes mounted');
@@ -511,6 +497,77 @@ if (shopController) {
   });
 }
 
+// Add route handler for reset-password
+app.get('/reset-password', (req, res) => {
+  const token = req.query.token;
+  
+  // Serve an HTML page with a button to open the app
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Reset Password - Barber World</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <style>
+        body { 
+          font-family: Arial, sans-serif; 
+          text-align: center; 
+          padding: 20px; 
+          background-color: #f5f5f5;
+          color: #333;
+        }
+        .container { 
+          max-width: 600px; 
+          margin: 0 auto; 
+          background-color: white;
+          padding: 30px;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .logo {
+          margin-bottom: 20px;
+        }
+        h1 {
+          color: #FF0000;
+          margin-bottom: 20px;
+        }
+        .btn { 
+          background-color: #FF0000; 
+          color: white; 
+          padding: 12px 20px; 
+          border: none; 
+          border-radius: 4px; 
+          cursor: pointer; 
+          font-size: 16px;
+          text-decoration: none;
+          display: inline-block;
+          margin: 10px 0;
+        }
+        .btn:hover {
+          background-color: #cc0000;
+        }
+        .note {
+          margin-top: 20px;
+          font-size: 14px;
+          color: #666;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="logo">
+          <h1>Barber World</h1>
+        </div>
+        <h2>Reset Your Password</h2>
+        <p>Click the button below to open the app and reset your password.</p>
+        <a href="barberworld://reset-password?token=${token}" class="btn">Open App</a>
+        <p class="note">If the button doesn't work, you may need to install the Barber World app first.</p>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 // Password change functionality
 app.post('/api/change-password', authMiddleware, async (req, res) => {
   try {
@@ -583,13 +640,21 @@ app.post('/api/request-password-reset', async (req, res) => {
     const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
     
     // Store reset token and expiry in user document
-    user.resetToken = resetToken;
-    user.resetTokenExpiry = Date.now() + 3600000; // 1 hour from now
-    await user.save();
+    // Use findByIdAndUpdate to bypass validation
+    await User.findByIdAndUpdate(
+      user._id,
+      {
+        resetToken: resetToken,
+        resetTokenExpiry: Date.now() + 3600000 // 1 hour from now
+      },
+      { runValidators: false }
+    );
     
-    // Send password reset email using Nodemailer
-    const resetUrl = `https://barber-world.fly.dev/reset-password?token=${resetToken}`;
+    // Create both web and mobile deep link URLs
+    const webResetUrl = `https://barber-world.fly.dev/reset-password?token=${resetToken}`;
+    const mobileDeepLink = `barberworld://reset-password?token=${resetToken}`;
     
+    // Send password reset email using Nodemailer with both links
     const mailOptions = {
       from: `"Barber World" <${process.env.EMAIL_USER || 'nexphase1989@gmail.com'}>`,
       to: email,
@@ -603,7 +668,12 @@ app.post('/api/request-password-reset', async (req, res) => {
           <p>We received a request to reset your password for your Barber World account. Click the button below to reset your password:</p>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${resetUrl}" style="background-color: #FF0000; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">Reset Password</a>
+            <a href="${webResetUrl}" style="background-color: #FF0000; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">Reset Password</a>
+          </div>
+          
+          <p>If you're using the mobile app, please use this link instead:</p>
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="${mobileDeepLink}" style="background-color: #333; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">Reset in Mobile App</a>
           </div>
           
           <p>If you didn't request a password reset, you can safely ignore this email.</p>
@@ -613,8 +683,9 @@ app.post('/api/request-password-reset', async (req, res) => {
           <p>Best regards,<br>The Barber World Team</p>
           
           <div style="margin-top: 20px; font-size: 12px; color: #777; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
-            <p>If the button doesn't work, copy and paste this URL into your browser:</p>
-            <p style="word-break: break-all;">${resetUrl}</p>
+            <p>If the buttons don't work, copy and paste one of these URLs into your browser:</p>
+            <p style="word-break: break-all;">Web: ${webResetUrl}</p>
+            <p style="word-break: break-all;">Mobile: ${mobileDeepLink}</p>
           </div>
         </div>
       `
@@ -676,11 +747,16 @@ app.post('/api/reset-password', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
     
-    // Update password and clear reset token fields
-    user.password = hashedPassword;
-    user.resetToken = undefined;
-    user.resetTokenExpiry = undefined;
-    await user.save();
+    // Update password and clear reset token fields using findByIdAndUpdate to bypass validation
+    await User.findByIdAndUpdate(
+      user._id,
+      {
+        password: hashedPassword,
+        resetToken: undefined,
+        resetTokenExpiry: undefined
+      },
+      { runValidators: false }
+    );
     
     // Send password change confirmation email
     const mailOptions = {
@@ -693,7 +769,7 @@ app.post('/api/reset-password', async (req, res) => {
           
           <p>Hello,</p>
           
-          <p>Your password for Barber World has been successfully reset.</p>
+                    <p>Your password for Barber World has been successfully reset.</p>
           
           <p>If you did not request this change, please contact our support team immediately.</p>
           
@@ -776,123 +852,122 @@ app.post('/api/contact-support', async (req, res) => {
       `
     };
     
-       // Prepare confirmation email to user
-       const userConfirmationMailOptions = {
-        from: `"Barber World Support" <${process.env.EMAIL_USER || 'nexphase1989@gmail.com'}>`,
-        to: email,
-        subject: `Your Support Request: ${subject}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
-            <h2 style="color: #FF0000; border-bottom: 1px solid #eee; padding-bottom: 10px;">Support Request Received</h2>
-            
-            <p>Hello ${userName},</p>
-            
-            <p>We've received your support request with the following details:</p>
-            
-            <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <p><strong>Category:</strong> ${category}</p>
-              <p><strong>Subject:</strong> ${subject}</p>
-              <p><strong>Message:</strong></p>
-              <p>${message.replace(/\n/g, '<br>')}</p>
-            </div>
-            
-            <p>Our support team will review your request and get back to you as soon as possible. Please allow 24-48 hours for a response.</p>
-            
-            <p>Best regards,<br>The Barber World Support Team</p>
+    // Prepare confirmation email to user
+    const userConfirmationMailOptions = {
+      from: `"Barber World Support" <${process.env.EMAIL_USER || 'nexphase1989@gmail.com'}>`,
+      to: email,
+      subject: `Your Support Request: ${subject}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+          <h2 style="color: #FF0000; border-bottom: 1px solid #eee; padding-bottom: 10px;">Support Request Received</h2>
+          
+          <p>Hello ${userName},</p>
+          
+          <p>We've received your support request with the following details:</p>
+          
+          <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p><strong>Category:</strong> ${category}</p>
+            <p><strong>Subject:</strong> ${subject}</p>
+            <p><strong>Message:</strong></p>
+            <p>${message.replace(/\n/g, '<br>')}</p>
           </div>
-        `
-      };
+          
+          <p>Our support team will review your request and get back to you as soon as possible. Please allow 24-48 hours for a response.</p>
+          
+          <p>Best regards,<br>The Barber World Support Team</p>
+        </div>
+      `
+    };
+    
+    // Send emails
+    try {
+      await transporter.sendMail(supportMailOptions);
+      console.log(`Support request email sent to support team from ${email}`);
       
-      // Send emails
-      try {
-        await transporter.sendMail(supportMailOptions);
-        console.log(`Support request email sent to support team from ${email}`);
-        
-        await transporter.sendMail(userConfirmationMailOptions);
-        console.log(`Confirmation email sent to user at ${email}`);
-      } catch (emailError) {
-        console.error('Error sending support emails:', emailError);
-        // Continue execution even if email fails - don't reveal email sending issues to client
-      }
-      
-      res.status(200).json({
-        success: true,
-        message: 'Your support request has been submitted successfully'
+      await transporter.sendMail(userConfirmationMailOptions);
+      console.log(`Confirmation email sent to user at ${email}`);
+    } catch (emailError) {
+      console.error('Error sending support emails:', emailError);
+      // Continue execution even if email fails - don't reveal email sending issues to client
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: 'Your support request has been submitted successfully'
+    });
+  } catch (error) {
+    console.error('Error processing support request:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error while processing your support request' 
+    });
+  }
+});
+
+// Test route to verify server is working
+app.get('/', (req, res) => {
+  res.send('Barber World API is running!');
+});
+
+// Route for checking all registered routes
+app.get('/api/routes', (req, res) => {
+  const routes = [];
+  app._router.stack.forEach(middleware => {
+    if (middleware.route) {
+      // Routes registered directly on the app
+      routes.push({
+        path: middleware.route.path,
+        method: Object.keys(middleware.route.methods)[0]
       });
-    } catch (error) {
-      console.error('Error processing support request:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Server error while processing your support request' 
+    } else if (middleware.name === 'router') {
+      // Router middleware
+      middleware.handle.stack.forEach(handler => {
+        if (handler.route) {
+          routes.push({
+            path: middleware.regexp.toString() + handler.route.path,
+            method: Object.keys(handler.route.methods)[0]
+          });
+        }
       });
     }
   });
+  res.json(routes);
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  const errorDetails = {
+    timestamp: new Date().toISOString(),
+    error: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method
+  };
   
-  // Test route to verify server is working
-  app.get('/', (req, res) => {
-    res.send('Barber World API is running!');
+  console.log('Error occurred:', errorDetails);
+  
+  res.status(500).json({
+    error: err.message,
+    path: req.path
   });
-  
-  // Route for checking all registered routes
-  app.get('/api/routes', (req, res) => {
-    const routes = [];
-    app._router.stack.forEach(middleware => {
-      if (middleware.route) {
-        // Routes registered directly on the app
-        routes.push({
-          path: middleware.route.path,
-          method: Object.keys(middleware.route.methods)[0]
-        });
-      } else if (middleware.name === 'router') {
-        // Router middleware
-        middleware.handle.stack.forEach(handler => {
-          if (handler.route) {
-            routes.push({
-              path: middleware.regexp.toString() + handler.route.path,
-              method: Object.keys(handler.route.methods)[0]
-            });
-          }
-        });
-      }
-    });
-    res.json(routes);
+});
+
+// Create the server instance with explicit host binding for Fly.io
+const server = app.listen(PORT, HOST, () => {
+  console.log(`Server running on ${HOST}:${PORT}`);
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
   });
-  
-  // Global error handler
-  app.use((err, req, res, next) => {
-    const errorDetails = {
-      timestamp: new Date().toISOString(),
-      error: err.message,
-      stack: err.stack,
-      path: req.path,
-      method: req.method
-    };
-    
-    console.log('Error occurred:', errorDetails);
-    
-    res.status(500).json({
-      error: err.message,
-      path: req.path
-    });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
   });
-  
-  // Create the server instance
-  const server = app.listen(PORT, HOST, () => {
-    console.log(`Server running on ${HOST}:${PORT}`);
-  });
-  
-  // Handle graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('SIGTERM signal received: closing HTTP server');
-    server.close(() => {
-      console.log('HTTP server closed');
-    });
-  });
-  
-  process.on('SIGINT', () => {
-    console.log('SIGINT signal received: closing HTTP server');
-    server.close(() => {
-      console.log('HTTP server closed');
-    });
-  });
-  
+});

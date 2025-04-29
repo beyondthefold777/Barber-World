@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { PaperProvider } from 'react-native-paper';
 import { View, Text } from 'react-native';
+// Keep this import for manual deep linking in components
+import * as Linking from 'expo-linking';
 
 // Import AuthProvider
 import { AuthProvider } from './context/AuthContext';
@@ -50,13 +52,20 @@ import PaymentMethodScreen from './components/settings/PaymentMethodScreen';
 import ChangePasswordScreen from './components/settings/ChangePasswordScreen';
 import ContactSupportScreen from './components/settings/ContactSupportScreen';
 import HelpCenterScreen from './components/settings/HelpCenterScreen';
-import ForgotPasswordScreen from './components/settings/ForgotPasswordScreen';
 import TermsOfServiceScreen from './components/settings/TermsOfServiceScreen';
 import PrivacyPolicyScreen from './components/settings/PrivacyPolicyScreen';
 import FeedbackScreen from './components/settings/FeedbackScreen';
 
+// Import password reset screens from main components directory
+import ForgotPasswordScreen from './components/ForgotPasswordScreen';
+import ResetPasswordScreen from './components/ResetPasswordScreen';
 
 const Stack = createStackNavigator();
+
+// Simple linking configuration - just define the prefixes
+const linking = {
+  prefixes: ['barberworld://', 'https://barber-world.fly.dev']
+};
 
 const App = () => {
   const [isReady, setIsReady] = useState(false);
@@ -83,7 +92,7 @@ const App = () => {
   return (
     <AuthProvider>
       <PaperProvider>
-        <NavigationContainer>
+        <NavigationContainer linking={linking}>
           <Stack.Navigator 
             initialRouteName="Splash"
             screenOptions={{
@@ -101,6 +110,31 @@ const App = () => {
             <Stack.Screen name="Register" component={RegisterScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             
+            {/* Password Reset Screens - Moved out of settings */}
+            <Stack.Screen 
+              name="ForgotPassword"
+              component={ForgotPasswordScreen}
+              options={{
+                headerShown: true,
+                title: 'Forgot Password',
+                headerStyle: {
+                  backgroundColor: '#000000',
+                }
+              }}
+            />
+            <Stack.Screen 
+              name="ResetPassword"
+              component={ResetPasswordScreen}
+              options={{
+                headerShown: true,
+                title: 'Reset Password',
+                headerStyle: {
+                  backgroundColor: '#000000',
+                }
+              }}
+            />
+            
+            {/* Rest of your screens... */}
             {/* Email Verification Screens */}
             <Stack.Screen 
               name="EmailVerification"
@@ -174,7 +208,6 @@ const App = () => {
             <Stack.Screen name="AccountDetails" component={AccountDetailsScreen} options={{ headerShown: true, title: 'Account Details' }} />
             <Stack.Screen name="ContactSupport" component={ContactSupportScreen} options={{ headerShown: true, title: 'Contact Support' }} />
             <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: true, title: 'Help Center' }} />
-            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ headerShown: true, title: 'Forgot Password' }} />
             <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: true, title: 'Terms of Service' }} />
             <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ headerShown: true, title: 'Privacy Policy' }} />
             <Stack.Screen name="Feedback" component={FeedbackScreen} options={{ headerShown: true, title: 'Feedback' }} />

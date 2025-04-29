@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import axios from 'axios';
+import env from '../config/environment';
 
 const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -34,16 +36,34 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
     try {
       setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // In a real app, you would call your auth service
-      // await authService.sendPasswordResetEmail(email);
+      // Make actual API call to request password reset
+      const response = await axios.post(`${env.apiUrl}/api/request-password-reset`, {
+        email: email.trim()
+      });
       
-      setResetSent(true);
+      // Check if the request was successful
+      if (response.data.success) {
+        setResetSent(true);
+      } else {
+        // This shouldn't happen with our API design, but just in case
+        Alert.alert('Error', response.data.message || 'Failed to send password reset email');
+      }
     } catch (error) {
       console.error('Error sending password reset:', error);
-      Alert.alert('Error', 'Failed to send password reset email. Please try again.');
+      
+      // Handle different types of errors
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        Alert.alert('Error', error.response.data.message || 'Failed to send password reset email');
+      } else if (error.request) {
+        // The request was made but no response was received
+        Alert.alert('Network Error', 'Unable to connect to the server. Please check your internet connection.');
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -68,7 +88,6 @@ const ForgotPasswordScreen = ({ navigation }) => {
           <Text style={styles.headerTitle}>Forgot Password</Text>
           <View style={{ width: 44 }} />
         </View>
-
         <ScrollView style={styles.content}>
           {!resetSent ? (
             <>
