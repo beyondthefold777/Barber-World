@@ -7,11 +7,14 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  SafeAreaView
+  SafeAreaView,
+  Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import messageService from '../services/messageService';
 
 const MessagesScreen = ({ navigation }) => {
   const [conversations, setConversations] = useState([]);
@@ -31,71 +34,43 @@ const MessagesScreen = ({ navigation }) => {
 
     // Load conversations
     loadConversations();
-  }, []);
 
-  const loadConversations = async () => {
-    setLoading(true);
-    try {
-      // In a real app, you would fetch conversations from your API
-      // For now, we'll just use dummy data
-      setTimeout(() => {
-        const dummyConversations = [
-          {
-            id: '1',
-            recipientId: 'user1',
-            recipientName: 'John Smith',
-            recipientImage: null,
-            lastMessage: 'Hey, I need to reschedule my appointment',
-            timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 minutes ago
-            unread: true,
-          },
-          {
-            id: '2',
-            recipientId: 'user2',
-            recipientName: 'Sarah Johnson',
-            recipientImage: null,
-            lastMessage: 'Thanks for the great haircut!',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60), // 1 hour ago
-            unread: false,
-          },
-          {
-            id: '3',
-            recipientId: 'user3',
-            recipientName: 'Mike Williams',
-            recipientImage: null,
-            lastMessage: 'Do you have any openings tomorrow?',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3), // 3 hours ago
-            unread: true,
-          },
-          {
-            id: '4',
-            recipientId: 'user4',
-            recipientName: 'Lisa Brown',
-            recipientImage: null,
-            lastMessage: 'See you next week!',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-            unread: false,
-          },
-          {
-            id: '5',
-            recipientId: 'user5',
-            recipientName: 'David Garcia',
-            recipientImage: null,
-            lastMessage: 'What products do you recommend for curly hair?',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48), // 2 days ago
-            unread: false,
-          },
-        ];
-        setConversations(dummyConversations);
-        setLoading(false);
-      }, 1000); // Simulate network delay
-    } catch (error) {
-      console.error('Error loading conversations:', error);
-      setLoading(false);
+    // Add a focus listener to reload conversations when screen is focused
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('MessagesScreen focused - reloading conversations');
+      loadConversations();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+// Update the loadConversations function in MessagesScreen.jsx
+
+const loadConversations = async () => {
+  setLoading(true);
+  console.log('Loading conversations...');
+  
+  try {
+    const response = await messageService.getConversations();
+    
+    if (response.success) {
+      console.log(`Successfully loaded ${response.conversations?.length || 0} conversations`);
+      setConversations(response.conversations || []);
+    } else {
+      console.error('Failed to load conversations:', response.message);
+      Alert.alert('Error', response.message || 'Failed to load conversations. Please try again.');
     }
-  };
+  } catch (error) {
+    console.error('Error loading conversations:', error);
+    Alert.alert('Error', 'An unexpected error occurred while loading conversations.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';
+    
     const now = new Date();
     const messageDate = new Date(timestamp);
     
@@ -115,46 +90,56 @@ const MessagesScreen = ({ navigation }) => {
   };
 
   const navigateToChat = (conversation) => {
+    console.log('Navigating to chat with:', conversation.recipient.username || conversation.recipient.businessName);
+    
     navigation.navigate('ChatScreen', {
-      conversationId: conversation.id,
-      recipientId: conversation.recipientId,
-      recipientName: conversation.recipientName,
+      conversationId: conversation._id,
+      recipientId: conversation.recipient._id,
+      recipientName: conversation.recipient.businessName || conversation.recipient.username,
+      recipientImage: conversation.recipient.profileImage,
     });
   };
 
-  const renderConversationItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.conversationItem}
-      onPress={() => navigateToChat(item)}
-    >
-      <View style={styles.avatarContainer}>
-        {item.recipientImage ? (
-          <Image source={{ uri: item.recipientImage }} style={styles.avatar} />
-        ) : (
-          <View style={styles.defaultAvatar}>
-            <Text style={styles.avatarText}>
-              {item.recipientName.charAt(0)}
-            </Text>
-          </View>
-        )}
-        {item.unread && <View style={styles.unreadIndicator} />}
-      </View>
-      
-      <View style={styles.conversationContent}>
-        <View style={styles.conversationHeader}>
-          <Text style={styles.recipientName}>{item.recipientName}</Text>
-          <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
+  const renderConversationItem = ({ item }) => {
+    const recipientName = item.recipient.businessName || item.recipient.username || 'Unknown';
+    const lastMessageText = item.lastMessage?.text || 'No messages yet';
+    const timestamp = item.lastMessage?.createdAt || item.lastMessageDate;
+    const unread = item.unreadCount > 0;
+    
+    return (
+      <TouchableOpacity
+        style={styles.conversationItem}
+        onPress={() => navigateToChat(item)}
+      >
+        <View style={styles.avatarContainer}>
+          {item.recipient.profileImage ? (
+            <Image source={{ uri: item.recipient.profileImage }} style={styles.avatar} />
+          ) : (
+            <View style={styles.defaultAvatar}>
+              <Text style={styles.avatarText}>
+                {recipientName.charAt(0)}
+              </Text>
+            </View>
+          )}
+          {unread && <View style={styles.unreadIndicator} />}
         </View>
-        <Text 
-          style={[styles.lastMessage, item.unread && styles.unreadMessage]}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {item.lastMessage}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+        
+        <View style={styles.conversationContent}>
+          <View style={styles.conversationHeader}>
+            <Text style={styles.recipientName}>{recipientName}</Text>
+            <Text style={styles.timestamp}>{formatTimestamp(timestamp)}</Text>
+          </View>
+          <Text 
+            style={[styles.lastMessage, unread && styles.unreadMessage]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {lastMessageText}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <LinearGradient
@@ -183,9 +168,11 @@ const MessagesScreen = ({ navigation }) => {
             <FlatList
               data={conversations}
               renderItem={renderConversationItem}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => item._id}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
+              refreshing={loading}
+              onRefresh={loadConversations}
             />
             <TouchableOpacity 
               style={styles.floatingButton}

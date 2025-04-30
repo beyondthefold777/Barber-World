@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,19 +10,23 @@ import {
   Platform,
   ActivityIndicator,
   Image,
-  SafeAreaView
+  SafeAreaView,
+  Alert
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import messageService from '../services/messageService';
 
 const ChatScreen = ({ route, navigation }) => {
-  const { recipientId, recipientName, recipientImage, shopId } = route.params;
+  const { recipientId, recipientName, recipientImage, shopId, conversationId } = route.params;
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState(null);
+  const [retrying, setRetrying] = useState(false);
   const flatListRef = useRef(null);
   const { user } = useAuth();
 
@@ -31,70 +35,158 @@ const ChatScreen = ({ route, navigation }) => {
     navigation.setOptions({
       title: recipientName || 'Chat',
     });
+    
     // Load messages
     loadMessages();
+    
+    // Mark messages as read when opening the chat
+    if (conversationId) {
+      markMessagesAsRead();
+    }
+    
+    console.log('ChatScreen initialized with recipient:', recipientId, recipientName);
   }, [recipientId]);
 
   const loadMessages = async () => {
     setLoading(true);
+    setError(null);
+    console.log('Loading messages for conversation with recipient:', recipientId);
+    
     try {
-      // In a real app, you would fetch messages from your API
-      // For now, we'll just simulate loading with a timeout
-      setTimeout(() => {
-        // This is just placeholder data - in a real app, you would fetch from your API
-        setMessages([]);
-        setLoading(false);
-      }, 1000);
+      const response = await messageService.getMessages(recipientId);
+      
+      if (response.success) {
+        console.log(`Successfully loaded ${response.messages?.length || 0} messages`);
+        
+        // Format messages for the UI
+        const formattedMessages = response.messages.map(msg => ({
+          _id: msg._id,
+          text: msg.text,
+          createdAt: new Date(msg.createdAt),
+          user: {
+            _id: msg.sender,
+            name: msg.sender === user?.id ? user?.username : recipientName,
+          },
+          sent: true,
+          received: msg.read,
+        }));
+        
+        setMessages(formattedMessages);
+        
+        // Mark messages as read if there are any
+        if (formattedMessages.length > 0 && conversationId) {
+          markMessagesAsRead();
+        }
+      } else {
+        console.error('Failed to load messages:', response.message);
+        setError(response.message || 'Failed to load messages');
+      }
     } catch (error) {
       console.error('Error loading messages:', error);
+      setError('An unexpected error occurred while loading messages');
+    } finally {
       setLoading(false);
+      setRetrying(false);
+    }
+  };
+
+  const markMessagesAsRead = async () => {
+    try {
+      console.log('Marking messages as read for conversation:', conversationId);
+      if (!conversationId) return;
+      
+      const response = await messageService.markAsRead(conversationId);
+      if (response.success) {
+        console.log('Messages marked as read successfully');
+      } else {
+        console.error('Failed to mark messages as read:', response.message);
+      }
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
     }
   };
 
   const handleSendMessage = async () => {
     if (inputText.trim() === '' || sending) return;
     setSending(true);
+    console.log('Sending message to recipient:', recipientId);
+    
+    const messageText = inputText.trim();
+    setInputText('');
+    
+    // Create a temporary message object for immediate UI feedback
     const newMessage = {
       _id: Date.now().toString(),
-      text: inputText.trim(),
+      text: messageText,
       createdAt: new Date(),
       user: {
         _id: user?.id || 'current-user',
-        name: user?.name || 'Me',
+        name: user?.username || user?.name || 'Me',
       },
       sent: true,
       received: false,
     };
-
+    
     // Add message to UI immediately for better UX
     setMessages(prevMessages => [...prevMessages, newMessage]);
-    setInputText('');
-
+    
     try {
-      // In a real app, you would send the message to your API
-      // For example:
-      // const token = await AsyncStorage.getItem('userToken');
-      // const response = await messageService.sendMessage(recipientId, inputText, token);
+      console.log('Sending message to API:', messageText);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await messageService.sendMessage(recipientId, messageText);
       
-      // Update message status after "sending" to server
-      setMessages(prevMessages => 
-        prevMessages.map(msg =>
-          msg._id === newMessage._id ? { ...msg, received: true } : msg
-        )
-      );
+      if (response.success) {
+        console.log('Message sent successfully:', response.message);
+        
+        // Update message status after sending to server
+        setMessages(prevMessages => 
+          prevMessages.map(msg =>
+            msg._id === newMessage._id ? { 
+              ...msg,
+              _id: response.message?._id || msg._id, // Use server-generated ID
+              received: true 
+            } : msg
+          )
+        );
+      } else {
+        console.error('Failed to send message:', response.message);
+        throw new Error(response.message || 'Failed to send message');
+      }
     } catch (error) {
       console.error('Error sending message:', error);
+      
       // Show error status on the message
-      setMessages(prevMessages => 
+      setMessages(prevMessages =>
         prevMessages.map(msg =>
           msg._id === newMessage._id ? { ...msg, error: true } : msg
         )
       );
+      
+      Alert.alert('Message Not Sent', 'Failed to send your message. Please try again.');
     } finally {
       setSending(false);
+    }
+  };
+
+  const retryLoadMessages = () => {
+    setRetrying(true);
+    loadMessages();
+  };
+
+  const testApiConnection = async () => {
+    setRetrying(true);
+    try {
+      const result = await messageService.testConnection();
+      if (result.success) {
+        Alert.alert('Connection Test', 'Successfully connected to the API server. Retrying to load messages...');
+        loadMessages();
+      } else {
+        Alert.alert('Connection Test Failed', result.message);
+        setRetrying(false);
+      }
+    } catch (error) {
+      Alert.alert('Connection Test Error', error.message);
+      setRetrying(false);
     }
   };
 
@@ -117,12 +209,12 @@ const ChatScreen = ({ route, navigation }) => {
               item.error ? 
                 <Feather name="alert-circle" size={12} color="red" style={{ marginLeft: 5 }} /> :
                 item.received ? 
-                  <Feather name="check-circle" size={12} color="#4CAF50" style={{ marginLeft: 5 }} /> :
+                  <Feather name="check-circle" size={12} color="#4CAF50" style={{ marginLeft: 5 }} /> : 
                   <Feather name="check" size={12} color="#999" style={{ marginLeft: 5 }} />
             )}
           </Text>
         </View>
-        </View>
+      </View>
     );
   };
 
@@ -135,6 +227,37 @@ const ChatScreen = ({ route, navigation }) => {
         </View>
       );
     }
+    
+    if (error) {
+      return (
+        <View style={styles.emptyChatContainer}>
+          <Feather name="alert-circle" size={60} color="#FF3B30" style={styles.emptyChatIcon} />
+          <Text style={styles.emptyChatTitle}>Connection Error</Text>
+          <Text style={styles.emptyChatText}>{error}</Text>
+          <View style={styles.errorButtonsContainer}>
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={retryLoadMessages}
+              disabled={retrying}
+            >
+              {retrying ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text style={styles.retryButtonText}>Retry</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.testConnectionButton}
+              onPress={testApiConnection}
+              disabled={retrying}
+            >
+              <Text style={styles.retryButtonText}>Test Connection</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+    
     return (
       <View style={styles.emptyChatContainer}>
         <Feather name="message-square" size={100} color="#666" style={styles.emptyChatIcon} />
@@ -361,6 +484,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     lineHeight: 24,
+  },
+  errorButtonsContainer: {
+    flexDirection: 'row',
+    marginTop: 20,
+  },
+  retryButton: {
+    backgroundColor: '#FF0000',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    marginHorizontal: 5,
+  },
+  testConnectionButton: {
+    backgroundColor: '#555',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    marginHorizontal: 5,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 
