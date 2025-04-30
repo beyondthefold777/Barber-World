@@ -58,6 +58,12 @@ import FeedbackScreen from './components/settings/FeedbackScreen';
 import ForgotPasswordScreen from './components/ForgotPasswordScreen';
 import ResetPasswordScreen from './components/ResetPasswordScreen';
 
+// Import ChatScreen
+import ChatScreen from './components/ChatScreen';
+
+// Import MessagesScreen
+import MessagesScreen from './components/MessagesScreen';
+
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -175,6 +181,33 @@ const App = () => {
               component={BarbershopDetail}
               options={{ headerShown: false }}
             />
+            
+            {/* Add MessagesScreen */}
+            <Stack.Screen 
+              name="MessagesScreen"
+              component={MessagesScreen}
+              options={{
+                headerShown: true,
+                title: 'Messages',
+                headerStyle: {
+                  backgroundColor: '#000000',
+                }
+              }}
+            />
+            
+            {/* Add ChatScreen */}
+            <Stack.Screen 
+              name="ChatScreen"
+              component={ChatScreen}
+              options={{ 
+                headerShown: true,
+                title: 'Chat',
+                headerStyle: {
+                  backgroundColor: '#000000',
+                }
+              }}
+            />
+            
             {/* Financial Hub Screens */}
             <Stack.Screen name="TaxForms" component={TaxFormsScreen} options={{ headerShown: true }} />
             <Stack.Screen name="WriteOffs" component={WriteOffsScreen} options={{ headerShown: true }} />
@@ -182,6 +215,7 @@ const App = () => {
             <Stack.Screen name="PaySchedule" component={PayScheduleScreen} options={{ headerShown: true }} />
             <Stack.Screen name="ProjectedIncome" component={ProjectedIncomeScreen} options={{ headerShown: true }} />
             <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ headerShown: true }} />
+            
             {/* Shop Settings Screens */}
             <Stack.Screen 
               name="CustomizeShop"
@@ -191,6 +225,7 @@ const App = () => {
                 title: 'Customize Shop'
               }}
             />
+            
             {/* Settings Screens */}
             <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
             <Stack.Screen name="PaymentMethod" component={PaymentMethodScreen} options={{ headerShown: true, title: 'Payment Methods' }} />

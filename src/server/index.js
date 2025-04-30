@@ -1126,6 +1126,397 @@ app.get('/api/routes', (req, res) => {
   });
   res.json(routes);
 });
+// Messaging routes - Add these directly to your server file
+// Import the Message and Conversation models
+const Message = require('./models/Message');
+const Conversation = require('./models/Conversation');
+
+// Get all conversations for the current user
+app.get('/api/messages/conversations', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Find all conversations where the current user is a participant
+    const conversations = await Conversation.find({
+      participants: userId
+    })
+    .populate({
+      path: 'participants',
+      select: 'username profileImage businessName role'
+    })
+    .populate({
+      path: 'lastMessage',
+      select: 'text sender createdAt read'
+    })
+    .sort({ updatedAt: -1 });
+
+    // Format the conversations for the client
+    const formattedConversations = conversations.map(conversation => {
+      // Find the other participant (not the current user)
+      const otherParticipant = conversation.participants.find(
+        participant => participant._id.toString() !== userId
+      );
+
+      // Get unread count for current user
+      const unreadCount = conversation.unreadCounts.get(userId) || 0;
+
+      return {
+        _id: conversation._id,
+        recipient: otherParticipant,
+        lastMessage: conversation.lastMessage,
+        lastMessageText: conversation.lastMessageText,
+        lastMessageDate: conversation.lastMessageDate,
+        unreadCount: unreadCount
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      conversations: formattedConversations
+    });
+  } catch (error) {
+    console.error('Error getting conversations:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving conversations',
+      error: error.message
+    });
+  }
+});
+
+// Get messages between current user and a specific recipient
+app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { recipientId } = req.params;
+
+    // Validate recipientId
+    if (!mongoose.Types.ObjectId.isValid(recipientId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid recipient ID'
+      });
+    }
+
+    // Check if recipient exists
+    const User = require('./models/User');
+    const recipient = await User.findById(recipientId);
+    if (!recipient) {
+      return res.status(404).json({
+        success: false,
+        message: 'Recipient not found'
+      });
+    }
+
+    // Find or create conversation
+    let conversation = await Conversation.findOne({
+      participants: { $all: [userId, recipientId] }
+    });
+
+    // If no conversation exists yet, create a new one
+    if (!conversation) {
+      conversation = new Conversation({
+        participants: [userId, recipientId],
+        unreadCounts: new Map()
+      });
+      await conversation.save();
+      
+      // Add conversation reference to both users
+      await User.findByIdAndUpdate(userId, {
+        $addToSet: { conversations: conversation._id }
+      });
+      await User.findByIdAndUpdate(recipientId, {
+        $addToSet: { conversations: conversation._id }
+      });
+    }
+
+    // Get messages between these users
+    const messages = await Message.find({
+      $or: [
+        { sender: userId, recipient: recipientId },
+        { sender: recipientId, recipient: userId }
+      ]
+    })
+    .sort({ createdAt: 1 });
+
+    // Mark messages from recipient as read
+    await Message.updateMany(
+      { sender: recipientId, recipient: userId, read: false },
+      { read: true }
+    );
+
+    // Update unread count in conversation
+    if (conversation.unreadCounts.get(userId) > 0) {
+      conversation.unreadCounts.set(userId, 0);
+      await conversation.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      conversation: conversation._id,
+      recipient: {
+        _id: recipient._id,
+        username: recipient.username,
+        businessName: recipient.businessName,
+        profileImage: recipient.profileImage,
+        role: recipient.role
+      },
+      messages
+    });
+  } catch (error) {
+    console.error('Error getting messages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving messages',
+      error: error.message
+    });
+  }
+});
+
+// Send a message to a recipient
+app.post('/api/messages/send', authMiddleware, async (req, res) => {
+  try {
+    const senderId = req.user.id;
+    const { recipientId, text } = req.body;
+
+    // Validate input
+    if (!recipientId || !text) {
+      return res.status(400).json({
+        success: false,
+        message: 'Recipient ID and message text are required'
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(recipientId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid recipient ID'
+      });
+    }
+
+    // Check if recipient exists
+    const User = require('./models/User');
+    const recipient = await User.findById(recipientId);
+    if (!recipient) {
+      return res.status(404).json({
+        success: false,
+        message: 'Recipient not found'
+      });
+    }
+
+    // Create the message
+    const newMessage = new Message({
+      sender: senderId,
+      recipient: recipientId,
+      text,
+      read: false
+    });
+
+    await newMessage.save();
+
+    // Find or create conversation
+    let conversation = await Conversation.findOne({
+      participants: { $all: [senderId, recipientId] }
+    });
+
+    if (!conversation) {
+      // Create new conversation
+      conversation = new Conversation({
+        participants: [senderId, recipientId],
+        lastMessage: newMessage._id,
+        lastMessageText: text,
+        lastMessageDate: new Date(),
+        unreadCounts: new Map([[recipientId, 1]])
+      });
+      
+      // Add conversation reference to both users
+      await User.findByIdAndUpdate(senderId, {
+        $addToSet: { conversations: conversation._id }
+      });
+      await User.findByIdAndUpdate(recipientId, {
+        $addToSet: { conversations: conversation._id }
+      });
+    } else {
+      // Update existing conversation
+      conversation.lastMessage = newMessage._id;
+      conversation.lastMessageText = text;
+      conversation.lastMessageDate = new Date();
+      
+      // Increment unread count for recipient
+      const currentUnreadCount = conversation.unreadCounts.get(recipientId) || 0;
+      conversation.unreadCounts.set(recipientId, currentUnreadCount + 1);
+    }
+
+    await conversation.save();
+
+    res.status(201).json({
+      success: true,
+      message: newMessage
+    });
+  } catch (error) {
+    console.error('Error sending message:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error sending message',
+      error: error.message
+    });
+  }
+});
+
+// Mark messages as read
+app.put('/api/messages/read/:conversationId', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { conversationId } = req.params;
+
+    // Validate conversationId
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid conversation ID'
+      });
+    }
+
+    // Find the conversation
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation not found'
+      });
+    }
+
+    // Check if user is a participant
+    if (!conversation.participants.includes(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to access this conversation'
+      });
+    }
+
+    // Find the other participant
+    const otherParticipantId = conversation.participants.find(
+      id => id.toString() !== userId
+    );
+
+    // Mark all messages from the other participant as read
+    await Message.updateMany(
+      { sender: otherParticipantId, recipient: userId, read: false },
+      { read: true }
+    );
+
+    // Reset unread count for current user
+    conversation.unreadCounts.set(userId, 0);
+    await conversation.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Messages marked as read'
+    });
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error marking messages as read',
+      error: error.message
+    });
+  }
+});
+
+// Add a route to get unread message count
+app.get('/api/messages/unread/count', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Find all conversations where the user is a participant
+    const conversations = await Conversation.find({
+      participants: userId
+    });
+
+    // Calculate total unread messages
+    let totalUnread = 0;
+    conversations.forEach(conversation => {
+      totalUnread += conversation.unreadCounts.get(userId) || 0;
+    });
+
+    res.status(200).json({
+      success: true,
+      unreadCount: totalUnread
+    });
+  } catch (error) {
+    console.error('Error getting unread count:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving unread message count',
+      error: error.message
+    });
+  }
+});
+
+// Add a route to delete a conversation
+app.delete('/api/messages/conversations/:conversationId', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { conversationId } = req.params;
+
+    // Validate conversationId
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid conversation ID'
+      });
+    }
+
+    // Find the conversation
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation not found'
+      });
+    }
+
+    // Check if user is a participant
+    if (!conversation.participants.includes(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete this conversation'
+      });
+    }
+
+    // Delete all messages in the conversation
+    await Message.deleteMany({
+      $or: [
+        { sender: conversation.participants[0], recipient: conversation.participants[1] },
+        { sender: conversation.participants[1], recipient: conversation.participants[0] }
+      ]
+    });
+
+    // Remove conversation reference from both users
+    const User = require('./models/User');
+    await User.updateMany(
+      { _id: { $in: conversation.participants } },
+      { $pull: { conversations: conversationId } }
+    );
+
+    // Delete the conversation
+    await Conversation.findByIdAndDelete(conversationId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Conversation deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting conversation:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting conversation',
+      error: error.message
+    });
+  }
+});
+
+
 
 // Global error handler
 app.use((err, req, res, next) => {

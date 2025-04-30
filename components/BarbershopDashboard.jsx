@@ -86,8 +86,8 @@ const BarbershopDashboard = () => {
       items: [
         {
           label: "Customize Shop",
-          screen: "CustomizeShop"  
-        },
+          screen: "CustomizeShop"
+          },
         "Cancellation Fees",
         "Reminder Settings",
         "Client Allergies",
@@ -126,14 +126,12 @@ const BarbershopDashboard = () => {
       style={styles.container}
     >
       <StatusBar barStyle="light-content" translucent={true} backgroundColor="transparent" />
-
       <TouchableOpacity 
         style={styles.menuButton}
         onPress={toggleMenu}
       >
         <Feather name="menu" size={24} color="white" />
       </TouchableOpacity>
-
       <Animated.View 
         style={[
           styles.sidebar,
@@ -149,12 +147,10 @@ const BarbershopDashboard = () => {
           <TouchableOpacity onPress={toggleMenu} style={styles.closeButton}>
             <Feather name="x" size={24} color="white" />
           </TouchableOpacity>
-
           <View style={styles.sidebarHeader}>
             <Text style={styles.sidebarTitle}>Business Center</Text>
             <View style={styles.titleUnderline} />
           </View>
-
           <ScrollView 
             style={styles.sidebarContent}
             showsVerticalScrollIndicator={true}
@@ -195,7 +191,6 @@ const BarbershopDashboard = () => {
           </ScrollView>
         </LinearGradient>
       </Animated.View>
-
       <ScrollView style={styles.content}>
         <Text style={styles.mainTitle}>Grow Your Business With Us</Text>
         
@@ -223,7 +218,6 @@ const BarbershopDashboard = () => {
               <Text style={styles.benefitText}>Real-time business insights & growth tracking</Text>
             </View>
           </View>
-
           <TouchableOpacity 
             style={styles.subscribeButton}
             onPress={() => navigation.navigate('TrialSignup')}
@@ -232,21 +226,23 @@ const BarbershopDashboard = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-
       <View style={styles.navbar}>
-        <TouchableOpacity style={styles.navItem}>
-          <Feather name="bell" size={24} color="white" />
-          <Text style={styles.navText}>Alerts</Text>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => navigation.navigate('MessagesScreen')}
+        >
+          <Feather name="message-square" size={24} color="white" />
+          <Text style={styles.navText}>Messages</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
-  style={styles.navItem}
-  onPress={() => navigation.navigate('AppointmentList')}
->
-  <Feather name="calendar" size={24} color="white" />
-  <Text style={styles.navText}>Appointments</Text>
-</TouchableOpacity>
-
+          style={styles.navItem} 
+          onPress={() => navigation.navigate('AppointmentList')}
+        >
+          <Feather name="calendar" size={24} color="white" />
+          <Text style={styles.navText}>Appointments</Text>
+        </TouchableOpacity>
+        
         <TouchableOpacity>
           <LinearGradient
             colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
@@ -255,12 +251,12 @@ const BarbershopDashboard = () => {
             style={styles.clipperButton}
           />
         </TouchableOpacity>
-
+        
         <TouchableOpacity style={styles.navItem}>
           <Feather name="trending-up" size={24} color="white" />
           <Text style={styles.navText}>Analytics</Text>
         </TouchableOpacity>
-
+        
         <TouchableOpacity style={styles.navItem}>
           <Feather name="user" size={24} color="white" />
           <Text style={styles.navText}>Profile</Text>

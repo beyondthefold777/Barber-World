@@ -31,7 +31,6 @@ const ChatScreen = ({ route, navigation }) => {
     navigation.setOptions({
       title: recipientName || 'Chat',
     });
-
     // Load messages
     loadMessages();
   }, [recipientId]);
@@ -54,7 +53,6 @@ const ChatScreen = ({ route, navigation }) => {
 
   const handleSendMessage = async () => {
     if (inputText.trim() === '' || sending) return;
-
     setSending(true);
     const newMessage = {
       _id: Date.now().toString(),
@@ -83,7 +81,7 @@ const ChatScreen = ({ route, navigation }) => {
       
       // Update message status after "sending" to server
       setMessages(prevMessages => 
-        prevMessages.map(msg => 
+        prevMessages.map(msg =>
           msg._id === newMessage._id ? { ...msg, received: true } : msg
         )
       );
@@ -91,7 +89,7 @@ const ChatScreen = ({ route, navigation }) => {
       console.error('Error sending message:', error);
       // Show error status on the message
       setMessages(prevMessages => 
-        prevMessages.map(msg => 
+        prevMessages.map(msg =>
           msg._id === newMessage._id ? { ...msg, error: true } : msg
         )
       );
@@ -137,14 +135,9 @@ const ChatScreen = ({ route, navigation }) => {
         </View>
       );
     }
-
     return (
       <View style={styles.emptyChatContainer}>
-        <Image 
-          source={require('../assets/message-icon.png')} 
-          style={styles.emptyChatIcon}
-          defaultSource={require('../assets/message-icon.png')}
-        />
+        <Feather name="message-square" size={100} color="#666" style={styles.emptyChatIcon} />
         <Text style={styles.emptyChatTitle}>Start a conversation</Text>
         <Text style={styles.emptyChatText}>
           Send a message to {recipientName} to discuss appointments, services, or ask questions.
@@ -171,8 +164,8 @@ const ChatScreen = ({ route, navigation }) => {
             <View style={styles.headerInfo}>
               {recipientImage ? (
                 <Image 
-                  source={{ uri: recipientImage }} 
-                  style={styles.recipientImage} 
+                  source={{ uri: recipientImage }}
+                  style={styles.recipientImage}
                 />
               ) : (
                 <View style={styles.recipientImagePlaceholder}>
@@ -184,7 +177,6 @@ const ChatScreen = ({ route, navigation }) => {
               <Text style={styles.headerTitle}>{recipientName}</Text>
             </View>
           </View>
-
           {messages.length > 0 ? (
             <FlatList
               ref={flatListRef}
@@ -198,7 +190,6 @@ const ChatScreen = ({ route, navigation }) => {
           ) : (
             renderEmptyChat()
           )}
-
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
@@ -357,10 +348,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   emptyChatIcon: {
-    width: 100,
-    height: 100,
     marginBottom: 20,
-    tintColor: '#666',
   },
   emptyChatTitle: {
     color: 'white',
@@ -377,4 +365,3 @@ const styles = StyleSheet.create({
 });
 
 export default ChatScreen;
-
