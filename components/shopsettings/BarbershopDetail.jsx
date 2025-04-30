@@ -18,10 +18,9 @@ import { Feather, FontAwesome } from '@expo/vector-icons';
 import { shopService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import reviewService from '../../services/reviewService';
-import AsyncStorage from '@react-native-async-storage/async-storage'; 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
-
 const BarbershopDetail = ({ route, navigation }) => {
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -66,7 +65,7 @@ const BarbershopDetail = ({ route, navigation }) => {
     
     fetchShopDetails();
   }, [shopId]);
-  
+
   const fetchReviews = async () => {
     if (!shopId) return;
     
@@ -97,6 +96,36 @@ const BarbershopDetail = ({ route, navigation }) => {
     navigation.navigate('SchedulingScreen', { 
       shopId: shop._id,
       shopName: shop.businessName || shop.name
+    });
+  };
+
+  const handleMessageBarber = () => {
+    if (!shop) return;
+    
+    if (!user) {
+      Alert.alert(
+        "Login Required",
+        "You need to be logged in to message this barber.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Login", 
+            onPress: () => navigation.navigate('Login', { 
+              returnScreen: 'BarbershopDetail',
+              returnParams: { shopId: shop._id }
+            }) 
+          }
+        ]
+      );
+      return;
+    }
+    
+    // Navigate to the chat screen with the shop owner
+    navigation.navigate('ChatScreen', {
+      recipientId: shop.ownerId || shop._id,
+      recipientName: shop.businessName || shop.name,
+      recipientImage: shop.profileImage || null,
+      shopId: shop._id
     });
   };
 
@@ -361,17 +390,26 @@ const BarbershopDetail = ({ route, navigation }) => {
           )}
         </View>
         
-        {/* Book Appointment Button */}
-        <TouchableOpacity 
-          style={styles.bookButton}
-          onPress={handleBookAppointment}
-        >
-          <Text style={styles.bookButtonText}>Book Appointment</Text>
-        </TouchableOpacity>
+        {/* Action Buttons */}
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity 
+            style={styles.bookButton}
+            onPress={handleBookAppointment}
+          >
+            <Text style={styles.bookButtonText}>Book Appointment</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.messageButton}
+            onPress={handleMessageBarber}
+          >
+            <Feather name="message-circle" size={20} color="white" style={styles.messageIcon} />
+            <Text style={styles.messageButtonText}>Message Barber</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
-
-      {/* Review Modal */}
-      <Modal
+         {/* Review Modal */}
+         <Modal
         animationType="slide"
         transparent={true}
         visible={reviewModalVisible}
@@ -394,9 +432,9 @@ const BarbershopDetail = ({ route, navigation }) => {
                   onPress={() => setRating(star)}
                 >
                   <FontAwesome 
-                    name="star" 
-                    size={30} 
-                    color={star <= rating ? '#FFD700' : '#444'} 
+                    name="star"
+                    size={30}
+                    color={star <= rating ? '#FFD700' : '#444'}
                     style={styles.starRatingIcon}
                   />
                 </TouchableOpacity>
@@ -588,15 +626,37 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  // Action buttons container
+  actionButtonsContainer: {
+    padding: 15,
+    marginBottom: 30,
+  },
   bookButton: {
     backgroundColor: '#FF0000',
     padding: 15,
-    margin: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 15,
   },
   bookButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  messageButton: {
+    backgroundColor: '#333',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FF0000',
+  },
+  messageIcon: {
+    marginRight: 10,
+  },
+  messageButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
@@ -731,4 +791,3 @@ const styles = StyleSheet.create({
 });
 
 export default BarbershopDetail;
-

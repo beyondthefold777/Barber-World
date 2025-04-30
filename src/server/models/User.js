@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-
 const userSchema = new mongoose.Schema({
   email: {
     type: String,
@@ -109,6 +108,12 @@ const userSchema = new mongoose.Schema({
       colorScheme: { type: String, default: 'default' }
     }
   },
+  
+  // Conversations reference
+  conversations: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Conversation'
+  }],
   
   createdAt: {
     type: Date,

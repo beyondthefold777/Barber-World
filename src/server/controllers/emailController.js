@@ -1,6 +1,6 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
-const config = require('../config/config');
+import config from '../config/environment';
 const emailService = require('../services/emailService');
 
 const emailController = {
