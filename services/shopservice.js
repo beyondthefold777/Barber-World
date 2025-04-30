@@ -5,11 +5,14 @@ const API_URL = config.apiUrl;
 console.log('API URL configured as:', API_URL);
 
 // Helper function to log request details
-const logRequest = (method, url, token) => {
+const logRequest = (method, url, token, data) => {
   console.log(`${method} request to: ${url}`);
   if (token) {
     console.log(`Using token (first 10 chars): ${token.substring(0, 10)}...`);
     console.log(`Token length: ${token.length}`);
+  }
+  if (data) {
+    console.log(`Request data:`, JSON.stringify(data).substring(0, 200) + (JSON.stringify(data).length > 200 ? '...' : ''));
   }
 };
 
@@ -73,6 +76,7 @@ export const shopService = {
         }
       );
       
+      console.log('Shop data response:', JSON.stringify(response.data).substring(0, 200) + '...');
       return response.data;
     } catch (error) {
       throw handleError('getShopData', error);
@@ -140,11 +144,22 @@ export const shopService = {
     
     try {
       const url = `${API_URL}/api/shop/services`;
-      logRequest('POST', url, token);
+      logRequest('POST', url, token, serviceData);
+      
+      // Make sure the service data is properly formatted
+      const formattedServiceData = {
+        name: serviceData.name,
+        description: serviceData.description,
+        price: parseFloat(serviceData.price),
+        duration: parseInt(serviceData.duration),
+        category: serviceData.category || null
+      };
+      
+      console.log('Formatted service data:', formattedServiceData);
       
       const response = await axios.post(
         url,
-        serviceData,
+        formattedServiceData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -153,6 +168,7 @@ export const shopService = {
         }
       );
       
+      console.log('Add service response:', response.data);
       return response.data;
     } catch (error) {
       throw handleError('addService', error);
@@ -189,11 +205,26 @@ export const shopService = {
     
     try {
       const url = `${API_URL}/api/shop/update`;
-      logRequest('PUT', url, token);
+      logRequest('PUT', url, token, shopData);
+      
+      // Make sure phone is included in the request
+      const formattedShopData = {
+        name: shopData.name,
+        description: shopData.description,
+        phone: shopData.phone, // Ensure phone is included
+        location: {
+          address: shopData.location.address,
+          city: shopData.location.city,
+          state: shopData.location.state,
+          zip: shopData.location.zip
+        }
+      };
+      
+      console.log('Formatted shop data:', formattedShopData);
       
       const response = await axios.put(
         url,
-        shopData,
+        formattedShopData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -202,6 +233,7 @@ export const shopService = {
         }
       );
       
+      console.log('Update shop response:', response.data);
       return response.data;
     } catch (error) {
       throw handleError('updateShopDetails', error);
@@ -284,7 +316,7 @@ export const shopService = {
     
     try {
       const url = `${API_URL}/api/shop/${shopId}/reviews`;
-      logRequest('POST', url, token);
+      logRequest('POST', url, token, reviewData);
       
       const response = await axios.post(
         url,
@@ -309,7 +341,7 @@ export const shopService = {
     
     try {
       const url = `${API_URL}/api/shop/create`;
-      logRequest('POST', url, token);
+      logRequest('POST', url, token, shopData);
       
       const response = await axios.post(
         url,
@@ -322,9 +354,47 @@ export const shopService = {
         }
       );
       
+      console.log('Create shop response:', response.data);
       return response.data;
     } catch (error) {
       throw handleError('createShop', error);
+    }
+  },
+  
+  // Update a service
+  updateService: async (serviceId, serviceData, token) => {
+    validateToken(token, 'updateService');
+    
+    try {
+      const url = `${API_URL}/api/shop/services/${serviceId}`;
+      logRequest('PUT', url, token, serviceData);
+      
+      // Make sure the service data is properly formatted
+      const formattedServiceData = {
+        name: serviceData.name,
+        description: serviceData.description,
+        price: parseFloat(serviceData.price),
+        duration: parseInt(serviceData.duration),
+        category: serviceData.category || null
+      };
+      
+      console.log('Formatted service data for update:', formattedServiceData);
+      
+      const response = await axios.put(
+        url,
+        formattedServiceData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      console.log('Update service response:', response.data);
+      return response.data;
+    } catch (error) {
+      throw handleError('updateService', error);
     }
   }
 };

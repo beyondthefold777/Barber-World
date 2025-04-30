@@ -479,6 +479,199 @@ if (shopRoutes) {
   console.error('Shop routes not mounted - module not loaded');
 }
 
+// Service routes - Add these four routes to your existing index.js file
+app.post('/api/shop/:shopId/services', authMiddleware, async (req, res) => {
+  try {
+    const { shopId } = req.params;
+    const { name, description, duration, price } = req.body;
+    
+    // Validation
+    if (!name || !price) {
+      return res.status(400).json({
+        success: false,
+        message: 'Service name and price are required'
+      });
+    }
+    
+    // Verify shop exists
+    const Shop = require('./models/shop.model');
+    const shop = await Shop.findById(shopId);
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shop not found'
+      });
+    }
+    
+    // Check if user is the shop owner
+    if (shop.userId.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to modify this shop'
+      });
+    }
+    
+    // Create new service
+    const newService = {
+      name,
+      description: description || '',
+      duration: duration || 30,
+      price
+    };
+    
+    // Add service to shop
+    shop.services.push(newService);
+    await shop.save();
+    
+    res.status(201).json({
+      success: true,
+      message: 'Service added successfully',
+      service: newService
+    });
+  } catch (error) {
+    console.error('Error adding service:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error adding service',
+      error: error.message
+    });
+  }
+});
+
+app.get('/api/shop/:shopId/services', async (req, res) => {
+  try {
+    const { shopId } = req.params;
+    
+    const Shop = require('./models/shop.model');
+    const shop = await Shop.findById(shopId, 'services');
+    
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shop not found'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      count: shop.services ? shop.services.length : 0,
+      services: shop.services || []
+    });
+  } catch (error) {
+    console.error(`Error fetching services for shop ${req.params.shopId}:`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching shop services',
+      error: error.message
+    });
+  }
+});
+
+app.put('/api/shop/:shopId/services/:serviceId', authMiddleware, async (req, res) => {
+  try {
+    const { shopId, serviceId } = req.params;
+    const { name, description, duration, price } = req.body;
+    
+    // Verify shop exists
+    const Shop = require('./models/shop.model');
+    const shop = await Shop.findById(shopId);
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shop not found'
+      });
+    }
+    
+    // Check if user is the shop owner
+    if (shop.userId.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to modify this shop'
+      });
+    }
+    
+    // Find the service
+    const serviceIndex = shop.services.findIndex(service => service._id.toString() === serviceId);
+    if (serviceIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found'
+      });
+    }
+    
+    // Update service
+    if (name) shop.services[serviceIndex].name = name;
+    if (description !== undefined) shop.services[serviceIndex].description = description;
+    if (duration) shop.services[serviceIndex].duration = duration;
+    if (price) shop.services[serviceIndex].price = price;
+    
+    await shop.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Service updated successfully',
+      service: shop.services[serviceIndex]
+    });
+  } catch (error) {
+    console.error('Error updating service:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating service',
+      error: error.message
+    });
+  }
+});
+
+app.delete('/api/shop/:shopId/services/:serviceId', authMiddleware, async (req, res) => {
+  try {
+    const { shopId, serviceId } = req.params;
+    
+    // Verify shop exists
+    const Shop = require('./models/shop.model');
+    const shop = await Shop.findById(shopId);
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shop not found'
+      });
+    }
+    
+    // Check if user is the shop owner
+    if (shop.userId.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to modify this shop'
+      });
+    }
+    
+    // Find and remove the service
+    const serviceIndex = shop.services.findIndex(service => service._id.toString() === serviceId);
+    if (serviceIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found'
+      });
+    }
+    
+    // Remove service
+    shop.services.splice(serviceIndex, 1);
+    await shop.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Service deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting service:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting service',
+      error: error.message
+    });
+  }
+});
+
+
 // IMPORTANT: This catch-all route must come LAST
 if (shopController) {
   app.get('/api/shop/:id', (req, res, next) => {
