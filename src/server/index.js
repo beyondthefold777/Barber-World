@@ -1133,43 +1133,66 @@ const mongoose = require('mongoose');
 const Message = require('./models/Message');
 const Conversation = require('./models/Conversation');
 const User = require('./models/User');
+const Shop = require('./models/shop.model');
 
 // Get all conversations for the current user
 app.get('/api/messages/conversations', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.userId; // Changed from req.user.id to req.user.userId
+    const userId = req.user.userId;
     console.log('Getting conversations for user ID:', userId);
+    
     // Find all conversations where the current user is a participant
     const conversations = await Conversation.find({
       participants: userId
-    })
-    .populate({
-      path: 'participants',
-      select: 'username firstName lastName profileImage businessName role'
-    })
-    .populate({
-      path: 'lastMessage',
-      select: 'text sender createdAt read'
-    })
-    .sort({ updatedAt: -1 });
+    }).sort({ updatedAt: -1 });
 
     // Format the conversations for the client
-    const formattedConversations = conversations.map(conversation => {
-      // Find the other participant (not the current user)
-      const otherParticipant = conversation.participants.find(
-        participant => participant._id.toString() !== userId
+    const formattedConversations = [];
+
+    // Process each conversation
+    for (const conversation of conversations) {
+      // Find the other participant ID (not the current user)
+      const otherParticipantId = conversation.participants.find(
+        participant => participant.toString() !== userId
       );
+      
       // Get unread count for current user
       const unreadCount = conversation.unreadCounts.get(userId) || 0;
-      return {
-        _id: conversation._id,
-        recipient: otherParticipant,
-        lastMessage: conversation.lastMessage,
-        lastMessageText: conversation.lastMessageText,
-        lastMessageDate: conversation.lastMessageDate,
-        unreadCount: unreadCount
-      };
-    });
+      
+      // Check if the other participant is a user
+      let otherParticipant = await User.findById(otherParticipantId)
+        .select('username firstName lastName profileImage businessName role');
+      
+      let isShop = false;
+      
+      // If not found in users, check if it's a shop
+      if (!otherParticipant) {
+        const shop = await Shop.findById(otherParticipantId)
+          .select('name images');
+          
+        if (shop) {
+          isShop = true;
+          otherParticipant = {
+            _id: shop._id,
+            businessName: shop.name,
+            profileImage: shop.images && shop.images.length > 0 ? shop.images[0] : null,
+            role: 'shop'
+          };
+        }
+      }
+      
+      if (otherParticipant) {
+        formattedConversations.push({
+          _id: conversation._id,
+          recipient: otherParticipant,
+          lastMessage: conversation.lastMessage,
+          lastMessageText: conversation.lastMessageText,
+          lastMessageDate: conversation.lastMessageDate,
+          unreadCount: unreadCount,
+          isShop: isShop
+        });
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -1188,10 +1211,10 @@ app.get('/api/messages/conversations', authMiddleware, async (req, res) => {
 // Get messages between current user and a specific recipient
 app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.userId; // Changed from req.user.id to req.user.userId
+    const userId = req.user.userId;
     const { recipientId } = req.params;
     console.log(`Getting messages between ${userId} and ${recipientId}`);
-    
+        
     // Validate recipientId
     if (!mongoose.Types.ObjectId.isValid(recipientId)) {
       return res.status(400).json({
@@ -1200,13 +1223,27 @@ app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
       });
     }
 
-    // Check if recipient exists
-    const recipient = await User.findById(recipientId);
+    // Check if recipient exists (either as a User or a Shop)
+    let recipient = await User.findById(recipientId);
+    let isShop = false;
+    
+    // If not found in User collection, check if it's a Shop
     if (!recipient) {
-      return res.status(404).json({
-        success: false,
-        message: 'Recipient not found'
-      });
+      const shop = await Shop.findById(recipientId);
+      if (shop) {
+        isShop = true;
+        recipient = {
+          _id: shop._id,
+          businessName: shop.name,
+          profileImage: shop.images && shop.images.length > 0 ? shop.images[0] : null,
+          role: 'shop'
+        };
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: 'Recipient not found'
+        });
+      }
     }
 
     // Find or create conversation
@@ -1222,14 +1259,18 @@ app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
         unreadCounts: new Map()
       });
       await conversation.save();
-      
-      // Add conversation reference to both users
+            
+      // Add conversation reference to user
       await User.findByIdAndUpdate(userId, {
         $addToSet: { conversations: conversation._id }
       });
-      await User.findByIdAndUpdate(recipientId, {
-        $addToSet: { conversations: conversation._id }
-      });
+      
+      // If recipient is a user (not a shop), add conversation to their list too
+      if (!isShop) {
+        await User.findByIdAndUpdate(recipientId, {
+          $addToSet: { conversations: conversation._id }
+        });
+      }
     }
 
     // Get messages between these users
@@ -1238,8 +1279,7 @@ app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
         { sender: userId, recipient: recipientId },
         { sender: recipientId, recipient: userId }
       ]
-    })
-    .sort({ createdAt: 1 });
+    }).sort({ createdAt: 1 });
 
     console.log(`Found ${messages.length} messages`);
 
@@ -1258,16 +1298,9 @@ app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
     res.status(200).json({
       success: true,
       conversation: conversation._id,
-      recipient: {
-        _id: recipient._id,
-        username: recipient.username,
-        firstName: recipient.firstName,
-        lastName: recipient.lastName,
-        businessName: recipient.businessName,
-        profileImage: recipient.profileImage,
-        role: recipient.role
-      },
-      messages
+      recipient: recipient,
+      messages,
+      isShop
     });
   } catch (error) {
     console.error('Error getting messages:', error);
@@ -1282,7 +1315,7 @@ app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
 // Send a message to a recipient
 app.post('/api/messages/send', authMiddleware, async (req, res) => {
   try {
-    const senderId = req.user.userId; // Changed from req.user.id to req.user.userId
+    const senderId = req.user.userId;
     const { recipientId, text } = req.body;
     console.log(`Sending message from ${senderId} to ${recipientId}`);
 
@@ -1293,7 +1326,7 @@ app.post('/api/messages/send', authMiddleware, async (req, res) => {
         message: 'Recipient ID and message text are required'
       });
     }
-    
+        
     if (!mongoose.Types.ObjectId.isValid(recipientId)) {
       return res.status(400).json({
         success: false,
@@ -1301,13 +1334,21 @@ app.post('/api/messages/send', authMiddleware, async (req, res) => {
       });
     }
 
-    // Check if recipient exists
-    const recipient = await User.findById(recipientId);
+    // Check if recipient exists (either as a User or a Shop)
+    let recipient = await User.findById(recipientId);
+    let isShop = false;
+    
+    // If not found in User collection, check if it's a Shop
     if (!recipient) {
-      return res.status(404).json({
-        success: false,
-        message: 'Recipient not found'
-      });
+      recipient = await Shop.findById(recipientId);
+      isShop = true;
+      
+      if (!recipient) {
+        return res.status(404).json({
+          success: false,
+          message: 'Recipient not found'
+        });
+      }
     }
 
     // Create the message
@@ -1335,21 +1376,25 @@ app.post('/api/messages/send', authMiddleware, async (req, res) => {
         lastMessageDate: new Date(),
         unreadCounts: new Map([[recipientId, 1]])
       });
-      
-      // Add conversation reference to both users
+            
+      // Add conversation reference to sender
       await User.findByIdAndUpdate(senderId, {
         $addToSet: { conversations: conversation._id }
       });
-      await User.findByIdAndUpdate(recipientId, {
-        $addToSet: { conversations: conversation._id }
-      });
+
+      // If recipient is a user (not a shop), add conversation to their list too
+      if (!isShop) {
+        await User.findByIdAndUpdate(recipientId, {
+          $addToSet: { conversations: conversation._id }
+        });
+      }
     } else {
       // Update existing conversation
       console.log('Updating existing conversation:', conversation._id);
       conversation.lastMessage = newMessage._id;
       conversation.lastMessageText = text;
       conversation.lastMessageDate = new Date();
-      
+            
       // Increment unread count for recipient
       const currentUnreadCount = conversation.unreadCounts.get(recipientId) || 0;
       conversation.unreadCounts.set(recipientId, currentUnreadCount + 1);
@@ -1373,7 +1418,7 @@ app.post('/api/messages/send', authMiddleware, async (req, res) => {
 // Mark messages as read
 app.put('/api/messages/read/:conversationId', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.userId; // Changed from req.user.id to req.user.userId
+    const userId = req.user.userId;
     const { conversationId } = req.params;
     console.log(`Marking messages as read in conversation ${conversationId} for user ${userId}`);
 
@@ -1395,7 +1440,7 @@ app.put('/api/messages/read/:conversationId', authMiddleware, async (req, res) =
     }
 
     // Check if user is a participant
-    if (!conversation.participants.includes(userId)) {
+    if (!conversation.participants.some(p => p.toString() === userId)) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to access this conversation'
@@ -1436,7 +1481,7 @@ app.put('/api/messages/read/:conversationId', authMiddleware, async (req, res) =
 // Get unread message count
 app.get('/api/messages/unread/count', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.userId; // Changed from req.user.id to req.user.userId
+    const userId = req.user.userId;
     console.log('Getting unread count for user:', userId);
 
     // Find all conversations where the user is a participant
@@ -1469,7 +1514,7 @@ app.get('/api/messages/unread/count', authMiddleware, async (req, res) => {
 // Delete a conversation
 app.delete('/api/messages/conversations/:conversationId', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.userId; // Changed from req.user.id to req.user.userId
+    const userId = req.user.userId;
     const { conversationId } = req.params;
     console.log(`Deleting conversation ${conversationId} for user ${userId}`);
 
@@ -1491,7 +1536,7 @@ app.delete('/api/messages/conversations/:conversationId', authMiddleware, async 
     }
 
     // Check if user is a participant
-    if (!conversation.participants.includes(userId)) {
+    if (!conversation.participants.some(p => p.toString() === userId)) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to delete this conversation'
@@ -1506,11 +1551,25 @@ app.delete('/api/messages/conversations/:conversationId', authMiddleware, async 
       ]
     });
 
-    // Remove conversation reference from both users
-    await User.updateMany(
-      { _id: { $in: conversation.participants } },
-      { $pull: { conversations: conversationId } }
+    // Get the other participant ID
+    const otherParticipantId = conversation.participants.find(
+      id => id.toString() !== userId
     );
+
+    // Check if other participant is a user or shop
+    const isShop = !(await User.findById(otherParticipantId));
+
+    // Remove conversation reference from current user
+    await User.findByIdAndUpdate(userId, {
+      $pull: { conversations: conversationId }
+    });
+
+    // If other participant is a user (not a shop), remove conversation from their list too
+    if (!isShop) {
+      await User.findByIdAndUpdate(otherParticipantId, {
+        $pull: { conversations: conversationId }
+      });
+    }
 
     // Delete the conversation
     await Conversation.findByIdAndDelete(conversationId);
@@ -1524,88 +1583,6 @@ app.delete('/api/messages/conversations/:conversationId', authMiddleware, async 
     res.status(500).json({
       success: false,
       message: 'Error deleting conversation',
-      error: error.message
-    });
-  }
-});
-
-// Add a route to search for users to message
-app.get('/api/messages/users/search', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { query } = req.query;
-    console.log(`Searching users with query: ${query}`);
-
-    if (!query || query.trim() === '') {
-      return res.status(400).json({
-        success: false,
-        message: 'Search query is required'
-      });
-    }
-
-    // Search for users by name, username, or business name
-    const users = await User.find({
-      _id: { $ne: userId }, // Exclude current user
-      $or: [
-        { firstName: { $regex: query, $options: 'i' } },
-        { lastName: { $regex: query, $options: 'i' } },
-        { username: { $regex: query, $options: 'i' } },
-        { businessName: { $regex: query, $options: 'i' } }
-      ]
-    }).select('_id username firstName lastName businessName profileImage role');
-
-    console.log(`Found ${users.length} users matching query`);
-
-    res.status(200).json({
-      success: true,
-      users
-    });
-  } catch (error) {
-    console.error('Error searching users:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error searching users',
-      error: error.message
-    });
-  }
-});
-
-// Add a route to get recent contacts
-app.get('/api/messages/contacts/recent', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    console.log(`Getting recent contacts for user ${userId}`);
-
-    // Find all conversations for this user
-    const conversations = await Conversation.find({
-      participants: userId
-    })
-    .sort({ updatedAt: -1 })
-    .limit(10);
-
-    // Extract the other participants
-    const contactIds = conversations.map(conversation => {
-      return conversation.participants.find(
-        participantId => participantId.toString() !== userId
-      );
-    });
-
-    // Get user details for these contacts
-    const contacts = await User.find({
-      _id: { $in: contactIds }
-    }).select('_id username firstName lastName businessName profileImage role');
-
-    console.log(`Found ${contacts.length} recent contacts`);
-
-    res.status(200).json({
-      success: true,
-      contacts
-    });
-  } catch (error) {
-    console.error('Error getting recent contacts:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error retrieving recent contacts',
       error: error.message
     });
   }
@@ -1756,12 +1733,24 @@ app.delete('/api/messages/message/:messageId', authMiddleware, async (req, res) 
       } else {
         // No messages left, delete the conversation
         await Conversation.findByIdAndDelete(conversation._id);
-        
-        // Remove conversation reference from both users
-        await User.updateMany(
-          { _id: { $in: conversation.participants } },
-          { $pull: { conversations: conversation._id } }
+                
+        // Check if other participant is a user or shop
+        const otherParticipantId = conversation.participants.find(
+          id => id.toString() !== userId
         );
+        const isShop = !(await User.findById(otherParticipantId));
+
+        // Remove conversation reference from current user
+        await User.findByIdAndUpdate(userId, {
+          $pull: { conversations: conversation._id }
+        });
+
+        // If other participant is a user (not a shop), remove conversation from their list too
+        if (!isShop) {
+          await User.findByIdAndUpdate(otherParticipantId, {
+            $pull: { conversations: conversation._id }
+          });
+        }
       }
     }
 
@@ -1774,56 +1763,6 @@ app.delete('/api/messages/message/:messageId', authMiddleware, async (req, res) 
     res.status(500).json({
       success: false,
       message: 'Error deleting message',
-      error: error.message
-    });
-  }
-});
-
-// Add a route to get message statistics
-app.get('/api/messages/stats', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    console.log(`Getting message stats for user ${userId}`);
-
-    // Count total sent messages
-    const sentCount = await Message.countDocuments({ sender: userId });
-
-    // Count total received messages
-    const receivedCount = await Message.countDocuments({ recipient: userId });
-
-    // Count unread messages
-    const unreadCount = await Message.countDocuments({ 
-      recipient: userId,
-      read: false 
-    });
-
-    // Count active conversations
-    const conversationCount = await Conversation.countDocuments({
-      participants: userId
-    });
-
-    // Get most recent message date
-    const latestMessage = await Message.findOne({
-      $or: [{ sender: userId }, { recipient: userId }]
-    }).sort({ createdAt: -1 });
-
-    const latestMessageDate = latestMessage ? latestMessage.createdAt : null;
-
-    res.status(200).json({
-      success: true,
-      stats: {
-        sent: sentCount,
-        received: receivedCount,
-        unread: unreadCount,
-        conversations: conversationCount,
-        latestMessageDate
-      }
-    });
-  } catch (error) {
-    console.error('Error getting message stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error retrieving message statistics',
       error: error.message
     });
   }
@@ -1864,7 +1803,7 @@ app.get('/api/messages/conversation/:conversationId/messages', authMiddleware, a
 
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+        
     // Get messages for this conversation
     const messages = await Message.find({
       $or: [
