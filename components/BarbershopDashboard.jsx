@@ -11,7 +11,7 @@ import {
   Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { Feather, MaterialIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -39,6 +39,14 @@ const BarbershopDashboard = () => {
     }).start();
     setIsOpen(!isOpen);
   };
+  
+  const showPremiumFeatureAlert = () => {
+    Alert.alert(
+      "Premium Feature",
+      "This premium feature is coming soon. Stay tuned!",
+      [{ text: "OK", style: "default" }]
+    );
+  };
 
   const sidebarSections = [
     {
@@ -46,39 +54,64 @@ const BarbershopDashboard = () => {
       items: [
         {
           label: "1099 Forms & Taxes",
-          screen: "TaxForms"
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
         },
         {
           label: "Product Tax Write-offs",
-          screen: "WriteOffs"
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
         },
         {
           label: "Business Expenses",
-          screen: "Expenses"
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
         },
         {
           label: "Pay Schedule",
-          screen: "PaySchedule"
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
         },
         {
           label: "Projected Income",
-          screen: "ProjectedIncome"
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
         },
         {
           label: "Payment History",
-          screen: "PaymentHistory"
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
         }
       ]
     },
     {
       title: "Marketing Center",
       items: [
-        "Promotions Manager",
-        "Boost Campaigns",
-        "Social Media Integration",
-        "Client Reviews",
-        "Message Blasts",
-        "Performance Tracker"
+        {
+          label: "Promotions Manager",
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
+        },
+        {
+          label: "Boost Campaigns",
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
+        },
+        {
+          label: "Social Media Integration",
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
+        },
+        {
+          label: "Message Blasts",
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
+        },
+        {
+          label: "Performance Tracker",
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
+        }
       ]
     },
     {
@@ -87,30 +120,65 @@ const BarbershopDashboard = () => {
         {
           label: "Customize Shop",
           screen: "CustomizeShop"
-          },
-        "Cancellation Fees",
-        "Reminder Settings",
-        "Client Allergies",
-        "Service Catalog",
-        "Deposit Requirements"
+        },
+        {
+          label: "Cancellation Fees",
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
+        },
+        {
+          label: "Client Allergies",
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
+        },
+        {
+          label: "Deposit Requirements",
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
+        }
       ]
     },
     {
       title: "Business Tools",
       items: [
-        "Digital Receipts",
-        "Chair Rental",
-        "Utility Tracking",
-        "Employee Management",
-        "Trial Management",
-        "Task Manager"
+        {
+          label: "Digital Receipts",
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
+        },
+        {
+          label: "Chair Rental",
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
+        },
+        {
+          label: "Utility Tracking",
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
+        },
+        {
+          label: "Employee Management",
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
+        },
+        {
+          label: "Trial Management",
+          isPremium: true,
+          onPress: showPremiumFeatureAlert
+        }
       ]
     },
     {
       title: "Account",
       items: [
-        "Profile Settings",
-        "Notifications",
+        {
+          label: "Profile Settings",
+          screen: "ProfileSettings"
+        },
+        {
+          label: "Notifications",
+          screen: "Notifications"
+        },
         {
           label: "Logout",
           onPress: handleLogout,
@@ -151,6 +219,13 @@ const BarbershopDashboard = () => {
             <Text style={styles.sidebarTitle}>Business Center</Text>
             <View style={styles.titleUnderline} />
           </View>
+          
+          <View style={styles.sidebarLegend}>
+            <Text style={styles.legendText}>
+              Features marked with <Ionicons name="star" size={14} color="#FF0000" /> are premium features coming soon
+            </Text>
+          </View>
+          
           <ScrollView 
             style={styles.sidebarContent}
             showsVerticalScrollIndicator={true}
@@ -175,11 +250,16 @@ const BarbershopDashboard = () => {
                     }}
                   >
                     {typeof item === 'object' ? (
-                      <View style={styles.logoutItem}>
-                        {item.icon && <Feather name={item.icon} size={20} color="#FF0000" />}
-                        <Text style={[styles.sidebarItemText, item.icon ? styles.logoutText : null]}>
-                          {item.label}
-                        </Text>
+                      <View style={styles.sidebarItemRow}>
+                        <View style={styles.logoutItem}>
+                          {item.icon && <Feather name={item.icon} size={20} color="#FF0000" />}
+                          <Text style={[styles.sidebarItemText, item.icon ? styles.logoutText : null]}>
+                            {item.label}
+                          </Text>
+                        </View>
+                        {item.isPremium && (
+                          <Ionicons name="star" size={16} color="#FF0000" />
+                        )}
                       </View>
                     ) : (
                       <Text style={styles.sidebarItemText}>{item}</Text>
@@ -192,38 +272,45 @@ const BarbershopDashboard = () => {
         </LinearGradient>
       </Animated.View>
       <ScrollView style={styles.content}>
-        <Text style={styles.mainTitle}>Grow Your Business With Us</Text>
+        <View style={styles.welcomeContainer}>
+          <Text style={styles.mainTitle}>Welcome to Your Shop!</Text>
+          <Text style={styles.welcomeText}>
+            Premium features marked with a <Ionicons name="star" size={14} color="#FF0000" /> are coming soon.
+            All other features are available now.
+          </Text>
+          
+          <View style={styles.featuresList}>
+            <View style={styles.featureItem}>
+              <Feather name="message-square" size={20} color="#FF0000" />
+              <Text style={styles.featureText}>In-app messaging between shop and clients</Text>
+            </View>
+            
+            <View style={styles.featureItem}>
+              <Feather name="calendar" size={20} color="#FF0000" />
+              <Text style={styles.featureText}>Appointment tracking and management</Text>
+            </View>
+            
+            <View style={styles.featureItem}>
+              <Feather name="edit" size={20} color="#FF0000" />
+              <Text style={styles.featureText}>Customizable shop profile</Text>
+            </View>
+          </View>
+        </View>
         
-        <View style={styles.benefitsContainer}>
-          <View style={styles.benefitItem}>
-            <Feather name="trending-up" size={24} color="#FF0000" />
-            <View style={styles.benefitContent}>
-              <Text style={styles.benefitTitle}>Increase Revenue</Text>
-              <Text style={styles.benefitText}>Average 40% boost in monthly bookings</Text>
-            </View>
+        <View style={styles.setupProfileCard}>
+          <View style={styles.setupProfileContent}>
+            <Feather name="scissors" size={40} color="white" />
+            <Text style={styles.setupProfileTitle}>Get Started Now!</Text>
+            <Text style={styles.setupProfileText}>
+              Set up your shop profile to start attracting clients
+            </Text>
+            <TouchableOpacity 
+              style={styles.setupProfileButton}
+              onPress={() => navigation.navigate('CustomizeShop')}
+            >
+              <Text style={styles.setupProfileButtonText}>Customize Your Shop</Text>
+            </TouchableOpacity>
           </View>
-          
-          <View style={styles.benefitItem}>
-            <Feather name="users" size={24} color="#FF0000" />
-            <View style={styles.benefitContent}>
-              <Text style={styles.benefitTitle}>Client Management</Text>
-              <Text style={styles.benefitText}>Smart scheduling & client retention tools</Text>
-            </View>
-          </View>
-          
-          <View style={styles.benefitItem}>
-            <Feather name="bar-chart-2" size={24} color="#FF0000" />
-            <View style={styles.benefitContent}>
-              <Text style={styles.benefitTitle}>Smart Analytics</Text>
-              <Text style={styles.benefitText}>Real-time business insights & growth tracking</Text>
-            </View>
-          </View>
-          <TouchableOpacity 
-            style={styles.subscribeButton}
-            onPress={() => navigation.navigate('TrialSignup')}
-          >
-            <Text style={styles.subscribeButtonText}>Start Free Trial</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
       <View style={styles.navbar}>
@@ -236,7 +323,7 @@ const BarbershopDashboard = () => {
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={styles.navItem} 
+          style={styles.navItem}
           onPress={() => navigation.navigate('AppointmentList')}
         >
           <Feather name="calendar" size={24} color="white" />
@@ -252,12 +339,18 @@ const BarbershopDashboard = () => {
           />
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={showPremiumFeatureAlert}
+        >
           <Feather name="trending-up" size={24} color="white" />
           <Text style={styles.navText}>Analytics</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => navigation.navigate('CustomizeShop')}
+        >
           <Feather name="user" size={24} color="white" />
           <Text style={styles.navText}>Profile</Text>
         </TouchableOpacity>
@@ -299,7 +392,7 @@ const styles = StyleSheet.create({
   },
   sidebarHeader: {
     paddingTop: 60,
-    marginBottom: 20,
+    marginBottom: 10,
   },
   sidebarTitle: {
     color: 'white',
@@ -311,6 +404,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     width: '100%',
     marginTop: 10,
+  },
+  sidebarLegend: {
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  legendText: {
+    color: 'white',
+    fontSize: 12,
   },
   sidebarContent: {
     flex: 1,
@@ -326,6 +429,11 @@ const styles = StyleSheet.create({
   sidebarItem: {
     paddingVertical: 8,
     paddingHorizontal: 10,
+  },
+  sidebarItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   sidebarItemText: {
     color: 'white',
@@ -345,52 +453,77 @@ const styles = StyleSheet.create({
     paddingTop: 100,
     paddingHorizontal: 20,
   },
+  welcomeContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+  },
   mainTitle: {
     color: 'white',
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 30,
+    marginBottom: 10,
     textAlign: 'center',
   },
-  benefitsContainer: {
-    marginTop: 10,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 15,
-    backgroundColor: '#000000',
-    padding: 15,
-    borderRadius: 10,
-  },
-  benefitContent: {
-    marginLeft: 15,
-    flex: 1,
-  },
-  benefitTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  benefitText: {
-    color: '#888',
+  welcomeText: {
+    color: '#DDD',
     fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 15,
+    lineHeight: 20,
+  },
+  featuresList: {
     marginTop: 5,
   },
-  subscribeButton: {
-    backgroundColor: '#FF0000',
-    padding: 15,
-    borderRadius: 10,
+  featureItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 30,
-    marginBottom: 20,
+    marginBottom: 8,
+  },
+  featureText: {
+    color: 'white',
+    fontSize: 14,
+    marginLeft: 10,
+  },
+  setupProfileCard: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 15,
+    overflow: 'hidden',
+    marginBottom: 25,
     elevation: 5,
   },
-  subscribeButtonText: {
+  setupProfileContent: {
+    padding: 25,
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  setupProfileTitle: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
-    letterSpacing: 0.5,
+    marginTop: 15,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  setupProfileText: {
+    color: 'white',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+    opacity: 0.9,
+  },
+  setupProfileButton: {
+    backgroundColor: '#FF0000',
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 25,
+    marginTop: 5,
+  },
+  setupProfileButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   navbar: {
     flexDirection: 'row',
