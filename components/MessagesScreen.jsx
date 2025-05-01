@@ -102,10 +102,11 @@ const loadConversations = async () => {
 
   const renderConversationItem = ({ item }) => {
     const recipientName = item.recipient.businessName || item.recipient.username || 'Unknown';
-    const lastMessageText = item.lastMessage?.text || 'No messages yet';
+    // Remove the "No messages yet" fallback text
+    const lastMessageText = item.lastMessageText || '';
     const timestamp = item.lastMessage?.createdAt || item.lastMessageDate;
     const unread = item.unreadCount > 0;
-    
+      
     return (
       <TouchableOpacity
         style={styles.conversationItem}
@@ -123,7 +124,7 @@ const loadConversations = async () => {
           )}
           {unread && <View style={styles.unreadIndicator} />}
         </View>
-        
+              
         <View style={styles.conversationContent}>
           <View style={styles.conversationHeader}>
             <Text style={styles.recipientName}>{recipientName}</Text>
@@ -140,7 +141,7 @@ const loadConversations = async () => {
       </TouchableOpacity>
     );
   };
-
+  
   return (
     <LinearGradient
       colors={['#000000', '#333333']}

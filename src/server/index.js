@@ -1266,7 +1266,7 @@ app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
     const userId = req.user.userId;
     const { recipientId } = req.params;
     console.log(`Getting messages between ${userId} and ${recipientId}`);
-        
+    
     // Validate recipientId
     if (!mongoose.Types.ObjectId.isValid(recipientId)) {
       return res.status(400).json({
@@ -1274,7 +1274,7 @@ app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
         message: 'Invalid recipient ID'
       });
     }
-
+    
     // Check if recipient exists (either as a User or a Shop)
     let recipient = await User.findById(recipientId);
     let isShop = false;
@@ -1297,12 +1297,30 @@ app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
         });
       }
     }
-
-    // Find or create conversation
+    
+    // Find shops owned by this user
+    const userShops = await Shop.find({ userId: userId }).select('_id');
+    const shopIds = userShops.map(shop => shop._id.toString());
+    
+    // First try to find a direct conversation between user and recipient
     let conversation = await Conversation.findOne({
       participants: { $all: [userId, recipientId] }
     });
-
+    
+    // If no direct conversation found, check if there's a conversation between user's shop and recipient
+    if (!conversation && shopIds.length > 0) {
+      for (const shopId of shopIds) {
+        const shopConversation = await Conversation.findOne({
+          participants: { $all: [shopId, recipientId] }
+        });
+        
+        if (shopConversation) {
+          conversation = shopConversation;
+          break;
+        }
+      }
+    }
+    
     // If no conversation exists yet, create a new one
     if (!conversation) {
       console.log('Creating new conversation');
@@ -1311,7 +1329,7 @@ app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
         unreadCounts: new Map()
       });
       await conversation.save();
-            
+      
       // Add conversation reference to user
       await User.findByIdAndUpdate(userId, {
         $addToSet: { conversations: conversation._id }
@@ -1324,35 +1342,56 @@ app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
         });
       }
     }
-
+    
     // Get messages between these users
     const messages = await Message.find({
       $or: [
-        { sender: userId, recipient: recipientId },
-        { sender: recipientId, recipient: userId }
+        { sender: conversation.participants[0], recipient: conversation.participants[1] },
+        { sender: conversation.participants[1], recipient: conversation.participants[0] }
       ]
     }).sort({ createdAt: 1 });
-
+    
     console.log(`Found ${messages.length} messages`);
-
+    
     // Mark messages from recipient as read
     await Message.updateMany(
-      { sender: recipientId, recipient: userId, read: false },
+      { 
+        sender: recipientId, 
+        recipient: { $in: [userId, ...shopIds] }, 
+        read: false 
+      },
       { read: true }
     );
-
+    
     // Update unread count in conversation
     if (conversation.unreadCounts.get(userId) > 0) {
       conversation.unreadCounts.set(userId, 0);
       await conversation.save();
     }
-
+    
+    // Determine if this is a shop conversation
+    const fromShopId = conversation.participants.find(
+      participant => shopIds.includes(participant.toString())
+    );
+    
+    let fromShop = null;
+    if (fromShopId) {
+      const shop = await Shop.findById(fromShopId).select('name');
+      if (shop) {
+        fromShop = {
+          _id: shop._id,
+          name: shop.name
+        };
+      }
+    }
+    
     res.status(200).json({
       success: true,
       conversation: conversation._id,
       recipient: recipient,
       messages,
-      isShop
+      isShop,
+      fromShop
     });
   } catch (error) {
     console.error('Error getting messages:', error);
@@ -1368,9 +1407,9 @@ app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
 app.post('/api/messages/send', authMiddleware, async (req, res) => {
   try {
     const senderId = req.user.userId;
-    const { recipientId, text } = req.body;
-    console.log(`Sending message from ${senderId} to ${recipientId}`);
-
+    const { recipientId, text, fromShopId } = req.body;
+    console.log(`Sending message from ${senderId} to ${recipientId}${fromShopId ? ` via shop ${fromShopId}` : ''}`);
+    
     // Validate input
     if (!recipientId || !text) {
       return res.status(400).json({
@@ -1378,14 +1417,35 @@ app.post('/api/messages/send', authMiddleware, async (req, res) => {
         message: 'Recipient ID and message text are required'
       });
     }
-        
+    
     if (!mongoose.Types.ObjectId.isValid(recipientId)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid recipient ID'
       });
     }
-
+    
+    // If sending from a shop, verify the user owns this shop
+    let actualSenderId = senderId;
+    if (fromShopId) {
+      if (!mongoose.Types.ObjectId.isValid(fromShopId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid shop ID'
+        });
+      }
+      
+      const shop = await Shop.findOne({ _id: fromShopId, userId: senderId });
+      if (!shop) {
+        return res.status(403).json({
+          success: false,
+          message: 'You do not own this shop'
+        });
+      }
+      
+      actualSenderId = fromShopId;
+    }
+    
     // Check if recipient exists (either as a User or a Shop)
     let recipient = await User.findById(recipientId);
     let isShop = false;
@@ -1402,38 +1462,40 @@ app.post('/api/messages/send', authMiddleware, async (req, res) => {
         });
       }
     }
-
+    
     // Create the message
     const newMessage = new Message({
-      sender: senderId,
+      sender: actualSenderId,
       recipient: recipientId,
       text,
       read: false
     });
     await newMessage.save();
     console.log('Message saved with ID:', newMessage._id);
-
+    
     // Find or create conversation
     let conversation = await Conversation.findOne({
-      participants: { $all: [senderId, recipientId] }
+      participants: { $all: [actualSenderId, recipientId] }
     });
-
+    
     if (!conversation) {
       // Create new conversation
       console.log('Creating new conversation');
       conversation = new Conversation({
-        participants: [senderId, recipientId],
+        participants: [actualSenderId, recipientId],
         lastMessage: newMessage._id,
         lastMessageText: text,
         lastMessageDate: new Date(),
         unreadCounts: new Map([[recipientId, 1]])
       });
-            
-      // Add conversation reference to sender
-      await User.findByIdAndUpdate(senderId, {
-        $addToSet: { conversations: conversation._id }
-      });
-
+      
+      // Add conversation reference to sender if it's a user
+      if (!fromShopId) {
+        await User.findByIdAndUpdate(senderId, {
+          $addToSet: { conversations: conversation._id }
+        });
+      }
+      
       // If recipient is a user (not a shop), add conversation to their list too
       if (!isShop) {
         await User.findByIdAndUpdate(recipientId, {
@@ -1446,13 +1508,14 @@ app.post('/api/messages/send', authMiddleware, async (req, res) => {
       conversation.lastMessage = newMessage._id;
       conversation.lastMessageText = text;
       conversation.lastMessageDate = new Date();
-            
+      
       // Increment unread count for recipient
       const currentUnreadCount = conversation.unreadCounts.get(recipientId) || 0;
       conversation.unreadCounts.set(recipientId, currentUnreadCount + 1);
     }
+    
     await conversation.save();
-
+    
     res.status(201).json({
       success: true,
       message: newMessage
@@ -1473,7 +1536,7 @@ app.put('/api/messages/read/:conversationId', authMiddleware, async (req, res) =
     const userId = req.user.userId;
     const { conversationId } = req.params;
     console.log(`Marking messages as read in conversation ${conversationId} for user ${userId}`);
-
+    
     // Validate conversationId
     if (!mongoose.Types.ObjectId.isValid(conversationId)) {
       return res.status(400).json({
@@ -1481,7 +1544,7 @@ app.put('/api/messages/read/:conversationId', authMiddleware, async (req, res) =
         message: 'Invalid conversation ID'
       });
     }
-
+    
     // Find the conversation
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
@@ -1490,427 +1553,771 @@ app.put('/api/messages/read/:conversationId', authMiddleware, async (req, res) =
         message: 'Conversation not found'
       });
     }
-
-    // Check if user is a participant
-    if (!conversation.participants.some(p => p.toString() === userId)) {
-      return res.status(403).json({
+    
+    // Check if user is a direct participant
+    let isParticipant = conversation.participants.some(p => p.toString() === userId);
+    let userShopId = null;
+    
+    // If not a direct participant, check if user owns any shop that is a participant
+    if (!isParticipant) {
+      // Find all shops owned by this user
+      const userShops = await Shop.find({ userId: userId }).select('_id');
+      const shopIds = userShops.map(shop => shop._id.toString());
+      
+      // Check if any of the user's shops are participants
+      for (const shopId of shopIds) {
+        if (conversation.participants.some(p => p.toString() === shopId)) {
+          isParticipant = true;
+          userShopId = shopId;
+          break;
+        }
+      }
+    }
+    
+      // If still not a participant, deny access
+      if (!isParticipant) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to access this conversation'
+        });
+      }
+      
+      // Find the other participant
+      const otherParticipantId = conversation.participants.find(
+        id => id.toString() !== userId && (userShopId ? id.toString() !== userShopId : true)
+      );
+      
+      // Mark all messages from the other participant as read
+      const result = await Message.updateMany(
+        { 
+          sender: otherParticipantId, 
+          recipient: userShopId || userId, 
+          read: false 
+        },
+        { read: true }
+      );
+      
+      console.log(`Marked ${result.nModified || result.modifiedCount} messages as read`);
+      
+      // Reset unread count for current user or shop
+      if (userShopId) {
+        // If reading as shop owner, update the shop's unread count
+        conversation.unreadCounts.set(userShopId, 0);
+      } else {
+        // Otherwise update the user's unread count
+        conversation.unreadCounts.set(userId, 0);
+      }
+      
+      await conversation.save();
+      
+      res.status(200).json({
+        success: true,
+        message: 'Messages marked as read'
+      });
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+      res.status(500).json({
         success: false,
-        message: 'Not authorized to access this conversation'
+        message: 'Error marking messages as read',
+        error: error.message
       });
     }
-
-    // Find the other participant
-    const otherParticipantId = conversation.participants.find(
-      id => id.toString() !== userId
-    );
-
-    // Mark all messages from the other participant as read
-    const result = await Message.updateMany(
-      { sender: otherParticipantId, recipient: userId, read: false },
-      { read: true }
-    );
-
-    console.log(`Marked ${result.nModified || result.modifiedCount} messages as read`);
-
-    // Reset unread count for current user
-    conversation.unreadCounts.set(userId, 0);
-    await conversation.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Messages marked as read'
-    });
-  } catch (error) {
-    console.error('Error marking messages as read:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error marking messages as read',
-      error: error.message
-    });
-  }
-});
-
-// Get unread message count
-app.get('/api/messages/unread/count', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    console.log('Getting unread count for user:', userId);
-
-    // Find all conversations where the user is a participant
-    const conversations = await Conversation.find({
-      participants: userId
-    });
-
-    // Calculate total unread messages
-    let totalUnread = 0;
-    conversations.forEach(conversation => {
-      totalUnread += conversation.unreadCounts.get(userId) || 0;
-    });
-
-    console.log(`User ${userId} has ${totalUnread} unread messages`);
-
-    res.status(200).json({
-      success: true,
-      unreadCount: totalUnread
-    });
-  } catch (error) {
-    console.error('Error getting unread count:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error retrieving unread message count',
-      error: error.message
-    });
-  }
-});
-
-// Delete a conversation
-app.delete('/api/messages/conversations/:conversationId', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { conversationId } = req.params;
-    console.log(`Deleting conversation ${conversationId} for user ${userId}`);
-
-    // Validate conversationId
-    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
-      return res.status(400).json({
+  });
+  
+  // Get unread message count
+  app.get('/api/messages/unread/count', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      console.log('Getting unread count for user:', userId);
+      
+      // Find all conversations where the user is a participant
+      const userConversations = await Conversation.find({
+        participants: userId
+      });
+      
+      // Find all shops owned by this user
+      const userShops = await Shop.find({ userId: userId }).select('_id');
+      const shopIds = userShops.map(shop => shop._id.toString());
+      
+      // Find all conversations where any of the user's shops are participants
+      const shopConversations = [];
+      if (shopIds.length > 0) {
+        for (const shopId of shopIds) {
+          const conversations = await Conversation.find({
+            participants: shopId
+          });
+          shopConversations.push(...conversations);
+        }
+      }
+      
+      // Calculate total unread messages for user's direct conversations
+      let totalUnread = 0;
+      userConversations.forEach(conversation => {
+        totalUnread += conversation.unreadCounts.get(userId) || 0;
+      });
+      
+      // Add unread messages from shop conversations
+      shopConversations.forEach(conversation => {
+        shopIds.forEach(shopId => {
+          totalUnread += conversation.unreadCounts.get(shopId) || 0;
+        });
+      });
+      
+      console.log(`User ${userId} has ${totalUnread} unread messages`);
+      
+      res.status(200).json({
+        success: true,
+        unreadCount: totalUnread
+      });
+    } catch (error) {
+      console.error('Error getting unread count:', error);
+      res.status(500).json({
         success: false,
-        message: 'Invalid conversation ID'
+        message: 'Error retrieving unread message count',
+        error: error.message
       });
     }
-
-    // Find the conversation
-    const conversation = await Conversation.findById(conversationId);
-    if (!conversation) {
-      return res.status(404).json({
-        success: false,
-        message: 'Conversation not found'
-      });
-    }
-
-    // Check if user is a participant
-    if (!conversation.participants.some(p => p.toString() === userId)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to delete this conversation'
-      });
-    }
-
-    // Delete all messages in the conversation
-    await Message.deleteMany({
-      $or: [
-        { sender: conversation.participants[0], recipient: conversation.participants[1] },
-        { sender: conversation.participants[1], recipient: conversation.participants[0] }
-      ]
-    });
-
-    // Get the other participant ID
-    const otherParticipantId = conversation.participants.find(
-      id => id.toString() !== userId
-    );
-
-    // Check if other participant is a user or shop
-    const isShop = !(await User.findById(otherParticipantId));
-
-    // Remove conversation reference from current user
-    await User.findByIdAndUpdate(userId, {
-      $pull: { conversations: conversationId }
-    });
-
-    // If other participant is a user (not a shop), remove conversation from their list too
-    if (!isShop) {
-      await User.findByIdAndUpdate(otherParticipantId, {
-        $pull: { conversations: conversationId }
-      });
-    }
-
-    // Delete the conversation
-    await Conversation.findByIdAndDelete(conversationId);
-
-    res.status(200).json({
-      success: true,
-      message: 'Conversation deleted successfully'
-    });
-  } catch (error) {
-    console.error('Error deleting conversation:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting conversation',
-      error: error.message
-    });
-  }
-});
-
-// Add a route to get conversation by recipient ID
-app.get('/api/messages/conversation/:recipientId', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { recipientId } = req.params;
-    console.log(`Getting conversation between ${userId} and ${recipientId}`);
-
-    // Validate recipientId
-    if (!mongoose.Types.ObjectId.isValid(recipientId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid recipient ID'
-      });
-    }
-
-    // Find conversation
-    const conversation = await Conversation.findOne({
-      participants: { $all: [userId, recipientId] }
-    });
-
-    if (!conversation) {
-      return res.status(404).json({
-        success: false,
-        message: 'Conversation not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      conversationId: conversation._id
-    });
-  } catch (error) {
-    console.error('Error getting conversation:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error retrieving conversation',
-      error: error.message
-    });
-  }
-});
-
-// Add a route to get a single message by ID
-app.get('/api/messages/message/:messageId', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { messageId } = req.params;
-    console.log(`Getting message ${messageId}`);
-
-    // Validate messageId
-    if (!mongoose.Types.ObjectId.isValid(messageId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid message ID'
-      });
-    }
-
-    // Find the message
-    const message = await Message.findById(messageId);
-    if (!message) {
-      return res.status(404).json({
-        success: false,
-        message: 'Message not found'
-      });
-    }
-
-    // Check if user is sender or recipient
-    if (message.sender.toString() !== userId && message.recipient.toString() !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access this message'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message
-    });
-  } catch (error) {
-    console.error('Error getting message:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error retrieving message',
-      error: error.message
-    });
-  }
-});
-
-// Add a route to delete a single message
-app.delete('/api/messages/message/:messageId', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { messageId } = req.params;
-    console.log(`Deleting message ${messageId}`);
-
-    // Validate messageId
-    if (!mongoose.Types.ObjectId.isValid(messageId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid message ID'
-      });
-    }
-
-    // Find the message
-    const message = await Message.findById(messageId);
-    if (!message) {
-      return res.status(404).json({
-        success: false,
-        message: 'Message not found'
-      });
-    }
-
-    // Check if user is sender
-    if (message.sender.toString() !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Only the sender can delete a message'
-      });
-    }
-
-    // Find the conversation
-    const conversation = await Conversation.findOne({
-      participants: { $all: [message.sender, message.recipient] }
-    });
-
-    // Delete the message
-    await Message.findByIdAndDelete(messageId);
-
-    // If this was the last message in the conversation, update the conversation
-    if (conversation && conversation.lastMessage && conversation.lastMessage.toString() === messageId) {
-      // Find the new last message
-      const lastMessage = await Message.findOne({
+  });
+  
+  // Delete a conversation
+  app.delete('/api/messages/conversations/:conversationId', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { conversationId } = req.params;
+      console.log(`Deleting conversation ${conversationId} for user ${userId}`);
+      
+      // Validate conversationId
+      if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid conversation ID'
+        });
+      }
+      
+      // Find the conversation
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Conversation not found'
+        });
+      }
+      
+      // Check if user is a direct participant
+      let isParticipant = conversation.participants.some(p => p.toString() === userId);
+      let userShopId = null;
+      
+      // If not a direct participant, check if user owns any shop that is a participant
+      if (!isParticipant) {
+        // Find all shops owned by this user
+        const userShops = await Shop.find({ userId: userId }).select('_id');
+        const shopIds = userShops.map(shop => shop._id.toString());
+        
+        // Check if any of the user's shops are participants
+        for (const shopId of shopIds) {
+          if (conversation.participants.some(p => p.toString() === shopId)) {
+            isParticipant = true;
+            userShopId = shopId;
+            break;
+          }
+        }
+      }
+      
+      // If still not a participant, deny access
+      if (!isParticipant) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to delete this conversation'
+        });
+      }
+      
+      // Delete all messages in the conversation
+      await Message.deleteMany({
         $or: [
           { sender: conversation.participants[0], recipient: conversation.participants[1] },
           { sender: conversation.participants[1], recipient: conversation.participants[0] }
         ]
-      }).sort({ createdAt: -1 });
-
-      if (lastMessage) {
-        conversation.lastMessage = lastMessage._id;
-        conversation.lastMessageText = lastMessage.text;
-        conversation.lastMessageDate = lastMessage.createdAt;
-        await conversation.save();
-      } else {
-        // No messages left, delete the conversation
-        await Conversation.findByIdAndDelete(conversation._id);
-                
-        // Check if other participant is a user or shop
-        const otherParticipantId = conversation.participants.find(
-          id => id.toString() !== userId
-        );
-        const isShop = !(await User.findById(otherParticipantId));
-
-        // Remove conversation reference from current user
-        await User.findByIdAndUpdate(userId, {
-          $pull: { conversations: conversation._id }
+      });
+      
+      // Get the other participant ID
+      const otherParticipantId = conversation.participants.find(
+        id => id.toString() !== userId && (userShopId ? id.toString() !== userShopId : true)
+      );
+      
+      // Check if other participant is a user or shop
+      const isShop = !(await User.findById(otherParticipantId));
+      
+      // Remove conversation reference from current user
+      await User.findByIdAndUpdate(userId, {
+        $pull: { conversations: conversationId }
+      });
+      
+      // If other participant is a user (not a shop), remove conversation from their list too
+      if (!isShop) {
+        await User.findByIdAndUpdate(otherParticipantId, {
+          $pull: { conversations: conversationId }
         });
-
-        // If other participant is a user (not a shop), remove conversation from their list too
-        if (!isShop) {
-          await User.findByIdAndUpdate(otherParticipantId, {
+      }
+      
+      // Delete the conversation
+      await Conversation.findByIdAndDelete(conversationId);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Conversation deleted successfully'
+      });
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error deleting conversation',
+        error: error.message
+      });
+    }
+  });
+  
+  // Add a route to get conversation by recipient ID
+  app.get('/api/messages/conversation/:recipientId', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { recipientId } = req.params;
+      console.log(`Getting conversation between ${userId} and ${recipientId}`);
+      
+      // Validate recipientId
+      if (!mongoose.Types.ObjectId.isValid(recipientId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid recipient ID'
+        });
+      }
+      
+      // First try to find a direct conversation between user and recipient
+      let conversation = await Conversation.findOne({
+        participants: { $all: [userId, recipientId] }
+      });
+      
+      // If no direct conversation found, check if user is a shop owner
+      if (!conversation) {
+        console.log(`No direct conversation found, checking if user ${userId} owns shops`);
+        
+        // Find all shops owned by this user
+        const userShops = await Shop.find({ userId: userId }).select('_id');
+        const shopIds = userShops.map(shop => shop._id.toString());
+        
+        console.log(`User owns ${shopIds.length} shops: ${shopIds.join(', ')}`);
+        
+        // Try to find a conversation between any of the user's shops and the recipient
+        if (shopIds.length > 0) {
+          for (const shopId of shopIds) {
+            const shopConversation = await Conversation.findOne({
+              participants: { $all: [shopId, recipientId] }
+            });
+            
+            if (shopConversation) {
+              console.log(`Found conversation between shop ${shopId} and recipient ${recipientId}`);
+              conversation = shopConversation;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!conversation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Conversation not found'
+        });
+      }
+      
+      res.status(200).json({
+        success: true,
+        conversationId: conversation._id
+      });
+    } catch (error) {
+      console.error('Error getting conversation:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving conversation',
+        error: error.message
+      });
+    }
+  });
+  
+  // Add a route to get a single message by ID
+  app.get('/api/messages/message/:messageId', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { messageId } = req.params;
+      console.log(`Getting message ${messageId}`);
+      
+      // Validate messageId
+      if (!mongoose.Types.ObjectId.isValid(messageId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid message ID'
+        });
+      }
+      
+      // Find the message
+      const message = await Message.findById(messageId);
+      if (!message) {
+        return res.status(404).json({
+          success: false,
+          message: 'Message not found'
+        });
+      }
+      
+      // Find all shops owned by this user
+      const userShops = await Shop.find({ userId: userId }).select('_id');
+      const shopIds = userShops.map(shop => shop._id.toString());
+      
+      // Check if user is sender or recipient (directly or via their shop)
+      const isSender = message.sender.toString() === userId || 
+                       shopIds.includes(message.sender.toString());
+      const isRecipient = message.recipient.toString() === userId || 
+                          shopIds.includes(message.recipient.toString());
+      
+      if (!isSender && !isRecipient) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to access this message'
+        });
+      }
+      
+      res.status(200).json({
+        success: true,
+        message
+      });
+    } catch (error) {
+      console.error('Error getting message:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving message',
+        error: error.message
+      });
+    }
+  });
+  
+  // Add a route to delete a single message
+  app.delete('/api/messages/message/:messageId', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { messageId } = req.params;
+      console.log(`Deleting message ${messageId}`);
+      
+      // Validate messageId
+      if (!mongoose.Types.ObjectId.isValid(messageId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid message ID'
+        });
+      }
+      
+      // Find the message
+      const message = await Message.findById(messageId);
+      if (!message) {
+        return res.status(404).json({
+          success: false,
+          message: 'Message not found'
+        });
+      }
+      
+      // Find all shops owned by this user
+      const userShops = await Shop.find({ userId: userId }).select('_id');
+      const shopIds = userShops.map(shop => shop._id.toString());
+      
+      // Check if user is sender (directly or via their shop)
+      const isSender = message.sender.toString() === userId || 
+                       shopIds.includes(message.sender.toString());
+      
+      if (!isSender) {
+        return res.status(403).json({
+          success: false,
+          message: 'Only the sender can delete a message'
+        });
+      }
+      
+      // Find the conversation
+      const conversation = await Conversation.findOne({
+        participants: { $all: [message.sender, message.recipient] }
+      });
+      
+      // Delete the message
+      await Message.findByIdAndDelete(messageId);
+      
+      // If this was the last message in the conversation, update the conversation
+      if (conversation && conversation.lastMessage && conversation.lastMessage.toString() === messageId) {
+        // Find the new last message
+        const lastMessage = await Message.findOne({
+          $or: [
+            { sender: conversation.participants[0], recipient: conversation.participants[1] },
+            { sender: conversation.participants[1], recipient: conversation.participants[0] }
+          ]
+        }).sort({ createdAt: -1 });
+        
+        if (lastMessage) {
+          conversation.lastMessage = lastMessage._id;
+          conversation.lastMessageText = lastMessage.text;
+          conversation.lastMessageDate = lastMessage.createdAt;
+          await conversation.save();
+        } else {
+          // No messages left, delete the conversation
+          await Conversation.findByIdAndDelete(conversation._id);
+          
+          // Check if other participant is a user or shop
+          const otherParticipantId = conversation.participants.find(
+            id => id.toString() !== userId && !shopIds.includes(id.toString())
+          );
+          
+          const isShop = !(await User.findById(otherParticipantId));
+          
+          // Remove conversation reference from current user
+          await User.findByIdAndUpdate(userId, {
             $pull: { conversations: conversation._id }
+          });
+          
+          // If other participant is a user (not a shop), remove conversation from their list too
+          if (!isShop) {
+            await User.findByIdAndUpdate(otherParticipantId, {
+              $pull: { conversations: conversation._id }
+            });
+          }
+        }
+      }
+      
+      res.status(200).json({
+        success: true,
+        message: 'Message deleted successfully'
+      });
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error deleting message',
+        error: error.message
+      });
+    }
+  });
+  
+  // Add a route to get paginated messages for a conversation
+  app.get('/api/messages/conversation/:conversationId/messages', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { conversationId } = req.params;
+      const { page = 1, limit = 20 } = req.query;
+      console.log(`Getting messages for conversation ${conversationId}, page ${page}, limit ${limit}`);
+      
+      // Validate conversationId
+      if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid conversation ID'
+        });
+      }
+      
+      // Find the conversation
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Conversation not found'
+        });
+      }
+      
+      // Check if user is a direct participant
+      let isParticipant = conversation.participants.some(p => p.toString() === userId);
+      let userShopIds = [];
+      
+      // If not a direct participant, check if user owns any shop that is a participant
+      if (!isParticipant) {
+        // Find all shops owned by this user
+        const userShops = await Shop.find({ userId: userId }).select('_id');
+        userShopIds = userShops.map(shop => shop._id.toString());
+        
+        // Check if any of the user's shops are participants
+        isParticipant = conversation.participants.some(p => userShopIds.includes(p.toString()));
+      }
+      
+      // If still not a participant, deny access
+      if (!isParticipant) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to access this conversation'
+        });
+      }
+      
+      // Calculate pagination
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+      
+      // Get messages for this conversation
+      const messages = await Message.find({
+        $or: [
+          { sender: conversation.participants[0], recipient: conversation.participants[1] },
+          { sender: conversation.participants[1], recipient: conversation.participants[0] }
+        ]
+      })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+      
+      // Get total count for pagination
+      const totalMessages = await Message.countDocuments({
+        $or: [
+          { sender: conversation.participants[0], recipient: conversation.participants[1] },
+          { sender: conversation.participants[1], recipient: conversation.participants[0] }
+        ]
+      });
+      
+      // Determine which participant IDs belong to the current user (user ID or shop IDs)
+      const userRelatedIds = [userId, ...userShopIds];
+      
+      // Mark unread messages as read
+      const updateResult = await Message.updateMany(
+        {
+          sender: { $nin: userRelatedIds },
+          recipient: { $in: userRelatedIds },
+          read: false
+        },
+        { read: true }
+      );
+      
+      console.log(`Marked ${updateResult.nModified || updateResult.modifiedCount} messages as read`);
+      
+      // Reset unread count for current user and their shops
+      let updated = false;
+      for (const id of userRelatedIds) {
+        if (conversation.unreadCounts.get(id) > 0) {
+          conversation.unreadCounts.set(id, 0);
+          updated = true;
+        }
+      }
+      
+      if (updated) {
+        await conversation.save();
+      }
+      
+      res.status(200).json({
+        success: true,
+        messages: messages.reverse(), // Reverse to get chronological order
+        pagination: {
+          total: totalMessages,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          pages: Math.ceil(totalMessages / parseInt(limit))
+        }
+      });
+    } catch (error) {
+      console.error('Error getting conversation messages:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving conversation messages',
+        error: error.message
+      });
+    }
+  });
+  
+  // Add a route to send a message from a shop
+  app.post('/api/messages/shop/:shopId/send', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { shopId } = req.params;
+      const { recipientId, text } = req.body;
+      
+      console.log(`Sending message from shop ${shopId} to ${recipientId}`);
+      
+      // Validate input
+      if (!recipientId || !text) {
+        return res.status(400).json({
+          success: false,
+          message: 'Recipient ID and message text are required'
+        });
+      }
+      
+      if (!mongoose.Types.ObjectId.isValid(shopId) || !mongoose.Types.ObjectId.isValid(recipientId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid shop ID or recipient ID'
+        });
+      }
+      
+      // Verify the user owns this shop
+      const shop = await Shop.findOne({ _id: shopId, userId: userId });
+      if (!shop) {
+        return res.status(403).json({
+          success: false,
+          message: 'You do not own this shop'
+        });
+      }
+      
+      // Check if recipient exists (either as a User or a Shop)
+      let recipient = await User.findById(recipientId);
+      let isShop = false;
+      
+      // If not found in User collection, check if it's a Shop
+      if (!recipient) {
+        recipient = await Shop.findById(recipientId);
+        isShop = true;
+        
+        if (!recipient) {
+          return res.status(404).json({
+            success: false,
+            message: 'Recipient not found'
           });
         }
       }
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Message deleted successfully'
-    });
-  } catch (error) {
-    console.error('Error deleting message:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting message',
-      error: error.message
-    });
-  }
-});
-
-// Add a route to get paginated messages for a conversation
-app.get('/api/messages/conversation/:conversationId/messages', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { conversationId } = req.params;
-    const { page = 1, limit = 20 } = req.query;
-    console.log(`Getting messages for conversation ${conversationId}, page ${page}, limit ${limit}`);
-
-    // Validate conversationId
-    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid conversation ID'
+      
+      // Create the message
+      const newMessage = new Message({
+        sender: shopId,
+        recipient: recipientId,
+        text,
+        read: false
       });
-    }
-
-    // Find the conversation
-    const conversation = await Conversation.findById(conversationId);
-    if (!conversation) {
-      return res.status(404).json({
-        success: false,
-        message: 'Conversation not found'
+      await newMessage.save();
+      console.log('Message saved with ID:', newMessage._id);
+      
+      // Find or create conversation
+      let conversation = await Conversation.findOne({
+        participants: { $all: [shopId, recipientId] }
       });
-    }
-
-    // Check if user is a participant
-    if (!conversation.participants.some(p => p.toString() === userId)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access this conversation'
-      });
-    }
-
-    // Calculate pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+      
+      if (!conversation) {
+        // Create new conversation
+        console.log('Creating new conversation');
+        conversation = new Conversation({
+          participants: [shopId, recipientId],
+          lastMessage: newMessage._id,
+          lastMessageText: text,
+          lastMessageDate: new Date(),
+          unreadCounts: new Map([[recipientId, 1]])
+        });
         
-    // Get messages for this conversation
-    const messages = await Message.find({
-      $or: [
-        { sender: conversation.participants[0], recipient: conversation.participants[1] },
-        { sender: conversation.participants[1], recipient: conversation.participants[0] }
-      ]
-    })
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(parseInt(limit));
-
-    // Get total count for pagination
-    const totalMessages = await Message.countDocuments({
-      $or: [
-        { sender: conversation.participants[0], recipient: conversation.participants[1] },
-        { sender: conversation.participants[1], recipient: conversation.participants[0] }
-      ]
-    });
-
-    // Mark unread messages as read
-    await Message.updateMany(
-      { 
-        sender: { $ne: userId },
-        recipient: userId,
-        read: false 
-      },
-      { read: true }
-    );
-
-    // Reset unread count for current user
-    if (conversation.unreadCounts.get(userId) > 0) {
-      conversation.unreadCounts.set(userId, 0);
-      await conversation.save();
-    }
-
-    res.status(200).json({
-      success: true,
-      messages: messages.reverse(), // Reverse to get chronological order
-      pagination: {
-        total: totalMessages,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(totalMessages / parseInt(limit))
+        // If recipient is a user (not a shop), add conversation to their list
+        if (!isShop) {
+          await User.findByIdAndUpdate(recipientId, {
+            $addToSet: { conversations: conversation._id }
+          });
+        }
+      } else {
+        // Update existing conversation
+        console.log('Updating existing conversation:', conversation._id);
+        conversation.lastMessage = newMessage._id;
+        conversation.lastMessageText = text;
+        conversation.lastMessageDate = new Date();
+        
+        // Increment unread count for recipient
+        const currentUnreadCount = conversation.unreadCounts.get(recipientId) || 0;
+        conversation.unreadCounts.set(recipientId, currentUnreadCount + 1);
       }
-    });
-  } catch (error) {
-    console.error('Error getting conversation messages:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error retrieving conversation messages',
-      error: error.message
-    });
-  }
-});
-
+      
+      await conversation.save();
+      
+      res.status(201).json({
+        success: true,
+        message: newMessage
+      });
+    } catch (error) {
+      console.error('Error sending message from shop:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error sending message',
+        error: error.message
+      });
+    }
+  });
+  
+  // Get all conversations for a specific shop
+  app.get('/api/messages/shop/:shopId/conversations', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { shopId } = req.params;
+      
+      console.log(`Getting conversations for shop ID: ${shopId}`);
+      
+      // Validate shopId
+      if (!mongoose.Types.ObjectId.isValid(shopId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid shop ID'
+        });
+      }
+      
+      // Verify the user owns this shop
+      const shop = await Shop.findOne({ _id: shopId, userId: userId });
+      if (!shop) {
+        return res.status(403).json({
+          success: false,
+          message: 'You do not own this shop'
+        });
+      }
+      
+      // Find all conversations where the shop is a participant
+      const conversations = await Conversation.find({
+        participants: shopId
+      }).sort({ updatedAt: -1 });
+      
+      // Format the conversations for the client
+      const formattedConversations = [];
+      
+      // Process each conversation
+      for (const conversation of conversations) {
+        // Find the other participant ID (not the shop)
+        const otherParticipantId = conversation.participants.find(
+          participant => participant.toString() !== shopId
+        );
+        
+        // Get unread count for this shop
+        const unreadCount = conversation.unreadCounts.get(shopId) || 0;
+        
+        // Check if the other participant is a user
+        let otherParticipant = await User.findById(otherParticipantId)
+          .select('username firstName lastName profileImage businessName role');
+        
+        let isShop = false;
+        
+        // If not found in users, check if it's a shop
+        if (!otherParticipant) {
+          const otherShop = await Shop.findById(otherParticipantId)
+            .select('name images');
+            
+          if (otherShop) {
+            isShop = true;
+            otherParticipant = {
+              _id: otherShop._id,
+              businessName: otherShop.name,
+              profileImage: otherShop.images && otherShop.images.length > 0 ? otherShop.images[0] : null,
+              role: 'shop'
+            };
+          }
+        }
+        
+        if (otherParticipant) {
+          formattedConversations.push({
+            _id: conversation._id,
+            recipient: otherParticipant,
+            lastMessage: conversation.lastMessage,
+            lastMessageText: conversation.lastMessageText,
+            lastMessageDate: conversation.lastMessageDate,
+            unreadCount: unreadCount,
+            isShop: isShop
+          });
+        }
+      }
+      
+      res.status(200).json({
+        success: true,
+        conversations: formattedConversations
+      });
+    } catch (error) {
+      console.error('Error getting shop conversations:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving shop conversations',
+        error: error.message
+      });
+    }
+  });
+  
 
 // Global error handler
 app.use((err, req, res, next) => {
