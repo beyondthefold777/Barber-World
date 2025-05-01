@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,17 +16,17 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import messageService from '../services/messageService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ChatScreen = ({ route, navigation }) => {
-  const { recipientId, recipientName, recipientImage, shopId, conversationId } = route.params;
+  const { recipientId, recipientName, recipientImage, shopId, conversationId: initialConversationId } = route.params;
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
-  const [retrying, setRetrying] = useState(false);
+  const [conversationId, setConversationId] = useState(initialConversationId);
   const flatListRef = useRef(null);
   const { user } = useAuth();
 
@@ -41,11 +41,23 @@ const ChatScreen = ({ route, navigation }) => {
     
     // Mark messages as read when opening the chat
     if (conversationId) {
-      markMessagesAsRead();
+      markMessagesAsRead(conversationId);
     }
     
     console.log('ChatScreen initialized with recipient:', recipientId, recipientName);
-  }, [recipientId]);
+    
+    // Set up a refresh interval to check for new messages
+    const messageRefreshInterval = setInterval(() => {
+      if (conversationId) {
+        refreshMessages();
+      }
+    }, 10000); // Check every 10 seconds
+    
+    // Clean up interval on unmount
+    return () => {
+      clearInterval(messageRefreshInterval);
+    };
+  }, [recipientId, conversationId]);
 
   const loadMessages = async () => {
     setLoading(true);
@@ -58,6 +70,11 @@ const ChatScreen = ({ route, navigation }) => {
       if (response.success) {
         console.log(`Successfully loaded ${response.messages?.length || 0} messages`);
         
+        // Update conversationId if it wasn't provided but we got it from the API
+        if (response.conversation && !conversationId) {
+          setConversationId(response.conversation);
+        }
+        
         // Format messages for the UI
         const formattedMessages = response.messages.map(msg => ({
           _id: msg._id,
@@ -65,7 +82,7 @@ const ChatScreen = ({ route, navigation }) => {
           createdAt: new Date(msg.createdAt),
           user: {
             _id: msg.sender,
-            name: msg.sender === user?.id ? user?.username : recipientName,
+            name: msg.sender === user?.id ? (user?.username || 'Me') : recipientName,
           },
           sent: true,
           received: msg.read,
@@ -74,8 +91,8 @@ const ChatScreen = ({ route, navigation }) => {
         setMessages(formattedMessages);
         
         // Mark messages as read if there are any
-        if (formattedMessages.length > 0 && conversationId) {
-          markMessagesAsRead();
+        if (formattedMessages.length > 0 && (conversationId || response.conversation)) {
+          markMessagesAsRead(conversationId || response.conversation);
         }
       } else {
         console.error('Failed to load messages:', response.message);
@@ -86,16 +103,53 @@ const ChatScreen = ({ route, navigation }) => {
       setError('An unexpected error occurred while loading messages');
     } finally {
       setLoading(false);
-      setRetrying(false);
     }
   };
 
-  const markMessagesAsRead = async () => {
+  const refreshMessages = async () => {
+    console.log('Refreshing messages for conversation:', conversationId);
+    
     try {
-      console.log('Marking messages as read for conversation:', conversationId);
+      // Only fetch new messages if we have a conversation ID
       if (!conversationId) return;
       
-      const response = await messageService.markAsRead(conversationId);
+      const messagesResponse = await messageService.getMessages(recipientId);
+      
+      if (messagesResponse.success && messagesResponse.messages) {
+        // Format messages for the UI
+        const formattedMessages = messagesResponse.messages.map(msg => ({
+          _id: msg._id,
+          text: msg.text,
+          createdAt: new Date(msg.createdAt),
+          user: {
+            _id: msg.sender,
+            name: msg.sender === user?.id ? (user?.username || 'Me') : recipientName,
+          },
+          sent: true,
+          received: msg.read,
+        }));
+        
+        // Check if we have new messages
+        if (formattedMessages.length > messages.length) {
+          console.log('New messages received:', formattedMessages.length - messages.length);
+          setMessages(formattedMessages);
+          
+          // Mark messages as read
+          markMessagesAsRead(conversationId);
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing messages:', error);
+    }
+  };
+
+  const markMessagesAsRead = async (convoId) => {
+    try {
+      const convId = convoId || conversationId;
+      console.log('Marking messages as read for conversation:', convId);
+      if (!convId) return;
+      
+      const response = await messageService.markAsRead(convId);
       if (response.success) {
         console.log('Messages marked as read successfully');
       } else {
@@ -121,7 +175,7 @@ const ChatScreen = ({ route, navigation }) => {
       createdAt: new Date(),
       user: {
         _id: user?.id || 'current-user',
-        name: user?.username || user?.name || 'Me',
+        name: user?.username || 'Me',
       },
       sent: true,
       received: false,
@@ -137,6 +191,11 @@ const ChatScreen = ({ route, navigation }) => {
       
       if (response.success) {
         console.log('Message sent successfully:', response.message);
+        
+        // If this is the first message, we might get a conversation ID back
+        if (response.conversation && !conversationId) {
+          setConversationId(response.conversation);
+        }
         
         // Update message status after sending to server
         setMessages(prevMessages => 
@@ -169,29 +228,11 @@ const ChatScreen = ({ route, navigation }) => {
   };
 
   const retryLoadMessages = () => {
-    setRetrying(true);
     loadMessages();
   };
 
-  const testApiConnection = async () => {
-    setRetrying(true);
-    try {
-      const result = await messageService.testConnection();
-      if (result.success) {
-        Alert.alert('Connection Test', 'Successfully connected to the API server. Retrying to load messages...');
-        loadMessages();
-      } else {
-        Alert.alert('Connection Test Failed', result.message);
-        setRetrying(false);
-      }
-    } catch (error) {
-      Alert.alert('Connection Test Error', error.message);
-      setRetrying(false);
-    }
-  };
-
   const renderMessage = ({ item }) => {
-    const isUserMessage = item.user._id === (user?.id || 'current-user');
+    const isUserMessage = item.user._id === user?.id || item.user._id === 'current-user';
     
     return (
       <View style={[
@@ -234,26 +275,12 @@ const ChatScreen = ({ route, navigation }) => {
           <Feather name="alert-circle" size={60} color="#FF3B30" style={styles.emptyChatIcon} />
           <Text style={styles.emptyChatTitle}>Connection Error</Text>
           <Text style={styles.emptyChatText}>{error}</Text>
-          <View style={styles.errorButtonsContainer}>
-            <TouchableOpacity 
-              style={styles.retryButton}
-              onPress={retryLoadMessages}
-              disabled={retrying}
-            >
-              {retrying ? (
-                <ActivityIndicator size="small" color="white" />
-              ) : (
-                <Text style={styles.retryButtonText}>Retry</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.testConnectionButton}
-              onPress={testApiConnection}
-              disabled={retrying}
-            >
-              <Text style={styles.retryButtonText}>Test Connection</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={retryLoadMessages}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -485,23 +512,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
   },
-  errorButtonsContainer: {
-    flexDirection: 'row',
-    marginTop: 20,
-  },
   retryButton: {
     backgroundColor: '#FF0000',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 20,
-    marginHorizontal: 5,
-  },
-  testConnectionButton: {
-    backgroundColor: '#555',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    marginHorizontal: 5,
+    marginTop: 15,
   },
   retryButtonText: {
     color: 'white',

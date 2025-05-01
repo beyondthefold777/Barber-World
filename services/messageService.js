@@ -7,15 +7,21 @@ const API_URL = config.apiUrl;
 /**
  * Creates an API request with error handling
  */
-const makeApiRequest = async ({ method = 'GET', endpoint, data = null, token = null }) => {
+const makeApiRequest = async ({ method = 'GET', endpoint, data = null }) => {
   try {
-    console.log(`Making ${method} request to: ${API_URL}${endpoint}`);
-    
+    // Get token if available, but don't require it
+    const token = await AsyncStorage.getItem('userToken');
     const headers = { 'Content-Type': 'application/json' };
     
     if (token) {
+      // Use Authorization header instead of x-auth-token
+      headers['Authorization'] = `Bearer ${token}`;
+      
+      // Keep x-auth-token for backward compatibility if needed
       headers['x-auth-token'] = token;
     }
+    
+    console.log(`Making ${method} request to ${endpoint} with token: ${token ? 'Yes' : 'No'}`);
     
     const response = await axios({
       method,
@@ -25,13 +31,10 @@ const makeApiRequest = async ({ method = 'GET', endpoint, data = null, token = n
       timeout: 10000 // 10 second timeout
     });
     
-    console.log(`API response status: ${response.status}`);
     return response.data;
   } catch (error) {
     console.error(`API request failed: ${error.message}`);
-    if (error.response) {
-      console.error(`Status: ${error.response.status}, Data:`, error.response.data);
-    }
+    console.error('Error details:', error.response?.data || 'No response data');
     
     return {
       success: false,
@@ -45,30 +48,13 @@ const makeApiRequest = async ({ method = 'GET', endpoint, data = null, token = n
  */
 const getConversations = async () => {
   try {
-    console.log('Fetching all conversations');
-    const token = await AsyncStorage.getItem('userToken');
-    
-    if (!token) {
-      console.error('No auth token found');
-      return { success: false, message: 'Authentication required' };
-    }
-    
     const response = await makeApiRequest({
-      endpoint: '/api/messages/conversations',
-      token
+      endpoint: '/api/messages/conversations'
     });
     
-    if (response?.success) {
-      console.log(`Successfully fetched ${response.conversations?.length || 0} conversations`);
-      return response;
-    } else {
-      console.error('Failed to fetch conversations:', response?.message);
-      return { 
-        success: false, 
-        message: response?.message || 'Failed to fetch conversations',
-        conversations: [] 
-      };
-    }
+    return response.success 
+      ? response 
+      : { success: false, message: response.message || 'Failed to fetch conversations', conversations: [] };
   } catch (error) {
     console.error('Error fetching conversations:', error);
     return { success: false, message: 'An unexpected error occurred', conversations: [] };
@@ -80,30 +66,36 @@ const getConversations = async () => {
  */
 const getMessages = async (recipientId) => {
   try {
-    console.log(`Fetching messages for recipient: ${recipientId}`);
-    const token = await AsyncStorage.getItem('userToken');
-    
-    if (!token) {
-      console.error('No auth token found');
-      return { success: false, message: 'Authentication required' };
-    }
-    
-    const response = await makeApiRequest({
-      endpoint: `/api/messages/${recipientId}`,
-      token
+    // First get the conversation ID
+    const conversationResponse = await makeApiRequest({
+      endpoint: `/api/messages/conversation/${recipientId}`
     });
     
-    if (response?.success) {
-      console.log(`Successfully fetched ${response.messages?.length || 0} messages`);
-      return response;
-    } else {
-      console.error('Failed to fetch messages:', response?.message);
+    if (!conversationResponse.success) {
+      // If no conversation exists yet, return empty messages array
       return { 
-        success: false, 
-        message: response?.message || 'Failed to fetch messages',
-        messages: [] 
+        success: true, 
+        messages: [],
+        conversation: null
       };
     }
+    
+    // Now get the messages using the conversation ID
+    const messagesResponse = await makeApiRequest({
+      endpoint: `/api/messages/conversation/${conversationResponse.conversationId}/messages`
+    });
+    
+    return messagesResponse.success
+      ? { 
+          ...messagesResponse,
+          conversation: conversationResponse.conversationId
+        }
+      : { 
+          success: false, 
+          message: messagesResponse.message || 'Failed to fetch messages', 
+          messages: [],
+          conversation: conversationResponse.conversationId
+        };
   } catch (error) {
     console.error('Error fetching messages:', error);
     return { success: false, message: 'An unexpected error occurred', messages: [] };
@@ -115,17 +107,7 @@ const getMessages = async (recipientId) => {
  */
 const sendMessage = async (recipientId, text) => {
   try {
-    console.log(`Sending message to recipient: ${recipientId}`);
-    console.log(`Message text: ${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`);
-    
-    const token = await AsyncStorage.getItem('userToken');
-    
-    if (!token) {
-      console.error('No auth token found');
-      return { success: false, message: 'Authentication required' };
-    }
-    
-    // Add username from storage if available
+    // Get user data if available
     const userDataString = await AsyncStorage.getItem('userData');
     let userData = {};
     
@@ -134,28 +116,23 @@ const sendMessage = async (recipientId, text) => {
     }
     
     const messageData = { 
-      recipientId, 
-      text,
-      senderName: userData.username || userData.businessName || ''
+      recipientId,
+      text
     };
+    
+    console.log('Sending message data:', messageData);
     
     const response = await makeApiRequest({
       method: 'POST',
       endpoint: '/api/messages/send',
-      data: messageData,
-      token
+      data: messageData
     });
     
-    if (response?.success) {
-      console.log('Message sent successfully');
-      return response;
-    } else {
-      console.error('Failed to send message:', response?.message);
-      return { 
-        success: false, 
-        message: response?.message || 'Failed to send message'
-      };
-    }
+    console.log('Message send response:', response);
+    
+    return response.success 
+      ? response 
+      : { success: false, message: response.message || 'Failed to send message' };
   } catch (error) {
     console.error('Error sending message:', error);
     return { success: false, message: 'An unexpected error occurred' };
@@ -167,30 +144,14 @@ const sendMessage = async (recipientId, text) => {
  */
 const markAsRead = async (conversationId) => {
   try {
-    console.log(`Marking messages as read for conversation: ${conversationId}`);
-    const token = await AsyncStorage.getItem('userToken');
-    
-    if (!token) {
-      console.error('No auth token found');
-      return { success: false, message: 'Authentication required' };
-    }
-    
     const response = await makeApiRequest({
       method: 'PUT',
-      endpoint: `/api/messages/read/${conversationId}`,
-      token
+      endpoint: `/api/messages/read/${conversationId}`
     });
     
-    if (response?.success) {
-      console.log('Messages marked as read successfully');
-      return response;
-    } else {
-      console.error('Failed to mark messages as read:', response?.message);
-      return { 
-        success: false, 
-        message: response?.message || 'Failed to mark messages as read'
-      };
-    }
+    return response.success 
+      ? response 
+      : { success: false, message: response.message || 'Failed to mark messages as read' };
   } catch (error) {
     console.error('Error marking messages as read:', error);
     return { success: false, message: 'An unexpected error occurred' };
@@ -198,21 +159,50 @@ const markAsRead = async (conversationId) => {
 };
 
 /**
- * Test API connection
+ * Get unread message count
  */
-const testConnection = async () => {
+const getUnreadCount = async () => {
   try {
-    console.log('Testing API connection...');
     const response = await makeApiRequest({
-      endpoint: '/api/ping'
+      endpoint: '/api/messages/unread/count'
     });
     
-    return response?.success 
-      ? { success: true, message: 'Connected to API successfully' }
-      : { success: false, message: response?.message || 'Connection test failed' };
+    return response.success 
+      ? response 
+      : { success: false, message: response.message || 'Failed to get unread count', unreadCount: 0 };
   } catch (error) {
-    console.error('API connection test failed:', error);
-    return { success: false, message: `Connection test failed: ${error.message}` };
+    console.error('Error getting unread count:', error);
+    return { success: false, message: 'An unexpected error occurred', unreadCount: 0 };
+  }
+};
+
+/**
+ * Debug function to check authentication status
+ */
+const checkAuthStatus = async () => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    const userData = await AsyncStorage.getItem('userData');
+    
+    console.log('Auth Status Check:');
+    console.log('Token exists:', !!token);
+    console.log('User data exists:', !!userData);
+    
+    if (token) {
+      console.log('Token preview:', token.substring(0, 10) + '...');
+    }
+    
+    return {
+      isAuthenticated: !!token,
+      hasUserData: !!userData
+    };
+  } catch (error) {
+    console.error('Error checking auth status:', error);
+    return {
+      isAuthenticated: false,
+      hasUserData: false,
+      error: error.message
+    };
   }
 };
 
@@ -221,5 +211,6 @@ export default {
   getMessages,
   sendMessage,
   markAsRead,
-  testConnection
+  getUnreadCount,
+  checkAuthStatus
 };
