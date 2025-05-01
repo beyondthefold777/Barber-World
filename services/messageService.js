@@ -45,6 +45,9 @@ const makeApiRequest = async ({ method = 'GET', endpoint, data = null }) => {
 
 /**
  * Get all conversations for the current user
+ * This will include both:
+ * 1. Direct conversations where the user is a participant
+ * 2. Conversations with shops owned by the user (if the user is a shop owner)
  */
 const getConversations = async () => {
   try {
@@ -63,6 +66,7 @@ const getConversations = async () => {
 
 /**
  * Get messages for a specific conversation
+ * @param {string} recipientId - ID of the recipient (user or shop)
  */
 const getMessages = async (recipientId) => {
   try {
@@ -104,6 +108,8 @@ const getMessages = async (recipientId) => {
 
 /**
  * Send a message to a recipient
+ * @param {string} recipientId - ID of the recipient (user or shop)
+ * @param {string} text - Message text
  */
 const sendMessage = async (recipientId, text) => {
   try {
@@ -115,7 +121,7 @@ const sendMessage = async (recipientId, text) => {
       userData = JSON.parse(userDataString);
     }
     
-    const messageData = { 
+    const messageData = {
       recipientId,
       text
     };
@@ -141,6 +147,7 @@ const sendMessage = async (recipientId, text) => {
 
 /**
  * Mark messages as read
+ * @param {string} conversationId - ID of the conversation
  */
 const markAsRead = async (conversationId) => {
   try {
@@ -160,6 +167,9 @@ const markAsRead = async (conversationId) => {
 
 /**
  * Get unread message count
+ * This will include unread messages from both:
+ * 1. Direct conversations where the user is a participant
+ * 2. Conversations with shops owned by the user (if the user is a shop owner)
  */
 const getUnreadCount = async () => {
   try {

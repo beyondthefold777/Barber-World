@@ -1141,20 +1141,55 @@ app.get('/api/messages/conversations', authMiddleware, async (req, res) => {
     const userId = req.user.userId;
     console.log('Getting conversations for user ID:', userId);
     
-    // Find all conversations where the current user is a participant
-    const conversations = await Conversation.find({
+    // Find all conversations where the current user is a direct participant
+    const userConversations = await Conversation.find({
       participants: userId
     }).sort({ updatedAt: -1 });
-
+    
+    // Find all shops owned by this user
+    const userShops = await Shop.find({ userId: userId }).select('_id');
+    const shopIds = userShops.map(shop => shop._id.toString());
+    
+    // Find all conversations where any of the user's shops are participants
+    const shopConversations = [];
+    if (shopIds.length > 0) {
+      for (const shopId of shopIds) {
+        const conversations = await Conversation.find({
+          participants: shopId
+        }).sort({ updatedAt: -1 });
+        
+        shopConversations.push(...conversations);
+      }
+    }
+    
+    // Combine and deduplicate conversations
+    const allConversations = [...userConversations];
+    for (const shopConv of shopConversations) {
+      if (!allConversations.some(conv => conv._id.toString() === shopConv._id.toString())) {
+        allConversations.push(shopConv);
+      }
+    }
+    
+    // Sort by last message date
+    allConversations.sort((a, b) => 
+      new Date(b.lastMessageDate || b.updatedAt) - new Date(a.lastMessageDate || a.updatedAt)
+    );
+    
     // Format the conversations for the client
     const formattedConversations = [];
-
+    
     // Process each conversation
-    for (const conversation of conversations) {
-      // Find the other participant ID (not the current user)
+    for (const conversation of allConversations) {
+      // Find the other participant ID (not the current user or their shops)
       const otherParticipantId = conversation.participants.find(
-        participant => participant.toString() !== userId
+        participant => {
+          const participantStr = participant.toString();
+          return participantStr !== userId && !shopIds.includes(participantStr);
+        }
       );
+      
+      // If both participants are the user's shops, skip this conversation
+      if (!otherParticipantId) continue;
       
       // Get unread count for current user
       const unreadCount = conversation.unreadCounts.get(userId) || 0;
@@ -1182,6 +1217,22 @@ app.get('/api/messages/conversations', authMiddleware, async (req, res) => {
       }
       
       if (otherParticipant) {
+        // Determine if this is a shop conversation (user's shop talking to someone)
+        const userShopId = conversation.participants.find(
+          participant => shopIds.includes(participant.toString())
+        );
+        
+        let fromShop = null;
+        if (userShopId) {
+          const shop = await Shop.findById(userShopId).select('name');
+          if (shop) {
+            fromShop = {
+              _id: shop._id,
+              name: shop.name
+            };
+          }
+        }
+        
         formattedConversations.push({
           _id: conversation._id,
           recipient: otherParticipant,
@@ -1189,11 +1240,12 @@ app.get('/api/messages/conversations', authMiddleware, async (req, res) => {
           lastMessageText: conversation.lastMessageText,
           lastMessageDate: conversation.lastMessageDate,
           unreadCount: unreadCount,
-          isShop: isShop
+          isShop: isShop,
+          fromShop: fromShop // This indicates if the conversation is from one of the user's shops
         });
       }
     }
-
+    
     res.status(200).json({
       success: true,
       conversations: formattedConversations
