@@ -1,5 +1,5 @@
 const nodemailer = require('nodemailer');
-const config = require('../config/config');
+import config from '../config/environment';
 
 const transporter = nodemailer.createTransport({
   service: config.emailService,
