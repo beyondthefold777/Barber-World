@@ -71,23 +71,25 @@ const GuestLandingPage = ({ navigation }) => {
       console.log('Invalid shop item:', item);
       return null;
     }
-    
+        
     // Format the address for display
     const formatAddress = () => {
-      if (item.address && typeof item.address === 'object') {
+      if (item.formattedAddress) {
+        return item.formattedAddress;
+      } else if (item.address && typeof item.address === 'object') {
         return item.address.street || '';
       } else if (typeof item.address === 'string') {
         return item.address;
       }
       return '';
     };
-    
+        
     // Format the location (city, state, zip)
     const formatLocation = () => {
       let city = '';
       let state = '';
       let zip = '';
-      
+            
       // Try to get values from both possible locations
       if (item.address && typeof item.address === 'object') {
         city = item.address.city || item.city || '';
@@ -98,44 +100,62 @@ const GuestLandingPage = ({ navigation }) => {
         state = item.state || '';
         zip = item.zipCode || '';
       }
-      
+            
       let location = '';
-      
+            
       if (city) {
         location += city;
       }
-      
+            
       if (city && state) {
         location += ', ';
       }
-      
+            
       if (state) {
         location += state;
       }
-      
+            
       if ((city || state) && zip) {
         location += ' ';
       }
-      
+            
       if (zip) {
         location += zip;
       }
-      
+            
       return location || '';
     };
 
-    // Generate a random rating for demo purposes or use actual rating if available
+    // Use actual rating if available
     const rating = item.rating ? item.rating.toFixed(1) : (Math.random() * 2 + 3).toFixed(1);
     const distance = item.distance ? item.distance.toFixed(1) : (Math.random() * 10).toFixed(1);
-    
+        
     // Format services for display
     const formatServices = () => {
       if (item.services && item.services.length > 0) {
-        return item.services.slice(0, 3).map(service => service.name).join(' • ');
+        return item.services.slice(0, 3).map(service => 
+          typeof service === 'object' ? service.name : service
+        ).join(' • ');
       }
       return ['Haircut', 'Beard Trim', 'Shave', 'Lineup'].slice(0, Math.floor(Math.random() * 4) + 1).join(' • ');
     };
-    
+        
+    // Get the best available image for the shop
+    const getShopImage = () => {
+      // First try profile image
+      if (item.profileImage) {
+        return { uri: item.profileImage };
+      } 
+      // Then try first image from images array
+      else if (item.images && item.images.length > 0) {
+        return { uri: item.images[0] };
+      } 
+      // Fall back to default image
+      else {
+        return require('../assets/clippers1.png');
+      }
+    };
+
     return (
       <TouchableOpacity 
         style={[styles.barbershopCard, index % 2 === 0 ? styles.barbershopCardEven : styles.barbershopCardOdd]}
@@ -147,15 +167,11 @@ const GuestLandingPage = ({ navigation }) => {
         >
           <View style={styles.cardHeader}>
             <View style={styles.shopIconContainer}>
-              {item.profileImage ? (
-                <Image 
-                  source={{ uri: item.profileImage }} 
-                  style={{ width: '100%', height: '100%', borderRadius: 25 }}
-                  resizeMode="cover"
-                />
-              ) : (
-                <FontAwesome name="scissors" size={24} color="#FF0000" />
-              )}
+              <Image 
+                source={getShopImage()}
+                style={{ width: '100%', height: '100%', borderRadius: 25 }}
+                resizeMode="cover"
+              />
             </View>
             <View style={styles.shopInfoContainer}>
               <Text style={styles.barbershopName}>{item.name || item.businessName || 'Unnamed Barbershop'}</Text>
@@ -169,28 +185,34 @@ const GuestLandingPage = ({ navigation }) => {
               </View>
             </View>
           </View>
-          
+                    
           <View style={styles.cardDivider} />
-          
+                    
           <View style={styles.cardBody}>
             <View style={styles.addressRow}>
               <Feather name="map-pin" size={16} color="#BBBBBB" style={styles.addressIcon} />
               <Text style={styles.barbershopAddress}>{formatAddress()}</Text>
             </View>
             <Text style={styles.barbershopLocation}>{formatLocation()}</Text>
-            
+                        
             <View style={styles.servicesContainer}>
               <Text style={styles.servicesText}>
                 {formatServices()}
               </Text>
             </View>
           </View>
-          
+                    
           <View style={styles.cardFooter}>
-            <TouchableOpacity style={styles.bookButton}>
+            <TouchableOpacity 
+              style={styles.bookButton}
+              onPress={() => navigation.navigate('BarbershopDetail', { shopId: item._id, initialTab: 'booking' })}
+            >
               <Text style={styles.bookButtonText}>Book Now</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.detailsButton}>
+            <TouchableOpacity 
+              style={styles.detailsButton}
+              onPress={() => navigation.navigate('BarbershopDetail', { shopId: item._id })}
+            >
               <Text style={styles.detailsButtonText}>Details</Text>
             </TouchableOpacity>
           </View>
@@ -286,7 +308,7 @@ const GuestLandingPage = ({ navigation }) => {
       <ScrollView style={styles.content}>
         <View style={styles.searchSection}>
           <Text style={styles.sectionTitle}>Find Your Barber</Text>
-          
+                
           <View style={styles.searchTypeContainer}>
             <TouchableOpacity 
               style={[
@@ -301,7 +323,7 @@ const GuestLandingPage = ({ navigation }) => {
               />
               <Text style={styles.searchTypeText}>City & State</Text>
             </TouchableOpacity>
-            
+                
             <TouchableOpacity 
               style={[
                 styles.searchTypeButton, 
@@ -312,7 +334,7 @@ const GuestLandingPage = ({ navigation }) => {
               <Text style={styles.searchTypeText}>ZIP Code</Text>
             </TouchableOpacity>
           </View>
-          
+                
           {searchType === 'location' ? (
             <View style={styles.locationInputs}>
               <TextInput

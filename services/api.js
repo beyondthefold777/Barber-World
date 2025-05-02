@@ -1021,16 +1021,16 @@ export const authService = {
 // Helper function to normalize shop data structure
 function normalizeShopData(shops) {
   if (!shops || !Array.isArray(shops)) return [];
-  
+    
   return shops.map(shop => {
     if (!shop) return null;
-    
+        
     // Create a normalized shop object
     const normalizedShop = {
       _id: shop._id || shop.id || Math.random().toString(),
       name: shop.businessName || shop.name || 'Unnamed Barbershop',
     };
-    
+        
     // Handle address data
     if (typeof shop.address === 'object' && shop.address !== null) {
       // If address is already an object, use it
@@ -1057,24 +1057,59 @@ function normalizeShopData(shops) {
         zip: shop.zipCode || ''
       };
     }
-    
+        
     // Make sure city, state, zip are available at both levels for flexibility
     normalizedShop.city = shop.city || normalizedShop.address.city || '';
     normalizedShop.state = shop.state || normalizedShop.address.state || '';
     normalizedShop.zipCode = shop.zipCode || normalizedShop.address.zip || '';
-    
+        
     // Copy these values to the address object too for consistency
     normalizedShop.address.city = normalizedShop.address.city || normalizedShop.city;
     normalizedShop.address.state = normalizedShop.address.state || normalizedShop.state;
     normalizedShop.address.zip = normalizedShop.address.zip || normalizedShop.zipCode;
-    
+        
     // Include other important fields
     normalizedShop.phone = shop.phone || shop.phoneNumber || '';
     normalizedShop.email = shop.email || '';
     normalizedShop.website = shop.website || '';
     normalizedShop.rating = shop.rating || 0;
     normalizedShop.services = shop.services || [];
-    normalizedShop.images = shop.images || [];
+    
+    // Enhanced image handling
+    // Handle profile image first
+    normalizedShop.profileImage = shop.profileImage || '';
+    
+    // Handle shop images
+    if (shop.images) {
+      // If images is an array, use it directly
+      if (Array.isArray(shop.images)) {
+        normalizedShop.images = shop.images;
+      } 
+      // If images is a string (single URL), convert to array
+      else if (typeof shop.images === 'string') {
+        normalizedShop.images = [shop.images];
+      }
+      // Otherwise, initialize as empty array
+      else {
+        normalizedShop.images = [];
+      }
+    } else {
+      // No images property, initialize as empty array
+      normalizedShop.images = [];
+    }
+    
+    // If we have a profile image but no images, add profile image to images array
+    if (normalizedShop.profileImage && normalizedShop.images.length === 0) {
+      normalizedShop.images.push(normalizedShop.profileImage);
+    }
+    
+    // If we have images but no profile image, use first image as profile
+    if (!normalizedShop.profileImage && normalizedShop.images.length > 0) {
+      normalizedShop.profileImage = normalizedShop.images[0];
+    }
+    
+    // Add formatted address for convenience
+    normalizedShop.formattedAddress = `${normalizedShop.address.street}${normalizedShop.address.street ? ', ' : ''}${normalizedShop.address.city}${normalizedShop.address.city ? ', ' : ''}${normalizedShop.address.state} ${normalizedShop.address.zip}`.trim();
     
     return normalizedShop;
   }).filter(shop => shop !== null); // Remove any null entries
