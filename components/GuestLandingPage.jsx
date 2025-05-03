@@ -125,7 +125,7 @@ const GuestLandingPage = ({ navigation }) => {
             
       return location || '';
     };
-
+  
     // Use actual rating if available
     const rating = item.rating ? item.rating.toFixed(1) : (Math.random() * 2 + 3).toFixed(1);
     const distance = item.distance ? item.distance.toFixed(1) : (Math.random() * 10).toFixed(1);
@@ -140,22 +140,31 @@ const GuestLandingPage = ({ navigation }) => {
       return ['Haircut', 'Beard Trim', 'Shave', 'Lineup'].slice(0, Math.floor(Math.random() * 4) + 1).join(' • ');
     };
         
-    // Get the best available image for the shop
-    const getShopImage = () => {
-      // First try profile image
-      if (item.profileImage) {
-        return { uri: item.profileImage };
-      } 
-      // Then try first image from images array
-      else if (item.images && item.images.length > 0) {
-        return { uri: item.images[0] };
-      } 
-      // Fall back to default image
-      else {
-        return require('../assets/clippers1.png');
+    // Get up to 3 images for the gallery preview
+    const getShopImages = () => {
+      let images = [];
+      
+      // First try to get images from the images array
+      if (item.images && item.images.length > 0) {
+        // Take up to 3 images from the array
+        images = item.images.slice(0, 3).map(img => ({ uri: img }));
       }
+      
+      // If no images in the array but there's a profile image, use that
+      if (images.length === 0 && item.profileImage) {
+        images.push({ uri: item.profileImage });
+      }
+      
+      // If still no images, use a default image
+      if (images.length === 0) {
+        images.push(require('../assets/clippers1.png'));
+      }
+      
+      return images;
     };
-
+  
+    const shopImages = getShopImages();
+  
     return (
       <TouchableOpacity 
         style={[styles.barbershopCard, index % 2 === 0 ? styles.barbershopCardEven : styles.barbershopCardOdd]}
@@ -167,11 +176,7 @@ const GuestLandingPage = ({ navigation }) => {
         >
           <View style={styles.cardHeader}>
             <View style={styles.shopIconContainer}>
-              <Image 
-                source={getShopImage()}
-                style={{ width: '100%', height: '100%', borderRadius: 25 }}
-                resizeMode="cover"
-              />
+              <FontAwesome name="scissors" size={24} color="#FF0000" />
             </View>
             <View style={styles.shopInfoContainer}>
               <Text style={styles.barbershopName}>{item.name || item.businessName || 'Unnamed Barbershop'}</Text>
@@ -184,6 +189,19 @@ const GuestLandingPage = ({ navigation }) => {
                 </View>
               </View>
             </View>
+          </View>
+          
+          {/* Gallery Preview */}
+          <View style={styles.imageGalleryContainer}>
+            {shopImages.map((image, imgIndex) => (
+              <View key={imgIndex} style={styles.galleryImageWrapper}>
+                <Image 
+                  source={image}
+                  style={styles.galleryImage}
+                  resizeMode="cover"
+                />
+              </View>
+            ))}
           </View>
                     
           <View style={styles.cardDivider} />
@@ -220,6 +238,7 @@ const GuestLandingPage = ({ navigation }) => {
       </TouchableOpacity>
     );
   };
+  
 
   return (
     <LinearGradient
@@ -459,7 +478,6 @@ const GuestLandingPage = ({ navigation }) => {
     </LinearGradient>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -713,6 +731,27 @@ const styles = StyleSheet.create({
     color: '#BBBBBB',
     fontSize: 14,
     marginLeft: 5,
+  },
+  // New gallery styles
+  imageGalleryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 10,
+    height: 100,
+  },
+  galleryImageWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    marginHorizontal: 5,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
   },
   cardDivider: {
     height: 1,
