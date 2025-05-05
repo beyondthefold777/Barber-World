@@ -4,26 +4,70 @@ const Appointment = require('../models/Appointment');
 const Shop = require('../models/shop.model');
 
 // Get available time slots
-router.get('/available-slots/:shopId/:date', async (req, res) => {
+router.get('/available-slots/:date', async (req, res) => {
   try {
+    // Get shopId from query parameters
+    const shopId = req.query.shopId;
+    
+    if (!shopId) {
+      return res.status(400).json({ message: 'Shop ID is required as a query parameter' });
+    }
+    
+    const date = req.params.date;
+    
+    // Find booked slots
     const bookedSlots = await Appointment.find({
-      shopId: req.params.shopId,
-      date: new Date(req.params.date),
+      shopId: shopId,
+      date: new Date(date),
       status: 'confirmed'
     }).select('timeSlot');
     
+    // Define all possible time slots
     const allTimeSlots = [
       '9:00 AM', '10:00 AM', '11:00 AM',
       '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM'
     ];
     
+    // Filter out booked slots
     const availableSlots = allTimeSlots.filter(slot => 
       !bookedSlots.some(booked => booked.timeSlot === slot)
     );
+    
+    // Return available slots
     res.json({ availableSlots });
   } catch (error) {
     console.log('Error fetching slots:', error);
     res.status(500).json({ message: error.message });
+  }
+});
+
+// Create new appointment
+router.post('/', async (req, res) => {
+  try {
+    console.log('Received appointment request:', req.body);
+    
+    // Validate required fields
+    if (!req.body.shopId) {
+      return res.status(400).json({ message: 'Shop ID is required' });
+    }
+    
+    // Create appointment object
+    const appointment = new Appointment({
+      clientId: req.body.clientId || '64f5e3c2e4b1234567890123',
+      shopId: req.body.shopId,
+      date: new Date(req.body.date),
+      timeSlot: req.body.timeSlot,
+      service: req.body.service || 'Regular Haircut',
+      status: 'confirmed'
+    });
+    
+    // Save to database
+    const newAppointment = await appointment.save();
+    console.log('Successfully saved appointment');
+    res.status(201).json(newAppointment);
+  } catch (error) {
+    console.log('Error saving appointment:', error);
+    res.status(400).json({ message: error.message });
   }
 });
 
@@ -53,6 +97,7 @@ router.post('/', async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
+
 
 // Get all appointments (for testing)
 router.get('/', async (req, res) => {

@@ -340,41 +340,61 @@ export const appointmentService = {
       throw error;
     }
   },
-  
-// Add a method to get shop data
-getShopData: async (userToken) => {
-  try {
-    // First check if we have shop data in AsyncStorage
-    const shopDataString = await AsyncStorage.getItem('shopData');
-    if (shopDataString) {
-      return JSON.parse(shopDataString);
-    }
-    
-    // Fetch shop data from API
-    const response = await fetch(`${API_URL}/api/shop`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${userToken}`,
-        'Accept': 'application/json'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to get shop information');
-    }
-    
-    const shopData = await response.json();
-    
-    // Save to AsyncStorage for future use
-    await AsyncStorage.setItem('shopData', JSON.stringify(shopData));
-    
-    return shopData;
-  } catch (error) {
-    console.error('Error getting shop data:', error);
-    throw error;
-  }
-},
 
+  // Add a method to get shop data
+  getShopData: async (userToken) => {
+    try {
+      // First check if we have shop data in AsyncStorage
+      const shopDataString = await AsyncStorage.getItem('shopData');
+      if (shopDataString) {
+        return JSON.parse(shopDataString);
+      }
+      
+      // Fetch shop data from API
+      const response = await fetch(`${API_URL}/api/shop`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to get shop information');
+      }
+      
+      const shopData = await response.json();
+      
+      // Save to AsyncStorage for future use
+      await AsyncStorage.setItem('shopData', JSON.stringify(shopData));
+      
+      return shopData;
+    } catch (error) {
+      console.error('Error getting shop data:', error);
+      throw error;
+    }
+  },
+
+  // Helper function to generate default time slots
+  generateDefaultTimeSlots() {
+    // Generate time slots from 9 AM to 5 PM
+    const slots = [];
+    for (let hour = 9; hour < 17; hour++) {
+      const amPm = hour < 12 ? 'AM' : 'PM';
+      const hour12 = hour > 12 ? hour - 12 : hour;
+      slots.push({
+        timeSlot: `${hour12}:00 ${amPm}`,
+        isBooked: false,
+        status: 'available'
+      });
+      slots.push({
+        timeSlot: `${hour12}:30 ${amPm}`,
+        isBooked: false,
+        status: 'available'
+      });
+    }
+    return slots;
+  },
   bookAppointment: async (appointmentData, userToken) => {
     try {
       console.log('Making appointment request with data:', appointmentData);
@@ -455,7 +475,7 @@ getShopData: async (userToken) => {
       const data = await response.json();
       console.log('Server response:', data);
       
-      // Store the appointment in AsyncStorage
+      // Store the appointment in AsyncStorage with the correct date
       try {
         // Get existing appointments
         const storedAppointments = await AsyncStorage.getItem('userAppointments');
@@ -465,7 +485,9 @@ getShopData: async (userToken) => {
         const enhancedAppointment = {
           ...data,
           shopName: appointmentData.shopName || 'Barbershop',
-          userId: currentUserId // Store the user ID explicitly
+          userId: currentUserId, // Store the user ID explicitly
+          // Ensure the date is stored as a string in ISO format to prevent timezone issues
+          date: data.date
         };
         
         // Ensure shopId is stored in the appointment
@@ -478,7 +500,8 @@ getShopData: async (userToken) => {
         console.log('Enhanced appointment with IDs:', {
           userId: enhancedAppointment.userId,
           shopId: enhancedAppointment.shopId,
-          shopName: enhancedAppointment.shopName
+          shopName: enhancedAppointment.shopName,
+          date: enhancedAppointment.date
         });
         
         // Add the new appointment to the array
@@ -498,23 +521,195 @@ getShopData: async (userToken) => {
     }
   },
   
-  getTimeSlots: async (date, shopId) => {
+
+  // Helper function to get booked time slots
+  getBookedTimeSlots: async (date, shopId, userToken) => {
+    if (!shopId || !date) {
+      return [];
+    }
+    
     try {
-      // Include shopId in the request to get shop-specific time slots
-      const url = shopId 
-        ? `${API_URL}/api/appointments/available-slots/${date}?shopId=${shopId}`
-        : `${API_URL}/api/appointments/available-slots/${date}`;
+      // Try to get from cache first
+      const cacheKey = `booked_slots_${shopId}_${date}`;
+      const cachedData = await AsyncStorage.getItem(cacheKey);
       
-      console.log('Fetching time slots from:', url);
+      if (cachedData) {
+        const { slots, timestamp } = JSON.parse(cachedData);
+        const cacheAge = Date.now() - timestamp;
+        
+        // Use cache if it's less than 2 minutes old
+        if (cacheAge < 2 * 60 * 1000) {
+          return slots;
+        }
+      }
       
-      const response = await fetch(url);
-      return await response.json();
+      // Fetch appointments for this shop on this date
+      let url = `${API_URL}/api/appointments/date/${date}`;
+      if (shopId) {
+        url += `?shopId=${shopId}`;
+      }
+      
+      const headers = {
+        'Accept': 'application/json'
+      };
+      
+      // Add authorization if token is provided
+      if (userToken) {
+        headers['Authorization'] = `Bearer ${userToken}`;
+      }
+      
+      const response = await fetch(url, { headers });
+      
+      if (!response.ok) {
+        console.log(`Error fetching booked slots: ${response.status}`);
+        return [];
+      }
+      
+      const data = await response.json();
+      let appointments = Array.isArray(data) ? data : 
+        (data && data.appointments ? data.appointments : []);
+      
+      // Filter to only include confirmed or pending appointments
+      const validStatuses = ['confirmed', 'pending'];
+      const bookedAppointments = appointments.filter(appointment => 
+        validStatuses.includes(appointment.status)
+      );
+      
+      // Extract time slots from appointments
+      const bookedSlots = bookedAppointments.map(appointment => ({
+        timeSlot: appointment.timeSlot,
+        time: appointment.time, // Some APIs use 'time' instead of 'timeSlot'
+        status: appointment.status
+      }));
+      
+      // Cache the results
+      await AsyncStorage.setItem(cacheKey, JSON.stringify({
+        slots: bookedSlots,
+        timestamp: Date.now()
+      }));
+      
+      return bookedSlots;
     } catch (error) {
-      console.error('Error fetching time slots:', error);
-      throw error;
+      console.error('Error fetching booked time slots:', error);
+      return [];
     }
   },
   
+  getTimeSlots: async (date, shopId, userToken) => {
+    try {
+      // Construct the URL with the new endpoint structure
+      const url = `${API_URL}/api/appointments/available-slots/${date}?shopId=${shopId}`;
+      
+      console.log('Fetching available time slots from:', url);
+      const response = await fetch(url);
+      
+      // Check if response is OK
+      if (!response.ok) {
+        console.error(`Error fetching time slots: ${response.status}`);
+        // Return a default set of time slots if the API fails
+        return appointmentService.generateDefaultTimeSlots();
+      }
+      
+      // Parse the response
+      const data = await response.json();
+      
+      // Check if the response has the expected structure
+      if (!data || !data.availableSlots || !Array.isArray(data.availableSlots)) {
+        console.error('Error: Unexpected response format:', data);
+        return appointmentService.generateDefaultTimeSlots();
+      }
+      
+      // Define all possible time slots
+      const allTimeSlots = [
+        '9:00 AM', '10:00 AM', '11:00 AM',
+        '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM'
+      ];
+      
+      // Create result array
+      const result = [];
+      
+      // Add all time slots with appropriate status
+      for (const slot of allTimeSlots) {
+        const isAvailable = data.availableSlots.includes(slot);
+        result.push({
+          timeSlot: slot,
+          isBooked: !isAvailable,
+          status: isAvailable ? 'available' : 'booked'
+        });
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error fetching time slots:', error);
+      // Return a default set of time slots if there's an error
+      return appointmentService.generateDefaultTimeSlots();
+    }
+  },
+  
+  getAppointmentsByDate: async (date, shopId, userToken) => {
+    try {
+      if (!date) {
+        throw new Error('Date is required');
+      }
+      
+      // Construct the URL based on available parameters
+      let url = `${API_URL}/api/appointments/date/${date}`;
+      if (shopId) {
+        url += `?shopId=${shopId}`;
+      }
+      
+      const headers = {
+        'Accept': 'application/json'
+      };
+      
+      // Add authorization if token is provided
+      if (userToken) {
+        headers['Authorization'] = `Bearer ${userToken}`;
+      }
+      
+      const response = await fetch(url, { headers });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch appointments: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      let appointments = Array.isArray(data) ? data : 
+        (data && data.appointments ? data.appointments : []);
+      
+      // Enhance appointments with additional information
+      const enhancedAppointments = appointments.map(appointment => ({
+        ...appointment,
+        formattedTime: formatTimeSlot(appointment.timeSlot || appointment.time),
+        status: appointment.status || 'confirmed',
+        isBooked: true
+      }));
+      
+      return enhancedAppointments;
+    } catch (error) {
+      console.error('Error fetching appointments by date:', error);
+      throw error;
+    }
+  },
+
+  isTimeSlotAvailable: async (date, timeSlot, shopId, userToken) => {
+    try {
+      // Get all time slots for the date
+      const allSlots = await appointmentService.getTimeSlots(date, shopId, userToken);
+      
+      // Find the specific slot
+      const slot = allSlots.find(s => 
+        s.timeSlot === timeSlot || s.time === timeSlot
+      );
+      
+      // Return availability status
+      return slot ? !slot.isBooked : false;
+    } catch (error) {
+      console.error('Error checking time slot availability:', error);
+      return false;
+    }
+  },
+
   getUserAppointments: async (userToken) => {
     try {
       console.log('Getting user appointments with token:', userToken ? 'Yes (token exists)' : 'No token');
@@ -700,52 +895,50 @@ getShopData: async (userToken) => {
       return [];
     }
   },
-  
-        
-          cancelAppointment: async (appointmentId, userToken) => {
-            try {
-              const response = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
-                method: 'DELETE',
-                headers: {
-                  'Authorization': `Bearer ${userToken}`,
-                  'Accept': 'application/json'
-                }
-              });
-              
-              if (!response.ok) {
-                const errorText = await response.text();
-                console.log(`Error canceling appointment: ${response.status}`, errorText);
-                throw new Error(`HTTP error! status: ${response.status}`);
-              }
-              
-              // Update the appointment in AsyncStorage
-              try {
-                const storedAppointments = await AsyncStorage.getItem('userAppointments');
-                if (storedAppointments) {
-                  let appointments = JSON.parse(storedAppointments);
-                  
-                  // Update the status of the canceled appointment
-                  appointments = appointments.map(app => 
-                    app._id === appointmentId ? {...app, status: 'canceled'} : app
-                  );
-                  
-                  await AsyncStorage.setItem('userAppointments', JSON.stringify(appointments));
-                  console.log('Updated appointment status in AsyncStorage');
-                }
-              } catch (storageError) {
-                console.log('Error updating appointment in AsyncStorage:', storageError);
-              }
-              
-              return await response.json();
-            } catch (error) {
-              console.error('Error canceling appointment:', error);
-              throw error;
-            }
-          }
-        };
 
-        
-        
+  cancelAppointment: async (appointmentId, userToken) => {
+    try {
+      const response = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log(`Error canceling appointment: ${response.status}`, errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      // Update the appointment in AsyncStorage
+      try {
+        const storedAppointments = await AsyncStorage.getItem('userAppointments');
+        if (storedAppointments) {
+          let appointments = JSON.parse(storedAppointments);
+          
+          // Update the status of the canceled appointment
+          appointments = appointments.map(app => 
+            app._id === appointmentId ? {...app, status: 'canceled'} : app
+          );
+          
+          await AsyncStorage.setItem('userAppointments', JSON.stringify(appointments));
+          console.log('Updated appointment status in AsyncStorage');
+        }
+      } catch (storageError) {
+        console.log('Error updating appointment in AsyncStorage:', storageError);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error canceling appointment:', error);
+      throw error;
+    }
+  }
+};
+
+
 
 export const authService = {
   login: async (email, password, role) => {
