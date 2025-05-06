@@ -71,7 +71,7 @@ const GuestLandingPage = ({ navigation }) => {
       console.log('Invalid shop item:', item);
       return null;
     }
-        
+    
     // Format the address for display
     const formatAddress = () => {
       if (item.formattedAddress) {
@@ -83,13 +83,13 @@ const GuestLandingPage = ({ navigation }) => {
       }
       return '';
     };
-        
+    
     // Format the location (city, state, zip)
     const formatLocation = () => {
       let city = '';
       let state = '';
       let zip = '';
-            
+        
       // Try to get values from both possible locations
       if (item.address && typeof item.address === 'object') {
         city = item.address.city || item.city || '';
@@ -100,36 +100,35 @@ const GuestLandingPage = ({ navigation }) => {
         state = item.state || '';
         zip = item.zipCode || '';
       }
-            
+        
       let location = '';
-            
+        
       if (city) {
         location += city;
       }
-            
+        
       if (city && state) {
         location += ', ';
       }
-            
+        
       if (state) {
         location += state;
       }
-            
+        
       if ((city || state) && zip) {
         location += ' ';
       }
-            
+        
       if (zip) {
         location += zip;
       }
-            
+        
       return location || '';
     };
-  
     // Use actual rating if available
     const rating = item.rating ? item.rating.toFixed(1) : (Math.random() * 2 + 3).toFixed(1);
     const distance = item.distance ? item.distance.toFixed(1) : (Math.random() * 10).toFixed(1);
-        
+    
     // Format services for display
     const formatServices = () => {
       if (item.services && item.services.length > 0) {
@@ -139,7 +138,7 @@ const GuestLandingPage = ({ navigation }) => {
       }
       return ['Haircut', 'Beard Trim', 'Shave', 'Lineup'].slice(0, Math.floor(Math.random() * 4) + 1).join(' • ');
     };
-        
+    
     // Get up to 3 images for the gallery preview
     const getShopImages = () => {
       let images = [];
@@ -162,9 +161,7 @@ const GuestLandingPage = ({ navigation }) => {
       
       return images;
     };
-  
     const shopImages = getShopImages();
-  
     return (
       <TouchableOpacity 
         style={[styles.barbershopCard, index % 2 === 0 ? styles.barbershopCardEven : styles.barbershopCardOdd]}
@@ -203,23 +200,23 @@ const GuestLandingPage = ({ navigation }) => {
               </View>
             ))}
           </View>
-                    
+            
           <View style={styles.cardDivider} />
-                    
+            
           <View style={styles.cardBody}>
             <View style={styles.addressRow}>
               <Feather name="map-pin" size={16} color="#BBBBBB" style={styles.addressIcon} />
               <Text style={styles.barbershopAddress}>{formatAddress()}</Text>
             </View>
             <Text style={styles.barbershopLocation}>{formatLocation()}</Text>
-                        
+              
             <View style={styles.servicesContainer}>
               <Text style={styles.servicesText}>
                 {formatServices()}
               </Text>
             </View>
           </View>
-                    
+            
           <View style={styles.cardFooter}>
             <TouchableOpacity 
               style={styles.bookButton}
@@ -239,95 +236,36 @@ const GuestLandingPage = ({ navigation }) => {
     );
   };
   
-
   return (
     <LinearGradient
       colors={['#000000', '#333333']}
       style={styles.container}
     >
       <StatusBar barStyle="light-content" translucent={true} backgroundColor="transparent" />
-      {/* Hamburger Menu Button */}
-      <TouchableOpacity 
-        style={styles.menuButton}
-        onPress={toggleMenu}
-      >
-        <Feather name="menu" size={24} color="white" />
-      </TouchableOpacity>
-      {/* Animated Sidebar */}
-      <Animated.View 
-        style={[
-          styles.sidebar,
-          {
-            transform: [{ translateX: slideAnim }],
-          },
-        ]}
-      >
-        <LinearGradient
-          colors={['#000000', '#333333']}
-          style={styles.sidebarGradient}
-        >
-          <TouchableOpacity onPress={toggleMenu} style={styles.closeButton}>
-            <Feather name="x" size={24} color="white" />
+      
+      <ScrollView style={styles.content} stickyHeaderIndices={[0]}>
+        {/* Sticky Header */}
+        <View style={styles.stickyHeader}>
+          {/* Hamburger Menu Button */}
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={toggleMenu}
+          >
+            <Feather name="menu" size={24} color="white" />
           </TouchableOpacity>
-          <View style={styles.sidebarHeader}>
-            <Text style={styles.sidebarTitle}>Business Center</Text>
-            <View style={styles.titleUnderline} />
+          
+          {/* Top Right Image */}
+          <View style={styles.topRightImage}>
+            <Image 
+              source={require('../assets/clippers1.png')}
+              style={{width: 50, height: 50}}
+            />
           </View>
-          <View style={styles.sidebarContent}>
-            <ScrollView 
-              showsVerticalScrollIndicator={true}
-              indicatorStyle="white"
-            >
-              {/* Section Titles */}
-              <Text style={styles.sidebarSection}>Account</Text>
-              <Text style={styles.sidebarSection}>Financial</Text>
-              <Text style={styles.sidebarSection}>Marketing & Promotions</Text>
-              <Text style={styles.sidebarSection}>Communication Hub</Text>
-              <Text style={styles.sidebarSection}>Analytics & Reports</Text>
-              <TouchableOpacity onPress={() => {
-                navigation.navigate('Settings');
-                toggleMenu(); // Close the menu after navigation
-              }}>
-                <Text style={styles.sidebarSection}>Settings</Text>
-              </TouchableOpacity>
-              <Text style={styles.sidebarSection}>Support & Resources</Text>
-            </ScrollView>
-          </View>
-          <View style={styles.sidebarFooter}>
-            <TouchableOpacity style={styles.footerLink}>
-              <Text style={styles.footerText}>Terms of Service</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.footerLink}>
-              <Text style={styles.footerText}>Privacy Policy</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.footerLink}>
-              <Text style={styles.footerText}>Contact Us</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.footerLink}>
-              <Text style={styles.footerText}>Help Center</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.logoutButton}
-              onPress={handleLogout}
-            >
-              <MaterialIcons name="logout" size={24} color="#FF0000" />
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
-      </Animated.View>
-      {/* Top Right Image */}
-      <View style={styles.topRightImage}>
-        <Image 
-          source={require('../assets/clippers1.png')}
-          style={{width: 50, height: 50}}
-        />
-      </View>
-      {/* Main Content Area */}
-      <ScrollView style={styles.content}>
+        </View>
+        
         <View style={styles.searchSection}>
           <Text style={styles.sectionTitle}>Find Your Barber</Text>
-                
+            
           <View style={styles.searchTypeContainer}>
             <TouchableOpacity 
               style={[
@@ -336,13 +274,9 @@ const GuestLandingPage = ({ navigation }) => {
               ]}
               onPress={() => setSearchType('location')}
             >
-              <Image 
-                source={require('../assets/scissors.png')}
-                style={styles.buttonIcon}
-              />
               <Text style={styles.searchTypeText}>City & State</Text>
             </TouchableOpacity>
-                
+              
             <TouchableOpacity 
               style={[
                 styles.searchTypeButton, 
@@ -353,7 +287,7 @@ const GuestLandingPage = ({ navigation }) => {
               <Text style={styles.searchTypeText}>ZIP Code</Text>
             </TouchableOpacity>
           </View>
-                
+            
           {searchType === 'location' ? (
             <View style={styles.locationInputs}>
               <TextInput
@@ -413,7 +347,7 @@ const GuestLandingPage = ({ navigation }) => {
             />
           </View>
         )}
-        
+         
         {/* No Results Message */}
         {searchResults.length === 0 && !loading && (
           <View style={styles.noResultsContainer}>
@@ -442,6 +376,62 @@ const GuestLandingPage = ({ navigation }) => {
           <Text style={styles.signupText}>Barbershop? List Your Shop</Text>
         </TouchableOpacity>
       </ScrollView>
+      
+      {/* Animated Sidebar */}
+      <Animated.View 
+        style={[
+          styles.sidebar,
+          {
+            transform: [{ translateX: slideAnim }],
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={['#000000', '#333333']}
+          style={styles.sidebarGradient}
+        >
+          <TouchableOpacity onPress={toggleMenu} style={styles.closeButton}>
+            <Feather name="x" size={24} color="white" />
+          </TouchableOpacity>
+          <View style={styles.sidebarHeader}>
+            <Text style={styles.sidebarTitle}>Business Center</Text>
+            <View style={styles.titleUnderline} />
+          </View>
+          <View style={styles.sidebarContent}>
+            <ScrollView 
+              showsVerticalScrollIndicator={true}
+              indicatorStyle="white"
+            >
+              {/* Section Titles */}
+              <Text style={styles.sidebarSection}>Account</Text>
+              <Text style={styles.sidebarSection}>Financial</Text>
+              <Text style={styles.sidebarSection}>Marketing & Promotions</Text>
+              <Text style={styles.sidebarSection}>Communication Hub</Text>
+              <Text style={styles.sidebarSection}>Analytics & Reports</Text>
+              <TouchableOpacity onPress={() => {
+                navigation.navigate('Settings');
+                toggleMenu(); // Close the menu after navigation
+              }}>
+                <Text style={styles.sidebarSection}>Settings</Text>
+              </TouchableOpacity>
+              <Text style={styles.sidebarSection}>Support & Resources</Text>
+            </ScrollView>
+          </View>
+          <View style={styles.sidebarFooter}>
+          <TouchableOpacity style={styles.footerLink}>
+              <Text style={styles.footerText}>Terms of Service</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.footerLink}>
+              <Text style={styles.footerText}>Privacy Policy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Feather name="log-out" size={18} color="#FF0000" />
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+      
       {/* Bottom Navigation Bar */}
       <View style={styles.navbar}>
         <TouchableOpacity style={styles.navItem}>
@@ -455,7 +445,7 @@ const GuestLandingPage = ({ navigation }) => {
           <Feather name="calendar" size={24} color="white" />
           <Text style={styles.navText}>Appointments</Text>
         </TouchableOpacity>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('GuestLandingPage')}>
           <LinearGradient
             colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
             start={{ x: 0, y: 0 }}
@@ -478,16 +468,25 @@ const GuestLandingPage = ({ navigation }) => {
     </LinearGradient>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  stickyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 50,
+    paddingBottom: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#000000', // Match the gradient start color
+  },
   menuButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 2,
     padding: 10,
+  },
+  topRightImage: {
+    marginTop: 20,
   },
   sidebar: {
     position: 'absolute',
@@ -562,18 +561,11 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontWeight: 'bold',
   },
-  topRightImage: {
-    position: 'absolute',
-    top: 120,
-    right: 20,
-    zIndex: 1,
-  },
   content: {
     flex: 1,
-    padding: 20,
-    paddingTop: 100,
   },
   searchSection: {
+    padding: 20,
     marginBottom: 20,
   },
   sectionTitle: {
@@ -641,6 +633,7 @@ const styles = StyleSheet.create({
   // New enhanced results section styles
   resultsSection: {
     marginBottom: 20,
+    paddingHorizontal: 20,
   },
   resultsTitleContainer: {
     flexDirection: 'row',
@@ -732,10 +725,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 5,
   },
-  // New gallery styles
+  // Updated gallery styles to align images to the left
   imageGalleryContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'flex-start', // Changed from center to flex-start
     alignItems: 'center',
     marginVertical: 10,
     height: 100,
@@ -744,7 +737,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 8,
-    marginHorizontal: 5,
+    marginRight: 10, // Changed from marginHorizontal to marginRight
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -830,6 +823,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderRadius: 10,
     marginVertical: 20,
+    marginHorizontal: 20,
   },
   noResults: {
     color: '#BBBBBB',
@@ -861,6 +855,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
+    marginHorizontal: 20,
     marginBottom: 30,
     borderWidth: 2,
     borderColor: '#FFFFFF',

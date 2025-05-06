@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { authService } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -91,94 +91,107 @@ const RegisterScreen = ({ navigation }) => {
             </TouchableOpacity>
           ))}
         </View>
-        <View style={styles.inputContainer}>
-          {formData.role === 'client' && (
-            <>
-              <TextInput
-                style={styles.input}
-                placeholder="Username"
-                placeholderTextColor="#999"
-                value={formData.username}
-                onChangeText={(value) => updateFormData('username', value)}
-                autoCapitalize="none"
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Phone Number"
-                placeholderTextColor="#999"
-                value={formData.phoneNumber}
-                onChangeText={(value) => updateFormData('phoneNumber', value)}
-                keyboardType="phone-pad"
-              />
-            </>
-          )}
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#999"
-            value={formData.email}
-            onChangeText={(value) => updateFormData('email', value)}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#999"
-            value={formData.password}
-            onChangeText={(value) => updateFormData('password', value)}
-            secureTextEntry
-          />
-          {formData.role === 'barbershop' && (
-            <>
-              <TextInput
-                style={styles.input}
-                placeholder="Business Name"
-                placeholderTextColor="#999"
-                value={formData.businessName}
-                onChangeText={(value) => updateFormData('businessName', value)}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Street Address"
-                placeholderTextColor="#999"
-                value={formData.address}
-                onChangeText={(value) => updateFormData('address', value)}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="City"
-                placeholderTextColor="#999"
-                value={formData.city}
-                onChangeText={(value) => updateFormData('city', value)}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="State"
-                placeholderTextColor="#999"
-                value={formData.state}
-                onChangeText={(value) => updateFormData('state', value)}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="ZIP Code"
-                placeholderTextColor="#999"
-                value={formData.zipCode}
-                onChangeText={(value) => updateFormData('zipCode', value)}
-                keyboardType="numeric"
-              />
-            </>
-          )}
-        </View>
-        <TouchableOpacity 
-          style={[styles.registerButton, loading && styles.disabledButton]}
-          onPress={handleRegister}
-          disabled={loading}
-        >
-          <Text style={styles.buttonText}>
-            {loading ? 'Creating Account...' : 'Register'}
-          </Text>
-        </TouchableOpacity>
+        
+        {!formData.role ? (
+          <View style={styles.imageContainer}>
+            <Image 
+              source={require('../assets/barberworldofficial.png')} 
+              style={styles.image}
+              resizeMode="contain"
+            />
+          </View>
+        ) : (
+          <View style={styles.inputContainer}>
+            {formData.role === 'client' && (
+              <>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Username"
+                  placeholderTextColor="#999"
+                  value={formData.username}
+                  onChangeText={(value) => updateFormData('username', value)}
+                  autoCapitalize="none"
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Phone Number"
+                  placeholderTextColor="#999"
+                  value={formData.phoneNumber}
+                  onChangeText={(value) => updateFormData('phoneNumber', value)}
+                  keyboardType="phone-pad"
+                />
+              </>
+            )}
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor="#999"
+              value={formData.email}
+              onChangeText={(value) => updateFormData('email', value)}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#999"
+              value={formData.password}
+              onChangeText={(value) => updateFormData('password', value)}
+              secureTextEntry
+            />
+            {formData.role === 'barbershop' && (
+              <>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Business Name"
+                  placeholderTextColor="#999"
+                  value={formData.businessName}
+                  onChangeText={(value) => updateFormData('businessName', value)}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Street Address"
+                  placeholderTextColor="#999"
+                  value={formData.address}
+                  onChangeText={(value) => updateFormData('address', value)}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="City"
+                  placeholderTextColor="#999"
+                  value={formData.city}
+                  onChangeText={(value) => updateFormData('city', value)}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="State"
+                  placeholderTextColor="#999"
+                  value={formData.state}
+                  onChangeText={(value) => updateFormData('state', value)}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="ZIP Code"
+                  placeholderTextColor="#999"
+                  value={formData.zipCode}
+                  onChangeText={(value) => updateFormData('zipCode', value)}
+                  keyboardType="numeric"
+                />
+              </>
+            )}
+            
+            <TouchableOpacity 
+              style={[styles.registerButton, loading && styles.disabledButton]}
+              onPress={handleRegister}
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? 'Creating Account...' : 'Register'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
         <TouchableOpacity onPress={() => navigation.navigate('Login')}>
           <Text style={styles.loginText}>Already have an account? Login</Text>
         </TouchableOpacity>
@@ -220,6 +233,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     fontWeight: 'bold',
+  },
+  imageContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 30,
+  },
+  image: {
+    width: '100%',
+    height: 250,
   },
   inputContainer: {
     marginBottom: 30,
