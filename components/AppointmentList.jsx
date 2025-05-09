@@ -109,11 +109,45 @@ const AppointmentList = () => {
         return 'Invalid date';
       }
       
-      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      // Create a date that accounts for timezone offset
+      // This ensures we're displaying the correct day regardless of timezone
+      const options = { 
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'UTC'  // Use UTC to prevent timezone shifts
+      };
+      
       return date.toLocaleDateString('en-US', options);
     } catch (error) {
       console.log(`Error formatting date: ${error.message}`);
       return dateString || 'N/A';
+    }
+  };
+
+  // Format time from appointment
+  const formatAppointmentTime = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        console.log(`Invalid time format: ${dateString}`);
+        return 'Invalid time';
+      }
+      
+      // Format time with timezone consideration
+      // Using UTC ensures we display the exact time that was booked
+      const options = { 
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'UTC'  // Use UTC to prevent timezone shifts
+      };
+      
+      return date.toLocaleTimeString('en-US', options);
+    } catch (error) {
+      console.log(`Error formatting time: ${error.message}`);
+      return 'N/A';
     }
   };
 
@@ -219,7 +253,9 @@ const AppointmentList = () => {
           
           <View style={styles.detailRow}>
             <Feather name="clock" size={14} color="#999" />
-            <Text style={styles.detailText}>{item.timeSlot || 'No time specified'}</Text>
+            <Text style={styles.detailText}>
+              {item.timeSlot || formatAppointmentTime(item.date) || 'No time specified'}
+            </Text>
           </View>
           
           <View style={styles.detailRow}>
@@ -273,7 +309,7 @@ const AppointmentList = () => {
             contentContainerStyle={styles.listContainer}
             refreshControl={
               <RefreshControl 
-                refreshing={refreshing} 
+                refreshing={refreshing}
                 onRefresh={handleRefresh}
                 colors={["#FF0000"]}
                 tintColor="#FF0000"
@@ -284,7 +320,7 @@ const AppointmentList = () => {
                 <Feather name="calendar" size={50} color="#666" />
                 <Text style={styles.emptyText}>
                   {isBarbershop 
-                    ? "No upcoming appointments for your shop" 
+                    ? "No upcoming appointments for your shop"
                     : "You don't have any appointments yet"}
                 </Text>
                 {!isBarbershop && (

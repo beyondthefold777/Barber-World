@@ -1,17 +1,17 @@
 import React, { useRef, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Image, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
   StatusBar,
   Animated,
   ScrollView,
-  Alert
+  Alert,
+  Dimensions
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather, MaterialIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -39,79 +39,16 @@ const BarbershopDashboard = () => {
     }).start();
     setIsOpen(!isOpen);
   };
-  
-  const showPremiumFeatureAlert = () => {
-    Alert.alert(
-      "Premium Feature",
-      "This premium feature is coming soon. Stay tuned!",
-      [{ text: "OK", style: "default" }]
-    );
-  };
 
   const sidebarSections = [
     {
-      title: "Financial Hub",
+      title: "Appointments",
       items: [
         {
-          label: "1099 Forms & Taxes",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
+          label: "View Appointments",
+          screen: "AppointmentList",
+          icon: "calendar"
         },
-        {
-          label: "Product Tax Write-offs",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Business Expenses",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Pay Schedule",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Projected Income",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Payment History",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        }
-      ]
-    },
-    {
-      title: "Marketing Center",
-      items: [
-        {
-          label: "Promotions Manager",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Boost Campaigns",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Social Media Integration",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Message Blasts",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Performance Tracker",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        }
       ]
     },
     {
@@ -119,65 +56,18 @@ const BarbershopDashboard = () => {
       items: [
         {
           label: "Customize Shop",
-          screen: "CustomizeShop"
+          screen: "CustomizeShop",
+          icon: "settings"
         },
-        {
-          label: "Cancellation Fees",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Client Allergies",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Deposit Requirements",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        }
-      ]
-    },
-    {
-      title: "Business Tools",
-      items: [
-        {
-          label: "Digital Receipts",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Chair Rental",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Utility Tracking",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Employee Management",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        },
-        {
-          label: "Trial Management",
-          isPremium: true,
-          onPress: showPremiumFeatureAlert
-        }
       ]
     },
     {
       title: "Account",
       items: [
         {
-          label: "Profile Settings",
-          screen: "ProfileSettings"
-        },
-        {
-          label: "Notifications",
-          screen: "Notifications"
+          label: "Settings",
+          screen: "Settings",
+          icon: "user"
         },
         {
           label: "Logout",
@@ -194,12 +84,83 @@ const BarbershopDashboard = () => {
       style={styles.container}
     >
       <StatusBar barStyle="light-content" translucent={true} backgroundColor="transparent" />
-      <TouchableOpacity 
-        style={styles.menuButton}
-        onPress={toggleMenu}
-      >
-        <Feather name="menu" size={24} color="white" />
-      </TouchableOpacity>
+      
+      <ScrollView style={styles.content} stickyHeaderIndices={[0]}>
+        {/* Sticky Header */}
+        <View style={styles.stickyHeader}>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={toggleMenu}
+          >
+            <Feather name="menu" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.welcomeContainer}>
+          <Text style={styles.mainTitle}>Welcome to Your Barber Dashboard</Text>
+          <Text style={styles.welcomeText}>
+            Manage your appointments and customize your shop profile
+          </Text>
+          
+          <View style={styles.featuresList}>
+            <View style={styles.featureItem}>
+              <Feather name="calendar" size={20} color="#FF0000" />
+              <Text style={styles.featureText}>View and manage your appointments</Text>
+            </View>
+            
+            <View style={styles.featureItem}>
+              <Feather name="edit" size={20} color="#FF0000" />
+              <Text style={styles.featureText}>Customize your shop profile</Text>
+            </View>
+            
+            <View style={styles.featureItem}>
+              <Feather name="user" size={20} color="#FF0000" />
+              <Text style={styles.featureText}>Update your account settings</Text>
+            </View>
+          </View>
+        </View>
+        
+        <View style={styles.quickActionsContainer}>
+          <Text style={styles.quickActionsTitle}>Quick Actions</Text>
+          
+          <View style={styles.actionCardsContainer}>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => navigation.navigate('AppointmentList')}
+            >
+              <Feather name="calendar" size={32} color="#FF0000" />
+              <Text style={styles.actionCardTitle}>Appointments</Text>
+              <Text style={styles.actionCardDesc}>View your upcoming appointments</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => navigation.navigate('CustomizeShop')}
+            >
+              <Feather name="settings" size={32} color="#FF0000" />
+              <Text style={styles.actionCardTitle}>Shop Settings</Text>
+              <Text style={styles.actionCardDesc}>Customize your shop profile</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.setupProfileCard}>
+          <View style={styles.setupProfileContent}>
+            <Feather name="scissors" size={40} color="white" />
+            <Text style={styles.setupProfileTitle}>Complete Your Profile</Text>
+            <Text style={styles.setupProfileText}>
+              Make sure your shop profile is up to date to attract more clients
+            </Text>
+            <TouchableOpacity 
+              style={styles.setupProfileButton}
+              onPress={() => navigation.navigate('CustomizeShop')}
+            >
+              <Text style={styles.setupProfileButtonText}>Update Profile</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Animated Sidebar */}
       <Animated.View 
         style={[
           styles.sidebar,
@@ -208,7 +169,7 @@ const BarbershopDashboard = () => {
           },
         ]}
       >
-         <LinearGradient
+        <LinearGradient
           colors={['#000000', '#333333']}
           style={styles.sidebarGradient}
         >
@@ -216,14 +177,8 @@ const BarbershopDashboard = () => {
             <Feather name="x" size={24} color="white" />
           </TouchableOpacity>
           <View style={styles.sidebarHeader}>
-            <Text style={styles.sidebarTitle}>Business Center</Text>
+            <Text style={styles.sidebarTitle}>Barber Dashboard</Text>
             <View style={styles.titleUnderline} />
-          </View>
-          
-          <View style={styles.sidebarLegend}>
-            <Text style={styles.legendText}>
-              Features marked with <Ionicons name="star" size={14} color="#FF0000" /> are premium features coming soon
-            </Text>
           </View>
           
           <ScrollView 
@@ -239,31 +194,22 @@ const BarbershopDashboard = () => {
                     key={itemIndex}
                     style={styles.sidebarItem}
                     onPress={() => {
-                      if (typeof item === 'object') {
-                        if (item.screen) {
-                          navigation.navigate(item.screen);
-                          toggleMenu();
-                        } else if (item.onPress) {
-                          item.onPress();
-                        }
+                      if (item.screen) {
+                        navigation.navigate(item.screen);
+                        toggleMenu();
+                      } else if (item.onPress) {
+                        item.onPress();
                       }
                     }}
                   >
-                    {typeof item === 'object' ? (
-                      <View style={styles.sidebarItemRow}>
-                        <View style={styles.logoutItem}>
-                          {item.icon && <Feather name={item.icon} size={20} color="#FF0000" />}
-                          <Text style={[styles.sidebarItemText, item.icon ? styles.logoutText : null]}>
-                            {item.label}
-                          </Text>
-                        </View>
-                        {item.isPremium && (
-                          <Ionicons name="star" size={16} color="#FF0000" />
-                        )}
+                    <View style={styles.sidebarItemRow}>
+                      <View style={styles.sidebarItemContent}>
+                        {item.icon && <Feather name={item.icon} size={20} color={item.icon === "log-out" ? "#FF0000" : "#FFFFFF"} style={styles.itemIcon} />}
+                        <Text style={[styles.sidebarItemText, item.icon === "log-out" ? styles.logoutText : null]}>
+                          {item.label}
+                        </Text>
                       </View>
-                    ) : (
-                      <Text style={styles.sidebarItemText}>{item}</Text>
-                    )}
+                    </View>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -271,48 +217,8 @@ const BarbershopDashboard = () => {
           </ScrollView>
         </LinearGradient>
       </Animated.View>
-      <ScrollView style={styles.content}>
-        <View style={styles.welcomeContainer}>
-          <Text style={styles.mainTitle}>Welcome to Your Shop!</Text>
-          <Text style={styles.welcomeText}>
-            Premium features marked with a <Ionicons name="star" size={14} color="#FF0000" /> are coming soon.
-            All other features are available now.
-          </Text>
-          
-          <View style={styles.featuresList}>
-            <View style={styles.featureItem}>
-              <Feather name="message-square" size={20} color="#FF0000" />
-              <Text style={styles.featureText}>In-app messaging between shop and clients</Text>
-            </View>
-            
-            <View style={styles.featureItem}>
-              <Feather name="calendar" size={20} color="#FF0000" />
-              <Text style={styles.featureText}>Appointment tracking and management</Text>
-            </View>
-            
-            <View style={styles.featureItem}>
-              <Feather name="edit" size={20} color="#FF0000" />
-              <Text style={styles.featureText}>Customizable shop profile</Text>
-            </View>
-          </View>
-        </View>
-        
-        <View style={styles.setupProfileCard}>
-          <View style={styles.setupProfileContent}>
-            <Feather name="scissors" size={40} color="white" />
-            <Text style={styles.setupProfileTitle}>Get Started Now!</Text>
-            <Text style={styles.setupProfileText}>
-              Set up your shop profile to start attracting clients
-            </Text>
-            <TouchableOpacity 
-              style={styles.setupProfileButton}
-              onPress={() => navigation.navigate('CustomizeShop')}
-            >
-              <Text style={styles.setupProfileButtonText}>Customize Your Shop</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
+
+      {/* Bottom Navigation Bar */}
       <View style={styles.navbar}>
         <TouchableOpacity 
           style={styles.navItem}
@@ -330,29 +236,31 @@ const BarbershopDashboard = () => {
           <Text style={styles.navText}>Appointments</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity>
-          <LinearGradient
-            colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.clipperButton}
-          />
-        </TouchableOpacity>
+        <View style={styles.centerButtonContainer}>
+          <TouchableOpacity>
+            <LinearGradient
+              colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.clipperButton}
+            />
+          </TouchableOpacity>
+        </View>
         
         <TouchableOpacity 
           style={styles.navItem}
-          onPress={showPremiumFeatureAlert}
+          onPress={() => navigation.navigate('ProfileSettings')}
         >
-          <Feather name="trending-up" size={24} color="white" />
-          <Text style={styles.navText}>Analytics</Text>
+          <Feather name="user" size={24} color="white" />
+          <Text style={styles.navText}>Profile</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
           style={styles.navItem}
           onPress={() => navigation.navigate('CustomizeShop')}
         >
-          <Feather name="user" size={24} color="white" />
-          <Text style={styles.navText}>Profile</Text>
+          <Feather name="settings" size={24} color="white" />
+          <Text style={styles.navText}>Settings</Text>
         </TouchableOpacity>
       </View>
     </LinearGradient>
@@ -363,11 +271,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  stickyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 50,
+    paddingBottom: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#000000', // Match the gradient start color
+  },
   menuButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 2,
     padding: 10,
   },
   sidebar: {
@@ -405,16 +318,6 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: 10,
   },
-  sidebarLegend: {
-    backgroundColor: 'rgba(255, 0, 0, 0.1)',
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 10,
-  },
-  legendText: {
-    color: 'white',
-    fontSize: 12,
-  },
   sidebarContent: {
     flex: 1,
     marginTop: 20,
@@ -427,7 +330,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sidebarItem: {
-    paddingVertical: 8,
+    paddingVertical: 12,
     paddingHorizontal: 10,
   },
   sidebarItemRow: {
@@ -435,28 +338,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  sidebarItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  itemIcon: {
+    marginRight: 12,
+  },
   sidebarItemText: {
     color: 'white',
     fontSize: 16,
   },
-  logoutItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   logoutText: {
-    marginLeft: 10,
     color: '#FF0000',
     fontWeight: 'bold'
   },
   content: {
     flex: 1,
-    paddingTop: 100,
-    paddingHorizontal: 20,
   },
   welcomeContainer: {
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     borderRadius: 10,
-    padding: 15,
+    padding: 20,
+    marginHorizontal: 20,
+    marginTop: 20,
     marginBottom: 20,
   },
   mainTitle: {
@@ -468,28 +373,62 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     color: '#DDD',
-    fontSize: 14,
+    fontSize: 16,
     textAlign: 'center',
     marginBottom: 15,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   featuresList: {
-    marginTop: 5,
+    marginTop: 15,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   featureText: {
     color: 'white',
-    fontSize: 14,
-    marginLeft: 10,
+    fontSize: 16,
+    marginLeft: 12,
+  },
+  quickActionsContainer: {
+    marginBottom: 20,
+    marginHorizontal: 20,
+  },
+  quickActionsTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  actionCardsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  actionCard: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 10,
+    padding: 15,
+    width: '48%',
+    alignItems: 'center',
+  },
+  actionCardTitle: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  actionCardDesc: {
+    color: '#DDD',
+    fontSize: 12,
+    textAlign: 'center',
   },
   setupProfileCard: {
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     borderRadius: 15,
     overflow: 'hidden',
+    marginHorizontal: 20,
     marginBottom: 25,
     elevation: 5,
   },
@@ -530,9 +469,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     backgroundColor: '#000000',
-    paddingVertical: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#333',
+    paddingBottom: 20,
+    paddingTop: 10,
   },
   navItem: {
     alignItems: 'center',
@@ -541,6 +479,10 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     marginTop: 5,
+  },
+  centerButtonContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   clipperButton: {
     width: 60,
