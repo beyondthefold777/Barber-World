@@ -418,17 +418,30 @@ const GuestLandingPage = ({ navigation }) => {
             </ScrollView>
           </View>
           <View style={styles.sidebarFooter}>
-          <TouchableOpacity style={styles.footerLink}>
-              <Text style={styles.footerText}>Terms of Service</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.footerLink}>
-              <Text style={styles.footerText}>Privacy Policy</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <Feather name="log-out" size={18} color="#FF0000" />
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
-          </View>
+  <TouchableOpacity 
+    style={styles.footerLink}
+    onPress={() => {
+      navigation.navigate('TermsOfService');
+      toggleMenu(); // Close the menu after navigation
+    }}
+  >
+    <Text style={styles.footerText}>Terms of Service</Text>
+  </TouchableOpacity>
+  <TouchableOpacity 
+    style={styles.footerLink}
+    onPress={() => {
+      navigation.navigate('PrivacyPolicy');
+      toggleMenu(); // Close the menu after navigation
+    }}
+  >
+    <Text style={styles.footerText}>Privacy Policy</Text>
+  </TouchableOpacity>
+  <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+    <Feather name="log-out" size={18} color="#FF0000" />
+    <Text style={styles.logoutText}>Logout</Text>
+  </TouchableOpacity>
+</View>
+
         </LinearGradient>
       </Animated.View>
       

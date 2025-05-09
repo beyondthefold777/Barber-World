@@ -64,6 +64,10 @@ import ChatScreen from './components/ChatScreen';
 // Import MessagesScreen
 import MessagesScreen from './components/MessagesScreen';
 
+// Import new Terms and Privacy components
+import TermsOfService from './components/TermsOfService';
+import PrivacyPolicy from './components/PrivacyPolicy';
+
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -233,8 +237,19 @@ const App = () => {
             <Stack.Screen name="AccountDetails" component={AccountDetailsScreen} options={{ headerShown: true, title: 'Account Details' }} />
             <Stack.Screen name="ContactSupport" component={ContactSupportScreen} options={{ headerShown: true, title: 'Contact Support' }} />
             <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: true, title: 'Help Center' }} />
-            <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: true, title: 'Terms of Service' }} />
-            <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ headerShown: true, title: 'Privacy Policy' }} />
+            
+            {/* Update the existing Terms and Privacy screens to use the new components */}
+            <Stack.Screen 
+              name="TermsOfService" 
+              component={TermsOfService} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="PrivacyPolicy" 
+              component={PrivacyPolicy} 
+              options={{ headerShown: false }}
+            />
+            
             <Stack.Screen name="Feedback" component={FeedbackScreen} options={{ headerShown: true, title: 'Feedback' }} />
           </Stack.Navigator>
           <StatusBar style="light" />

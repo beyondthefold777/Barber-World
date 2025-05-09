@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const SplashScreen = () => {
   const navigation = useNavigation();
@@ -9,17 +10,19 @@ const SplashScreen = () => {
     const timeout = setTimeout(() => {
       navigation.replace('Register');
     }, 3000);
-
     return () => clearTimeout(timeout);
   }, [navigation]);
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#000000', '#333333']}
+      style={styles.container}
+    >
       <Image
-        source={require('../assets/barberworld-logo.png')}
+        source={require('../assets/barberworldofficial.png')}
         style={styles.logo}
       />
-    </View>
+    </LinearGradient>
   );
 };
 
@@ -28,7 +31,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
   },
   logo: {
     width: 200,
