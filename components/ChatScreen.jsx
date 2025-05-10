@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import messageService from '../services/messageService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import config from '../config/environment';
 
 const ChatScreen = ({ route, navigation }) => {
   const { recipientId, recipientName, recipientImage, shopId, conversationId: initialConversationId } = route.params;
@@ -29,8 +30,15 @@ const ChatScreen = ({ route, navigation }) => {
   const [conversationId, setConversationId] = useState(initialConversationId);
   const flatListRef = useRef(null);
   const { user } = useAuth();
+  
+  // Store the user's ID to identify their messages
+  const currentUserId = user?._id || user?.id;
 
   useEffect(() => {
+    // Debug log to check user object
+    console.log('User object in ChatScreen:', JSON.stringify(user, null, 2));
+    console.log('Current user ID:', currentUserId);
+    
     // Set the header title to the recipient's name
     navigation.setOptions({
       title: recipientName || 'Chat',
@@ -45,10 +53,11 @@ const ChatScreen = ({ route, navigation }) => {
     }
     
     console.log('ChatScreen initialized with recipient:', recipientId, recipientName);
+    console.log('Current user ID:', currentUserId);
     
     // Set up a refresh interval to check for new messages
     const messageRefreshInterval = setInterval(() => {
-      if (conversationId) {
+      if (conversationId || recipientId) {
         refreshMessages();
       }
     }, 10000); // Check every 10 seconds
@@ -62,31 +71,59 @@ const ChatScreen = ({ route, navigation }) => {
   const loadMessages = async () => {
     setLoading(true);
     setError(null);
-    console.log('Loading messages for conversation with recipient:', recipientId);
+    console.log('Loading messages with params:', {
+       conversationId,
+       recipientId,
+       currentUserId
+     });
     
     try {
-      const response = await messageService.getMessages(recipientId);
+      let response;
+      
+      // Use conversationId if available, otherwise use recipientId
+      if (conversationId) {
+        console.log('Loading messages using conversation ID:', conversationId);
+        response = await messageService.getMessages({ conversationId });
+      } else {
+        console.log('Loading messages using recipient ID:', recipientId);
+        response = await messageService.getMessages(recipientId);
+      }
       
       if (response.success) {
         console.log(`Successfully loaded ${response.messages?.length || 0} messages`);
         
         // Update conversationId if it wasn't provided but we got it from the API
         if (response.conversation && !conversationId) {
+          console.log('Setting conversation ID from response:', response.conversation);
           setConversationId(response.conversation);
         }
         
         // Format messages for the UI
-        const formattedMessages = response.messages.map(msg => ({
-          _id: msg._id,
-          text: msg.text,
-          createdAt: new Date(msg.createdAt),
-          user: {
-            _id: msg.sender,
-            name: msg.sender === user?.id ? (user?.username || 'Me') : recipientName,
-          },
-          sent: true,
-          received: msg.read,
-        }));
+        const formattedMessages = (response.messages || []).map(msg => {
+          // Determine if the current user is the sender
+          const isSentByCurrentUser = msg.sender === currentUserId;
+          
+          console.log(`Message ${msg._id}: sender=${msg.sender}, recipient=${msg.recipient}, currentUser=${currentUserId}, isSentByCurrentUser=${isSentByCurrentUser}`);
+          
+          return {
+            _id: msg._id,
+            text: msg.content || msg.text, // Handle both content and text fields
+            createdAt: new Date(msg.timestamp || msg.createdAt),
+            user: {
+              _id: msg.sender, // Keep the actual sender ID
+              name: isSentByCurrentUser ? 
+                (user?.username || user?.businessName || 'Me') : 
+                recipientName,
+            },
+            sent: true,
+            received: msg.read,
+            // Add this flag to help with rendering
+            isSentByCurrentUser: isSentByCurrentUser
+          };
+        });
+        
+        // Sort messages by date (newest first)
+        formattedMessages.sort((a, b) => b.createdAt - a.createdAt);
         
         setMessages(formattedMessages);
         
@@ -105,44 +142,91 @@ const ChatScreen = ({ route, navigation }) => {
       setLoading(false);
     }
   };
-
+  
   const refreshMessages = async () => {
-    console.log('Refreshing messages for conversation:', conversationId);
+    console.log('Refreshing messages with params:', {
+       conversationId,
+       recipientId,
+       currentUserId
+     });
     
     try {
-      // Only fetch new messages if we have a conversation ID
-      if (!conversationId) return;
+      // Only fetch new messages if we have a conversation ID or recipient ID
+      if (!conversationId && !recipientId) return;
       
-      const messagesResponse = await messageService.getMessages(recipientId);
+      let messagesResponse;
+      
+      // Use conversationId if available, otherwise use recipientId
+      if (conversationId) {
+        console.log('Refreshing messages using conversation ID:', conversationId);
+        messagesResponse = await messageService.getMessages({ conversationId });
+      } else {
+        console.log('Refreshing messages using recipient ID:', recipientId);
+        messagesResponse = await messageService.getMessages(recipientId);
+      }
       
       if (messagesResponse.success && messagesResponse.messages) {
         // Format messages for the UI
-        const formattedMessages = messagesResponse.messages.map(msg => ({
-          _id: msg._id,
-          text: msg.text,
-          createdAt: new Date(msg.createdAt),
-          user: {
-            _id: msg.sender,
-            name: msg.sender === user?.id ? (user?.username || 'Me') : recipientName,
-          },
-          sent: true,
-          received: msg.read,
-        }));
+        const formattedMessages = (messagesResponse.messages || []).map(msg => {
+          // Determine if the current user is the sender
+          const isSentByCurrentUser = msg.sender === currentUserId;
+          
+          console.log(`Message ${msg._id}: sender=${msg.sender}, recipient=${msg.recipient}, currentUser=${currentUserId}, isSentByCurrentUser=${isSentByCurrentUser}`);
+          
+          return {
+            _id: msg._id,
+            text: msg.content || msg.text, // Handle both content and text fields
+            createdAt: new Date(msg.timestamp || msg.createdAt),
+            user: {
+              _id: msg.sender, // Keep the actual sender ID
+              name: isSentByCurrentUser ? 
+                (user?.username || user?.businessName || 'Me') : 
+                recipientName,
+            },
+            sent: true,
+            received: msg.read,
+            // Add this flag to help with rendering
+            isSentByCurrentUser: isSentByCurrentUser
+          };
+        });
         
-        // Check if we have new messages
-        if (formattedMessages.length > messages.length) {
-          console.log('New messages received:', formattedMessages.length - messages.length);
-          setMessages(formattedMessages);
+        // Sort messages by date (newest first)
+        formattedMessages.sort((a, b) => b.createdAt - a.createdAt);
+        
+        console.log('Refreshed messages count:', formattedMessages.length);
+        console.log('Current messages count:', messages.length);
+        
+        // Check if we have new messages by comparing IDs
+        const currentMessageIds = new Set(messages.map(m => m._id));
+        const hasNewMessages = formattedMessages.some(m => !currentMessageIds.has(m._id));
+        
+        if (hasNewMessages || formattedMessages.length !== messages.length) {
+          console.log('New messages received, updating UI');
+          
+          // Preserve pending messages
+          const pendingMessages = messages.filter(m => m.pending);
+          const updatedMessages = [...pendingMessages, ...formattedMessages.filter(m => 
+            !pendingMessages.some(p => p._id === m._id)
+          )];
+          
+          setMessages(updatedMessages);
+          
+          // Update conversation ID if needed
+          if (messagesResponse.conversation && !conversationId) {
+            setConversationId(messagesResponse.conversation);
+          }
           
           // Mark messages as read
-          markMessagesAsRead(conversationId);
+          if (conversationId || messagesResponse.conversation) {
+            markMessagesAsRead(conversationId || messagesResponse.conversation);
+          }
         }
       }
     } catch (error) {
       console.error('Error refreshing messages:', error);
     }
   };
-
+  
   const markMessagesAsRead = async (convoId) => {
     try {
       const convId = convoId || conversationId;
@@ -150,10 +234,12 @@ const ChatScreen = ({ route, navigation }) => {
       if (!convId) return;
       
       const response = await messageService.markAsRead(convId);
-      if (response.success) {
+      if (response && response.success) {
         console.log('Messages marked as read successfully');
-      } else {
+      } else if (response) {
         console.error('Failed to mark messages as read:', response.message);
+      } else {
+        console.error('Failed to mark messages as read: No response');
       }
     } catch (error) {
       console.error('Error marking messages as read:', error);
@@ -164,49 +250,65 @@ const ChatScreen = ({ route, navigation }) => {
     if (inputText.trim() === '' || sending) return;
     setSending(true);
     console.log('Sending message to recipient:', recipientId);
+    console.log('Using conversation ID:', conversationId);
     
     const messageText = inputText.trim();
     setInputText('');
     
     // Create a temporary message object for immediate UI feedback
+    const tempId = Date.now().toString();
     const newMessage = {
-      _id: Date.now().toString(),
+      _id: tempId,
       text: messageText,
       createdAt: new Date(),
       user: {
-        _id: user?.id || 'current-user',
-        name: user?.username || 'Me',
+        _id: currentUserId, // Use the current user's ID
+        name: user?.username || user?.businessName || 'Me',
       },
       sent: true,
       received: false,
+      pending: true, // Mark as pending until confirmed by server
+      isSentByCurrentUser: true // Always true for messages we send
     };
     
     // Add message to UI immediately for better UX
-    setMessages(prevMessages => [...prevMessages, newMessage]);
+    setMessages(prevMessages => [newMessage, ...prevMessages]);
     
     try {
       console.log('Sending message to API:', messageText);
+      console.log('Sending message data:', { recipientId, text: messageText });
       
       const response = await messageService.sendMessage(recipientId, messageText);
+      
+      console.log('Message send response:', JSON.stringify(response));
       
       if (response.success) {
         console.log('Message sent successfully:', response.message);
         
         // If this is the first message, we might get a conversation ID back
         if (response.conversation && !conversationId) {
+          console.log('Setting conversation ID from send response:', response.conversation);
           setConversationId(response.conversation);
         }
         
-        // Update message status after sending to server
+        // Update the temporary message with the server-generated ID and mark as received
         setMessages(prevMessages => 
           prevMessages.map(msg =>
-            msg._id === newMessage._id ? { 
-              ...msg,
-              _id: response.message?._id || msg._id, // Use server-generated ID
-              received: true 
+            msg._id === tempId ? {
+               ...msg,
+              _id: response.message?._id || msg._id,
+              pending: false,
+              received: true,
+              // Keep the isSentByCurrentUser flag
+              isSentByCurrentUser: true
             } : msg
           )
         );
+        
+        // Refresh messages after sending to ensure we have the latest data
+        setTimeout(() => {
+          refreshMessages();
+        }, 1000);
       } else {
         console.error('Failed to send message:', response.message);
         throw new Error(response.message || 'Failed to send message');
@@ -217,7 +319,7 @@ const ChatScreen = ({ route, navigation }) => {
       // Show error status on the message
       setMessages(prevMessages =>
         prevMessages.map(msg =>
-          msg._id === newMessage._id ? { ...msg, error: true } : msg
+          msg._id === tempId ? { ...msg, pending: false, error: true } : msg
         )
       );
       
@@ -226,13 +328,16 @@ const ChatScreen = ({ route, navigation }) => {
       setSending(false);
     }
   };
-
+  
   const retryLoadMessages = () => {
     loadMessages();
   };
 
   const renderMessage = ({ item }) => {
-    const isUserMessage = item.user._id === user?.id || item.user._id === 'current-user';
+    // Use the isSentByCurrentUser flag we added to determine message alignment
+    const isUserMessage = item.isSentByCurrentUser;
+    
+    console.log('Rendering message:', item._id, 'from user:', item.user._id, 'current user:', currentUserId, 'isUserMessage:', isUserMessage);
     
     return (
       <View style={[
@@ -241,7 +346,9 @@ const ChatScreen = ({ route, navigation }) => {
       ]}>
         <View style={[
           styles.messageBubble,
-          isUserMessage ? styles.userMessageBubble : styles.otherMessageBubble
+          isUserMessage ? styles.userMessageBubble : styles.otherMessageBubble,
+          item.pending ? styles.pendingMessage : null,
+          item.error ? styles.errorMessage : null
         ]}>
           <Text style={styles.messageText}>{item.text}</Text>
           <Text style={styles.messageTime}>
@@ -249,16 +356,18 @@ const ChatScreen = ({ route, navigation }) => {
             {isUserMessage && (
               item.error ? 
                 <Feather name="alert-circle" size={12} color="red" style={{ marginLeft: 5 }} /> :
-                item.received ? 
-                  <Feather name="check-circle" size={12} color="#4CAF50" style={{ marginLeft: 5 }} /> : 
-                  <Feather name="check" size={12} color="#999" style={{ marginLeft: 5 }} />
+                item.pending ?
+                  <Feather name="clock" size={12} color="#999" style={{ marginLeft: 5 }} /> :
+                  item.received ?
+                    <Feather name="check-circle" size={12} color="#4CAF50" style={{ marginLeft: 5 }} /> :
+                    <Feather name="check" size={12} color="#999" style={{ marginLeft: 5 }} />
             )}
           </Text>
         </View>
       </View>
     );
   };
-
+  
   const renderEmptyChat = () => {
     if (loading) {
       return (
@@ -292,14 +401,14 @@ const ChatScreen = ({ route, navigation }) => {
         <Text style={styles.emptyChatText}>
           Send a message to {recipientName} to discuss appointments, services, or ask questions.
         </Text>
-      </View>
+        </View>
     );
   };
 
   return (
     <LinearGradient colors={['#000000', '#333333']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
+      <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardAvoidView}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
@@ -320,22 +429,22 @@ const ChatScreen = ({ route, navigation }) => {
               ) : (
                 <View style={styles.recipientImagePlaceholder}>
                   <Text style={styles.recipientInitial}>
-                    {recipientName ? recipientName.charAt(0).toUpperCase() : 'B'}
+                    {recipientName ? recipientName.charAt(0).toUpperCase() : '?'}
                   </Text>
                 </View>
               )}
               <Text style={styles.headerTitle}>{recipientName}</Text>
             </View>
           </View>
+          
           {messages.length > 0 ? (
             <FlatList
               ref={flatListRef}
               data={messages}
               renderItem={renderMessage}
-              keyExtractor={item => item._id}
+              keyExtractor={item => item._id.toString()}
               contentContainerStyle={styles.messagesContainer}
-              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-              onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              inverted={true}
             />
           ) : (
             renderEmptyChat()
@@ -522,6 +631,13 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  pendingMessage: {
+    opacity: 0.7,
+  },
+  errorMessage: {
+    borderColor: 'red',
+    borderWidth: 1,
   },
 });
 

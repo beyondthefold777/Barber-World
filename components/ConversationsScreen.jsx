@@ -61,13 +61,19 @@ const ConversationsScreen = ({ navigation }) => {
   };
 
   const handleConversationPress = (conversation) => {
+    // Log the conversation object to see what we're working with
+    console.log('Navigating to conversation:', JSON.stringify(conversation, null, 2));
+    
+    // IMPORTANT: Pass the conversationId to the ChatScreen
     navigation.navigate('ChatScreen', {
+      conversationId: conversation._id, // Add this line to pass the conversation ID
       recipientId: conversation.recipient._id,
       recipientName: conversation.recipient.name || conversation.recipient.businessName,
       recipientImage: conversation.recipient.profileImage,
       shopId: conversation.recipient.shopId
     });
   };
+  
 
   const renderConversationItem = ({ item }) => {
     const lastMessageTime = new Date(item.lastMessage.createdAt);

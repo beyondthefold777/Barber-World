@@ -65,40 +65,50 @@ const getConversations = async () => {
 };
 
 /**
- * Get messages for a specific conversation
- * @param {string} recipientId - ID of the recipient (user or shop)
+ * Get messages for a specific conversation or recipient
+ * @param {string|object} recipientIdOrOptions - ID of the recipient (user or shop) or an object with conversationId
  */
-const getMessages = async (recipientId) => {
+const getMessages = async (recipientIdOrOptions) => {
   try {
-    // First get the conversation ID
-    const conversationResponse = await makeApiRequest({
-      endpoint: `/api/messages/conversation/${recipientId}`
+    let endpoint;
+    
+    // Check if we're passing a conversation ID or recipient ID
+    if (typeof recipientIdOrOptions === 'object' && recipientIdOrOptions.conversationId) {
+      // We have a conversation ID
+      endpoint = `/api/messages/conversation/${recipientIdOrOptions.conversationId}/messages`;
+      console.log('Getting messages using conversation ID:', recipientIdOrOptions.conversationId);
+    } else {
+      // We have a recipient ID
+      endpoint = `/api/messages/${recipientIdOrOptions}`;
+      console.log('Getting messages using recipient ID:', recipientIdOrOptions);
+    }
+    
+    const response = await makeApiRequest({
+      endpoint: endpoint
     });
     
-    if (!conversationResponse.success) {
-      // If no conversation exists yet, return empty messages array
-      return { 
-        success: true, 
-        messages: [],
-        conversation: null
+    // If using recipient ID and successful, we might get a conversation ID back
+    if (typeof recipientIdOrOptions !== 'object' && response.success && response.conversationId) {
+      return {
+        ...response,
+        conversation: response.conversationId
       };
     }
     
-    // Now get the messages using the conversation ID
-    const messagesResponse = await makeApiRequest({
-      endpoint: `/api/messages/conversation/${conversationResponse.conversationId}/messages`
-    });
+    // If using conversation ID directly, include it in the response
+    if (typeof recipientIdOrOptions === 'object' && recipientIdOrOptions.conversationId) {
+      return {
+        ...response,
+        conversation: recipientIdOrOptions.conversationId
+      };
+    }
     
-    return messagesResponse.success
-      ? { 
-          ...messagesResponse,
-          conversation: conversationResponse.conversationId
-        }
+    return response.success
+      ? response
       : { 
           success: false, 
-          message: messagesResponse.message || 'Failed to fetch messages', 
-          messages: [],
-          conversation: conversationResponse.conversationId
+          message: response.message || 'Failed to fetch messages', 
+          messages: [] 
         };
   } catch (error) {
     console.error('Error fetching messages:', error);
@@ -134,7 +144,7 @@ const sendMessage = async (recipientId, text) => {
       data: messageData
     });
     
-    console.log('Message send response:', response);
+    console.log('Message send response:', JSON.stringify(response));
     
     return response.success 
       ? response 
