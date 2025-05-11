@@ -445,42 +445,47 @@ const GuestLandingPage = ({ navigation }) => {
         </LinearGradient>
       </Animated.View>
       
-      {/* Bottom Navigation Bar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity style={styles.navItem}>
-          <Feather name="home" size={24} color="white" />
-          <Text style={styles.navText}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => navigation.navigate('AppointmentsScreen')}
-        >
-          <Feather name="calendar" size={24} color="white" />
-          <Text style={styles.navText}>Appointments</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('GuestLandingPage')}>
-          <LinearGradient
-            colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.clipperButton}
-          />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Feather name="search" size={24} color="white" />
-          <Text style={styles.navText}>Find Shops</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => navigation.navigate('Settings')}
-        >
-          <Feather name="user" size={24} color="white" />
-          <Text style={styles.navText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
-    </LinearGradient>
-  );
+{/* Bottom Navigation Bar */}
+<View style={styles.navbar}>
+  <TouchableOpacity style={styles.navItem}>
+    <Feather name="home" size={24} color="white" />
+    <Text style={styles.navText}>Home</Text>
+  </TouchableOpacity>
+  <TouchableOpacity 
+    style={styles.navItem}
+    onPress={() => navigation.navigate('AppointmentsScreen')}
+  >
+    <Feather name="calendar" size={24} color="white" />
+    <Text style={styles.navText}>Appointments</Text>
+  </TouchableOpacity>
+  <TouchableOpacity onPress={() => navigation.navigate('GuestLandingPage')}>
+    <LinearGradient
+      colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.clipperButton}
+    />
+  </TouchableOpacity>
+  <TouchableOpacity 
+    style={styles.navItem}
+    onPress={() => navigation.navigate('MessagesScreen')}
+  >
+    <Feather name="message-square" size={24} color="white" />
+    <Text style={styles.navText}>Messages</Text>
+  </TouchableOpacity>
+  <TouchableOpacity 
+    style={styles.navItem}
+    onPress={() => navigation.navigate('Settings')}
+  >
+    <Feather name="user" size={24} color="white" />
+    <Text style={styles.navText}>Profile</Text>
+  </TouchableOpacity>
+</View>
+
+</LinearGradient>
+);
 };
+
 
 const styles = StyleSheet.create({
   container: {

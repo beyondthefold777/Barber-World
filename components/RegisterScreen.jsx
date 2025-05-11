@@ -43,16 +43,17 @@ const RegisterScreen = ({ navigation }) => {
       await AsyncStorage.setItem('userToken', response.token);
       await AsyncStorage.setItem('userRole', response.user.role);
       
-      // Navigate to email verification screen instead of directly to dashboard
-      navigation.replace('EmailVerification', {
-        email: formData.email,
-        userId: response.user._id
-      });
+      // Navigate based on user role
+      if (formData.role === 'client') {
+        navigation.replace('GuestLandingPage');
+      } else {
+        navigation.replace('BarbershopDashboard');
+      }
       
       // Show success message
       Alert.alert(
         'Registration Successful', 
-        'Please check your email to verify your account.',
+        'Your account has been created successfully.',
         [{ text: 'OK' }]
       );
       
@@ -95,7 +96,7 @@ const RegisterScreen = ({ navigation }) => {
         {!formData.role ? (
           <View style={styles.imageContainer}>
             <Image 
-              source={require('../assets/barberworldofficial.png')} 
+              source={require('../assets/barberworldofficial.png')}
               style={styles.image}
               resizeMode="contain"
             />

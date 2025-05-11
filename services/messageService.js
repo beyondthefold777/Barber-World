@@ -118,30 +118,36 @@ const getMessages = async (recipientIdOrOptions) => {
 
 /**
  * Send a message to a recipient
- * @param {string} recipientId - ID of the recipient (user or shop)
- * @param {string} text - Message text
+ * @param {object} messageData - Contains recipientId, text, and optionally conversationId
  */
-const sendMessage = async (recipientId, text) => {
+const sendMessage = async (messageData) => {
   try {
-    // Get user data if available
-    const userDataString = await AsyncStorage.getItem('userData');
-    let userData = {};
+    // Extract data from the messageData object
+    const { recipientId, text, conversationId } = messageData;
     
-    if (userDataString) {
-      userData = JSON.parse(userDataString);
+    if (!recipientId || !text) {
+      console.error('Missing required fields for sending message');
+      return { success: false, message: 'Recipient ID and message text are required' };
     }
     
-    const messageData = {
+    // Prepare the message data
+    const payload = {
       recipientId,
       text
     };
     
-    console.log('Sending message data:', messageData);
+    // If conversationId is provided, include it to ensure we use the existing conversation
+    if (conversationId) {
+      payload.conversationId = conversationId;
+      console.log('Using existing conversation ID:', conversationId);
+    }
+    
+    console.log('Sending message data:', payload);
     
     const response = await makeApiRequest({
       method: 'POST',
       endpoint: '/api/messages/send',
-      data: messageData
+      data: payload
     });
     
     console.log('Message send response:', JSON.stringify(response));
@@ -197,6 +203,27 @@ const getUnreadCount = async () => {
 };
 
 /**
+ * Find or get an existing conversation with a recipient
+ * @param {string} recipientId - ID of the recipient
+ */
+const findOrCreateConversation = async (recipientId) => {
+  try {
+    const response = await makeApiRequest({
+      method: 'POST',
+      endpoint: '/api/messages/conversation',
+      data: { recipientId }
+    });
+    
+    return response.success 
+      ? response.conversation 
+      : null;
+  } catch (error) {
+    console.error('Error finding/creating conversation:', error);
+    return null;
+  }
+};
+
+/**
  * Debug function to check authentication status
  */
 const checkAuthStatus = async () => {
@@ -232,5 +259,6 @@ export default {
   sendMessage,
   markAsRead,
   getUnreadCount,
+  findOrCreateConversation,
   checkAuthStatus
 };

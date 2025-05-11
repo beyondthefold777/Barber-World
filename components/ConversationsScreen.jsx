@@ -23,24 +23,34 @@ const ConversationsScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadConversations();
-  }, []);
+    
+    // Add a focus listener to reload conversations when screen is focused
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('ConversationsScreen focused - reloading conversations');
+      loadConversations();
+    });
+    
+    return unsubscribe;
+  }, [navigation]);
 
   const loadConversations = async () => {
     if (!user) {
       setLoading(false);
       return;
     }
-
+    
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (!token) {
         setLoading(false);
         return;
       }
-
-      const response = await messageService.getConversations(token);
+      
+      console.log('Loading conversations...');
+      const response = await messageService.getConversations();
       
       if (response.success && Array.isArray(response.conversations)) {
+        console.log(`Successfully loaded ${response.conversations.length} conversations`);
         setConversations(response.conversations);
       } else {
         console.error('Invalid conversations response:', response);
@@ -74,7 +84,6 @@ const ConversationsScreen = ({ navigation }) => {
     });
   };
   
-
   const renderConversationItem = ({ item }) => {
     const lastMessageTime = new Date(item.lastMessage.createdAt);
     const now = new Date();
@@ -102,7 +111,6 @@ const ConversationsScreen = ({ navigation }) => {
             </Text>
           </View>
         )}
-
         <View style={styles.conversationInfo}>
           <View style={styles.conversationHeader}>
             <Text style={styles.recipientName}>
@@ -144,7 +152,6 @@ const ConversationsScreen = ({ navigation }) => {
         </View>
       );
     }
-
     return (
       <View style={styles.emptyContainer}>
         <Feather name="message-circle" size={60} color="#666" />
@@ -161,7 +168,6 @@ const ConversationsScreen = ({ navigation }) => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
       </View>
-
       <FlatList
         data={conversations}
         renderItem={renderConversationItem}

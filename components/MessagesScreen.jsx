@@ -31,42 +31,40 @@ const MessagesScreen = ({ navigation }) => {
       },
       headerTintColor: '#FFFFFF',
     });
-
+    
     // Load conversations
     loadConversations();
-
+    
     // Add a focus listener to reload conversations when screen is focused
     const unsubscribe = navigation.addListener('focus', () => {
       console.log('MessagesScreen focused - reloading conversations');
       loadConversations();
     });
-
+    
     return unsubscribe;
   }, [navigation]);
 
-// Update the loadConversations function in MessagesScreen.jsx
-
-const loadConversations = async () => {
-  setLoading(true);
-  console.log('Loading conversations...');
-  
-  try {
-    const response = await messageService.getConversations();
+  const loadConversations = async () => {
+    setLoading(true);
+    console.log('Loading conversations...');
     
-    if (response.success) {
-      console.log(`Successfully loaded ${response.conversations?.length || 0} conversations`);
-      setConversations(response.conversations || []);
-    } else {
-      console.error('Failed to load conversations:', response.message);
-      Alert.alert('Error', response.message || 'Failed to load conversations. Please try again.');
+    try {
+      const response = await messageService.getConversations();
+      
+      if (response.success) {
+        console.log(`Successfully loaded ${response.conversations?.length || 0} conversations`);
+        setConversations(response.conversations || []);
+      } else {
+        console.error('Failed to load conversations:', response.message);
+        Alert.alert('Error', response.message || 'Failed to load conversations. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      Alert.alert('Error', 'An unexpected error occurred while loading conversations.');
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Error loading conversations:', error);
-    Alert.alert('Error', 'An unexpected error occurred while loading conversations.');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return '';
