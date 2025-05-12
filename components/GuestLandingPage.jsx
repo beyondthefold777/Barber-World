@@ -15,6 +15,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, MaterialIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
 import { authService } from '../services/api';
+import { useUnreadMessages } from '../context/UnreadMessagesContext';
+import NotificationBadge from '../components/NotificationBadge';
 
 const GuestLandingPage = ({ navigation }) => {
   const [searchType, setSearchType] = useState('location');
@@ -25,6 +27,10 @@ const GuestLandingPage = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(-300)).current;
+  
+  // Add a fallback for the unread messages context
+  const unreadMessagesContext = useUnreadMessages();
+  const unreadCount = unreadMessagesContext ? unreadMessagesContext.unreadCount : 0;
 
   const toggleMenu = () => {
     const toValue = isOpen ? -300 : 0;
@@ -51,7 +57,7 @@ const GuestLandingPage = ({ navigation }) => {
       const searchParams = searchType === 'location'
          ? { city, state }
         : { zipCode };
-        
+      
       // Use the existing searchBarbershops method from authService
       const results = await authService.searchBarbershops(searchParams);
       console.log('Search results received:', results.length);
@@ -89,7 +95,7 @@ const GuestLandingPage = ({ navigation }) => {
       let city = '';
       let state = '';
       let zip = '';
-        
+      
       // Try to get values from both possible locations
       if (item.address && typeof item.address === 'object') {
         city = item.address.city || item.city || '';
@@ -100,29 +106,29 @@ const GuestLandingPage = ({ navigation }) => {
         state = item.state || '';
         zip = item.zipCode || '';
       }
-        
+      
       let location = '';
-        
+      
       if (city) {
         location += city;
       }
-        
+      
       if (city && state) {
         location += ', ';
       }
-        
+      
       if (state) {
         location += state;
       }
-        
+      
       if ((city || state) && zip) {
         location += ' ';
       }
-        
+      
       if (zip) {
         location += zip;
       }
-        
+      
       return location || '';
     };
     // Use actual rating if available
@@ -200,23 +206,23 @@ const GuestLandingPage = ({ navigation }) => {
               </View>
             ))}
           </View>
-            
+          
           <View style={styles.cardDivider} />
-            
+          
           <View style={styles.cardBody}>
             <View style={styles.addressRow}>
               <Feather name="map-pin" size={16} color="#BBBBBB" style={styles.addressIcon} />
               <Text style={styles.barbershopAddress}>{formatAddress()}</Text>
             </View>
             <Text style={styles.barbershopLocation}>{formatLocation()}</Text>
-              
+            
             <View style={styles.servicesContainer}>
               <Text style={styles.servicesText}>
                 {formatServices()}
               </Text>
             </View>
           </View>
-            
+          
           <View style={styles.cardFooter}>
             <TouchableOpacity 
               style={styles.bookButton}
@@ -265,7 +271,7 @@ const GuestLandingPage = ({ navigation }) => {
         
         <View style={styles.searchSection}>
           <Text style={styles.sectionTitle}>Find Your Barber</Text>
-            
+          
           <View style={styles.searchTypeContainer}>
             <TouchableOpacity 
               style={[
@@ -276,7 +282,7 @@ const GuestLandingPage = ({ navigation }) => {
             >
               <Text style={styles.searchTypeText}>City & State</Text>
             </TouchableOpacity>
-              
+            
             <TouchableOpacity 
               style={[
                 styles.searchTypeButton, 
@@ -287,7 +293,7 @@ const GuestLandingPage = ({ navigation }) => {
               <Text style={styles.searchTypeText}>ZIP Code</Text>
             </TouchableOpacity>
           </View>
-            
+          
           {searchType === 'location' ? (
             <View style={styles.locationInputs}>
               <TextInput
@@ -413,79 +419,86 @@ const GuestLandingPage = ({ navigation }) => {
                 toggleMenu(); // Close the menu after navigation
               }}>
                 <Text style={styles.sidebarSection}>Settings</Text>
-              </TouchableOpacity>
+                </TouchableOpacity>
               <Text style={styles.sidebarSection}>Support & Resources</Text>
             </ScrollView>
           </View>
           <View style={styles.sidebarFooter}>
-  <TouchableOpacity 
-    style={styles.footerLink}
-    onPress={() => {
-      navigation.navigate('TermsOfService');
-      toggleMenu(); // Close the menu after navigation
-    }}
-  >
-    <Text style={styles.footerText}>Terms of Service</Text>
-  </TouchableOpacity>
-  <TouchableOpacity 
-    style={styles.footerLink}
-    onPress={() => {
-      navigation.navigate('PrivacyPolicy');
-      toggleMenu(); // Close the menu after navigation
-    }}
-  >
-    <Text style={styles.footerText}>Privacy Policy</Text>
-  </TouchableOpacity>
-  <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-    <Feather name="log-out" size={18} color="#FF0000" />
-    <Text style={styles.logoutText}>Logout</Text>
-  </TouchableOpacity>
-</View>
-
+            <TouchableOpacity 
+              style={styles.footerLink}
+              onPress={() => {
+                navigation.navigate('TermsOfService');
+                toggleMenu(); // Close the menu after navigation
+              }}
+            >
+              <Text style={styles.footerText}>Terms of Service</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.footerLink}
+              onPress={() => {
+                navigation.navigate('PrivacyPolicy');
+                toggleMenu(); // Close the menu after navigation
+              }}
+            >
+              <Text style={styles.footerText}>Privacy Policy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Feather name="log-out" size={18} color="#FF0000" />
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
         </LinearGradient>
       </Animated.View>
       
-{/* Bottom Navigation Bar */}
-<View style={styles.navbar}>
-  <TouchableOpacity style={styles.navItem}>
-    <Feather name="home" size={24} color="white" />
-    <Text style={styles.navText}>Home</Text>
-  </TouchableOpacity>
-  <TouchableOpacity 
-    style={styles.navItem}
-    onPress={() => navigation.navigate('AppointmentsScreen')}
-  >
-    <Feather name="calendar" size={24} color="white" />
-    <Text style={styles.navText}>Appointments</Text>
-  </TouchableOpacity>
-  <TouchableOpacity onPress={() => navigation.navigate('GuestLandingPage')}>
-    <LinearGradient
-      colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.clipperButton}
-    />
-  </TouchableOpacity>
-  <TouchableOpacity 
-    style={styles.navItem}
-    onPress={() => navigation.navigate('MessagesScreen')}
-  >
+      {/* Bottom Navigation Bar */}
+      <View style={styles.navbar}>
+        <TouchableOpacity style={styles.navItem}>
+          <Feather name="home" size={24} color="white" />
+          <Text style={styles.navText}>Home</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => navigation.navigate('AppointmentsScreen')}
+        >
+          <Feather name="calendar" size={24} color="white" />
+          <Text style={styles.navText}>Appointments</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity onPress={() => navigation.navigate('GuestLandingPage')}>
+          <LinearGradient
+            colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.clipperButton}
+          />
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+  style={styles.navItem}
+  onPress={() => navigation.navigate('MessagesScreen')}
+>
+  <View style={styles.iconWithBadge}>
     <Feather name="message-square" size={24} color="white" />
-    <Text style={styles.navText}>Messages</Text>
-  </TouchableOpacity>
-  <TouchableOpacity 
-    style={styles.navItem}
-    onPress={() => navigation.navigate('Settings')}
-  >
-    <Feather name="user" size={24} color="white" />
-    <Text style={styles.navText}>Profile</Text>
-  </TouchableOpacity>
-</View>
+    {unreadCount > 0 && (
+      <NotificationBadge count={unreadCount} />
+    )}
+  </View>
+  <Text style={styles.navText}>Messages</Text>
+</TouchableOpacity>
 
-</LinearGradient>
-);
+        
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => navigation.navigate('Settings')}
+        >
+          <Feather name="user" size={24} color="white" />
+          <Text style={styles.navText}>Profile</Text>
+        </TouchableOpacity>
+      </View>
+    </LinearGradient>
+  );
 };
-
 
 const styles = StyleSheet.create({
   container: {
@@ -905,9 +918,10 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: -25,
+    marginTop: -15,
     borderWidth: 3,
-    borderColor: '#FFFFFF',
+    borderColor: '#000',
+    overflow: 'hidden',
   },
 });
 

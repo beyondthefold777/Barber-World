@@ -105,11 +105,11 @@ const getMessages = async (recipientIdOrOptions) => {
     
     return response.success
       ? response
-      : { 
-          success: false, 
-          message: response.message || 'Failed to fetch messages', 
-          messages: [] 
-        };
+      : {
+           success: false,
+           message: response.message || 'Failed to fetch messages',
+           messages: []
+         };
   } catch (error) {
     console.error('Error fetching messages:', error);
     return { success: false, message: 'An unexpected error occurred', messages: [] };
@@ -182,6 +182,33 @@ const markAsRead = async (conversationId) => {
 };
 
 /**
+ * Mark a conversation as read
+ * @param {string} conversationId - ID of the conversation to mark as read
+ */
+const markConversationAsRead = async (conversationId) => {
+  try {
+    console.log(`Marking conversation ${conversationId} as read`);
+    
+    // Use the existing markAsRead function or create a new endpoint
+    const response = await markAsRead(conversationId);
+    
+    if (response.success) {
+      console.log(`Successfully marked conversation ${conversationId} as read`);
+    } else {
+      console.error(`Failed to mark conversation ${conversationId} as read:`, response.message);
+    }
+    
+    return response;
+  } catch (error) {
+    console.error(`Error marking conversation ${conversationId} as read:`, error);
+    return { 
+      success: false, 
+      message: 'An unexpected error occurred while marking conversation as read' 
+    };
+  }
+};
+
+/**
  * Get unread message count
  * This will include unread messages from both:
  * 1. Direct conversations where the user is a participant
@@ -195,10 +222,10 @@ const getUnreadCount = async () => {
     
     return response.success 
       ? response 
-      : { success: false, message: response.message || 'Failed to get unread count', unreadCount: 0 };
+      : { success: false, message: response.message || 'Failed to get unread count', count: 0 };
   } catch (error) {
     console.error('Error getting unread count:', error);
-    return { success: false, message: 'An unexpected error occurred', unreadCount: 0 };
+    return { success: false, message: 'An unexpected error occurred', count: 0 };
   }
 };
 
@@ -258,6 +285,7 @@ export default {
   getMessages,
   sendMessage,
   markAsRead,
+  markConversationAsRead,  // Added this new method
   getUnreadCount,
   findOrCreateConversation,
   checkAuthStatus

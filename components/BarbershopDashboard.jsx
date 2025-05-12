@@ -14,12 +14,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useUnreadMessages } from '../context/UnreadMessagesContext';
+import NotificationBadge from './NotificationBadge';
 
 const BarbershopDashboard = () => {
   const navigation = useNavigation();
   const [isOpen, setIsOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(-300)).current;
-
+  const { unreadCount } = useUnreadMessages();
+  
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem('userToken');
@@ -159,7 +162,6 @@ const BarbershopDashboard = () => {
           </View>
         </View>
       </ScrollView>
-
       {/* Animated Sidebar */}
       <Animated.View 
         style={[
@@ -217,14 +219,16 @@ const BarbershopDashboard = () => {
           </ScrollView>
         </LinearGradient>
       </Animated.View>
-
       {/* Bottom Navigation Bar */}
       <View style={styles.navbar}>
         <TouchableOpacity 
           style={styles.navItem}
           onPress={() => navigation.navigate('MessagesScreen')}
         >
-          <Feather name="message-square" size={24} color="white" />
+          <View>
+            <Feather name="message-square" size={24} color="white" />
+            {unreadCount > 0 && <NotificationBadge count={unreadCount} />}
+          </View>
           <Text style={styles.navText}>Messages</Text>
         </TouchableOpacity>
         

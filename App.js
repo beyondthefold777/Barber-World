@@ -8,6 +8,8 @@ import { View, Text } from 'react-native';
 
 // Import AuthProvider
 import { AuthProvider } from './context/AuthContext';
+// Import UnreadMessagesProvider
+import { UnreadMessagesProvider } from './context/UnreadMessagesContext';
 
 // Existing imports
 import SplashScreen from './components/SplashScreen';
@@ -94,167 +96,169 @@ const App = () => {
 
   return (
     <AuthProvider>
-      <PaperProvider>
-        <NavigationContainer>
-          <Stack.Navigator 
-            initialRouteName="Splash"
-            screenOptions={{
-              headerShown: false,
-              headerStyle: {
-                backgroundColor: '#000000',
-              },
-              headerTintColor: '#FFFFFF',
-              headerTitleStyle: {
-                fontWeight: 'bold',
-              },
-            }}
-          >
-            <Stack.Screen name="Splash" component={SplashScreen} />
-            <Stack.Screen name="Register" component={RegisterScreen} />
-            <Stack.Screen name="Login" component={LoginScreen} />
-            
-            {/* Password Reset Screens - Moved out of settings */}
-            <Stack.Screen 
-              name="ForgotPassword"
-              component={ForgotPasswordScreen}
-              options={{
-                headerShown: true,
-                title: 'Forgot Password',
+      <UnreadMessagesProvider>
+        <PaperProvider>
+          <NavigationContainer>
+            <Stack.Navigator 
+              initialRouteName="Splash"
+              screenOptions={{
+                headerShown: false,
                 headerStyle: {
                   backgroundColor: '#000000',
-                }
+                },
+                headerTintColor: '#FFFFFF',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
               }}
-            />
-            <Stack.Screen 
-              name="ResetPassword"
-              component={ResetPasswordScreen}
-              options={{
-                headerShown: true,
-                title: 'Reset Password',
-                headerStyle: {
-                  backgroundColor: '#000000',
-                }
-              }}
-            />
-            
-            {/* Rest of your screens... */}
-            {/* Email Verification Screens */}
-            <Stack.Screen 
-              name="EmailVerification"
-              component={EmailVerificationScreen}
-              options={{
-                headerShown: true,
-                title: 'Verify Your Email',
-                headerStyle: {
-                  backgroundColor: '#000000',
-                }
-              }}
-            />
-            <Stack.Screen 
-              name="VerificationSuccess"
-              component={VerificationSuccessScreen}
-              options={{
-                headerShown: false
-              }}
-            />
-            
-            <Stack.Screen name="GuestLandingPage" component={GuestLandingPage} />
-            <Stack.Screen name="LandingPage" component={LandingPage} />
-            <Stack.Screen name="SchedulingScreen" component={SchedulingScreen} />
-            <Stack.Screen name="BarbershopDashboard" component={BarbershopDashboard} />
-            <Stack.Screen name="TrialSignup" component={TrialSignup} />
-            <Stack.Screen 
-              name="AppointmentList"
-              component={AppointmentList}
-              options={{
-                headerShown: true,
-                title: 'Appointments'
-              }}
-            />
-            
-            {/* Add AppointmentsScreen */}
-            <Stack.Screen 
-              name="AppointmentsScreen"
-              component={AppointmentsScreen}
-              options={{ headerShown: false }}
-            />
-            
-            {/* Add BarbershopDetail Screen */}
-            <Stack.Screen 
-              name="BarbershopDetail"
-              component={BarbershopDetail}
-              options={{ headerShown: false }}
-            />
-            
-            {/* Add MessagesScreen */}
-            <Stack.Screen 
-              name="MessagesScreen"
-              component={MessagesScreen}
-              options={{
-                headerShown: true,
-                title: 'Messages',
-                headerStyle: {
-                  backgroundColor: '#000000',
-                }
-              }}
-            />
-            
-            {/* Add ChatScreen */}
-            <Stack.Screen 
-              name="ChatScreen"
-              component={ChatScreen}
-              options={{ 
-                headerShown: true,
-                title: 'Chat',
-                headerStyle: {
-                  backgroundColor: '#000000',
-                }
-              }}
-            />
-            
-            {/* Financial Hub Screens */}
-            <Stack.Screen name="TaxForms" component={TaxFormsScreen} options={{ headerShown: true }} />
-            <Stack.Screen name="WriteOffs" component={WriteOffsScreen} options={{ headerShown: true }} />
-            <Stack.Screen name="Expenses" component={ExpensesScreen} options={{ headerShown: true }} />
-            <Stack.Screen name="PaySchedule" component={PayScheduleScreen} options={{ headerShown: true }} />
-            <Stack.Screen name="ProjectedIncome" component={ProjectedIncomeScreen} options={{ headerShown: true }} />
-            <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ headerShown: true }} />
-            
-            {/* Shop Settings Screens */}
-            <Stack.Screen 
-              name="CustomizeShop"
-              component={CustomizeShopScreen}
-              options={{
-                headerShown: true,
-                title: 'Customize Shop'
-              }}
-            />
-            
-            {/* Settings Screens */}
-            <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="PaymentMethod" component={PaymentMethodScreen} options={{ headerShown: true, title: 'Payment Methods' }} />
-            <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: true, title: 'Change Password' }} />
-            <Stack.Screen name="AccountDetails" component={AccountDetailsScreen} options={{ headerShown: true, title: 'Account Details' }} />
-            <Stack.Screen name="ContactSupport" component={ContactSupportScreen} options={{ headerShown: true, title: 'Contact Support' }} />
-            <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: true, title: 'Help Center' }} />
-            
-            {/* Update the existing Terms and Privacy screens to use the new components */}
-            <Stack.Screen 
-              name="TermsOfService" 
-              component={TermsOfService} 
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="PrivacyPolicy" 
-              component={PrivacyPolicy} 
-              options={{ headerShown: false }}
-            />
-            
-            <Stack.Screen name="Feedback" component={FeedbackScreen} options={{ headerShown: true, title: 'Feedback' }} />
-          </Stack.Navigator>
-          <StatusBar style="light" />
-        </NavigationContainer>
-      </PaperProvider>
+            >
+              <Stack.Screen name="Splash" component={SplashScreen} />
+              <Stack.Screen name="Register" component={RegisterScreen} />
+              <Stack.Screen name="Login" component={LoginScreen} />
+              
+              {/* Password Reset Screens - Moved out of settings */}
+              <Stack.Screen 
+                name="ForgotPassword"
+                component={ForgotPasswordScreen}
+                options={{
+                  headerShown: true,
+                  title: 'Forgot Password',
+                  headerStyle: {
+                    backgroundColor: '#000000',
+                  }
+                }}
+              />
+              <Stack.Screen 
+                name="ResetPassword"
+                component={ResetPasswordScreen}
+                options={{
+                  headerShown: true,
+                  title: 'Reset Password',
+                  headerStyle: {
+                    backgroundColor: '#000000',
+                  }
+                }}
+              />
+              
+              {/* Rest of your screens... */}
+              {/* Email Verification Screens */}
+              <Stack.Screen 
+                name="EmailVerification"
+                component={EmailVerificationScreen}
+                options={{
+                  headerShown: true,
+                  title: 'Verify Your Email',
+                  headerStyle: {
+                    backgroundColor: '#000000',
+                  }
+                }}
+              />
+              <Stack.Screen 
+                name="VerificationSuccess"
+                component={VerificationSuccessScreen}
+                options={{
+                  headerShown: false
+                }}
+              />
+              
+              <Stack.Screen name="GuestLandingPage" component={GuestLandingPage} />
+              <Stack.Screen name="LandingPage" component={LandingPage} />
+              <Stack.Screen name="SchedulingScreen" component={SchedulingScreen} />
+              <Stack.Screen name="BarbershopDashboard" component={BarbershopDashboard} />
+              <Stack.Screen name="TrialSignup" component={TrialSignup} />
+              <Stack.Screen 
+                name="AppointmentList"
+                component={AppointmentList}
+                options={{
+                  headerShown: true,
+                  title: 'Appointments'
+                }}
+              />
+              
+              {/* Add AppointmentsScreen */}
+              <Stack.Screen 
+                name="AppointmentsScreen"
+                component={AppointmentsScreen}
+                options={{ headerShown: false }}
+              />
+              
+              {/* Add BarbershopDetail Screen */}
+              <Stack.Screen 
+                name="BarbershopDetail"
+                component={BarbershopDetail}
+                options={{ headerShown: false }}
+              />
+              
+              {/* Add MessagesScreen */}
+              <Stack.Screen 
+                name="MessagesScreen"
+                component={MessagesScreen}
+                options={{
+                  headerShown: true,
+                  title: 'Messages',
+                  headerStyle: {
+                    backgroundColor: '#000000',
+                  }
+                }}
+              />
+              
+              {/* Add ChatScreen */}
+              <Stack.Screen 
+                name="ChatScreen"
+                component={ChatScreen}
+                options={{ 
+                  headerShown: true,
+                  title: 'Chat',
+                  headerStyle: {
+                    backgroundColor: '#000000',
+                  }
+                }}
+              />
+              
+              {/* Financial Hub Screens */}
+              <Stack.Screen name="TaxForms" component={TaxFormsScreen} options={{ headerShown: true }} />
+              <Stack.Screen name="WriteOffs" component={WriteOffsScreen} options={{ headerShown: true }} />
+              <Stack.Screen name="Expenses" component={ExpensesScreen} options={{ headerShown: true }} />
+              <Stack.Screen name="PaySchedule" component={PayScheduleScreen} options={{ headerShown: true }} />
+              <Stack.Screen name="ProjectedIncome" component={ProjectedIncomeScreen} options={{ headerShown: true }} />
+              <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ headerShown: true }} />
+              
+              {/* Shop Settings Screens */}
+              <Stack.Screen 
+                name="CustomizeShop"
+                component={CustomizeShopScreen}
+                options={{
+                  headerShown: true,
+                  title: 'Customize Shop'
+                }}
+              />
+              
+              {/* Settings Screens */}
+              <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+              <Stack.Screen name="PaymentMethod" component={PaymentMethodScreen} options={{ headerShown: true, title: 'Payment Methods' }} />
+              <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: true, title: 'Change Password' }} />
+              <Stack.Screen name="AccountDetails" component={AccountDetailsScreen} options={{ headerShown: true, title: 'Account Details' }} />
+              <Stack.Screen name="ContactSupport" component={ContactSupportScreen} options={{ headerShown: true, title: 'Contact Support' }} />
+              <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: true, title: 'Help Center' }} />
+              
+              {/* Update the existing Terms and Privacy screens to use the new components */}
+              <Stack.Screen 
+                name="TermsOfService" 
+                component={TermsOfService}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="PrivacyPolicy" 
+                component={PrivacyPolicy}
+                options={{ headerShown: false }}
+              />
+              
+              <Stack.Screen name="Feedback" component={FeedbackScreen} options={{ headerShown: true, title: 'Feedback' }} />
+            </Stack.Navigator>
+            <StatusBar style="light" />
+          </NavigationContainer>
+        </PaperProvider>
+      </UnreadMessagesProvider>
     </AuthProvider>
   );
 };

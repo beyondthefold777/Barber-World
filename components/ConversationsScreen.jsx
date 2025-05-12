@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useUnreadMessages } from '../context/UnreadMessagesContext';
 import messageService from '../services/messageService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -20,6 +21,7 @@ const ConversationsScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { user } = useAuth();
+  const { updateTotalUnreadCount, resetUnreadCount } = useUnreadMessages();
 
   useEffect(() => {
     loadConversations();
@@ -52,9 +54,21 @@ const ConversationsScreen = ({ navigation }) => {
       if (response.success && Array.isArray(response.conversations)) {
         console.log(`Successfully loaded ${response.conversations.length} conversations`);
         setConversations(response.conversations);
+        
+        // Update the total unread count in the context
+        updateTotalUnreadCount(response.conversations);
+        
+        // Log the total unread count for debugging
+        const totalUnread = response.conversations.reduce(
+          (total, conversation) => total + (conversation.unreadCount || 0),
+          0
+        );
+        console.log(`Total unread messages across all conversations: ${totalUnread}`);
       } else {
         console.error('Invalid conversations response:', response);
         setConversations([]);
+        // Reset unread count if no valid conversations
+        resetUnreadCount();
       }
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -70,13 +84,42 @@ const ConversationsScreen = ({ navigation }) => {
     loadConversations();
   };
 
-  const handleConversationPress = (conversation) => {
+  const handleConversationPress = async (conversation) => {
     // Log the conversation object to see what we're working with
     console.log('Navigating to conversation:', JSON.stringify(conversation, null, 2));
     
+    // If this conversation has unread messages, mark them as read
+    if (conversation.unreadCount > 0) {
+      try {
+        // Call API to mark conversation as read
+        await messageService.markConversationAsRead(conversation._id);
+        
+        // Update local state to reflect read status
+        setConversations(prevConversations => 
+          prevConversations.map(conv => 
+            conv._id === conversation._id 
+              ? { ...conv, unreadCount: 0 } 
+              : conv
+          )
+        );
+        
+        // Recalculate total unread count
+        const updatedConversations = conversations.map(conv => 
+          conv._id === conversation._id 
+            ? { ...conv, unreadCount: 0 } 
+            : conv
+        );
+        
+        // Update the global unread count
+        updateTotalUnreadCount(updatedConversations);
+      } catch (error) {
+        console.error('Error marking conversation as read:', error);
+      }
+    }
+    
     // IMPORTANT: Pass the conversationId to the ChatScreen
     navigation.navigate('ChatScreen', {
-      conversationId: conversation._id, // Add this line to pass the conversation ID
+      conversationId: conversation._id,
       recipientId: conversation.recipient._id,
       recipientName: conversation.recipient.name || conversation.recipient.businessName,
       recipientImage: conversation.recipient.profileImage,
