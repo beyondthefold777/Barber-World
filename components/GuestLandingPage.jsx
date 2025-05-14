@@ -26,6 +26,7 @@ const GuestLandingPage = ({ navigation }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const slideAnim = useRef(new Animated.Value(-300)).current;
   
   // Add a fallback for the unread messages context
@@ -53,9 +54,10 @@ const GuestLandingPage = ({ navigation }) => {
 
   const handleSearch = async () => {
     setLoading(true);
+    setHasSearched(true);
     try {
-      const searchParams = searchType === 'location'
-         ? { city, state }
+      const searchParams = searchType === 'location' 
+        ? { city, state }
         : { zipCode };
       
       // Use the existing searchBarbershops method from authService
@@ -131,6 +133,7 @@ const GuestLandingPage = ({ navigation }) => {
       
       return location || '';
     };
+
     // Use actual rating if available
     const rating = item.rating ? item.rating.toFixed(1) : (Math.random() * 2 + 3).toFixed(1);
     const distance = item.distance ? item.distance.toFixed(1) : (Math.random() * 10).toFixed(1);
@@ -167,7 +170,9 @@ const GuestLandingPage = ({ navigation }) => {
       
       return images;
     };
+
     const shopImages = getShopImages();
+
     return (
       <TouchableOpacity 
         style={[styles.barbershopCard, index % 2 === 0 ? styles.barbershopCardEven : styles.barbershopCardOdd]}
@@ -354,8 +359,8 @@ const GuestLandingPage = ({ navigation }) => {
           </View>
         )}
          
-        {/* No Results Message */}
-        {searchResults.length === 0 && !loading && (
+        {/* No Results Message - Only show after a search has been performed */}
+        {searchResults.length === 0 && hasSearched && !loading && (
           <View style={styles.noResultsContainer}>
             <FontAwesome name="search" size={50} color="#444" />
             <Text style={styles.noResults}>
@@ -382,74 +387,144 @@ const GuestLandingPage = ({ navigation }) => {
           <Text style={styles.signupText}>Barbershop? List Your Shop</Text>
         </TouchableOpacity>
       </ScrollView>
-      
-      {/* Animated Sidebar */}
-      <Animated.View 
-        style={[
-          styles.sidebar,
-          {
-            transform: [{ translateX: slideAnim }],
-          },
-        ]}
-      >
-        <LinearGradient
-          colors={['#000000', '#333333']}
-          style={styles.sidebarGradient}
+{/* Animated Sidebar - Styled like the BarbershopDashboard */}
+<Animated.View 
+  style={[
+    styles.sidebar,
+    {
+      transform: [{ translateX: slideAnim }],
+    },
+  ]}
+>
+  <LinearGradient
+    colors={['#000000', '#333333']}
+    style={styles.sidebarGradient}
+  >
+    <TouchableOpacity onPress={toggleMenu} style={styles.closeButton}>
+      <Feather name="x" size={24} color="white" />
+    </TouchableOpacity>
+    
+    <View style={styles.sidebarHeader}>
+      <Text style={styles.sidebarTitle}>Dashboard</Text>
+      <View style={styles.titleUnderline} />
+    </View>
+    
+    <ScrollView
+      style={styles.sidebarContent}
+      showsVerticalScrollIndicator={true}
+      indicatorStyle="white"
+    >
+      {/* Guest Menu Section */}
+      <View>
+        <Text style={styles.sidebarSection}>Menu</Text>
+        
+        <TouchableOpacity 
+          style={styles.sidebarItem}
+          onPress={() => {
+            navigation.navigate('AppointmentsScreen');
+            toggleMenu();
+          }}
         >
-          <TouchableOpacity onPress={toggleMenu} style={styles.closeButton}>
-            <Feather name="x" size={24} color="white" />
-          </TouchableOpacity>
-          <View style={styles.sidebarHeader}>
-            <Text style={styles.sidebarTitle}>Business Center</Text>
-            <View style={styles.titleUnderline} />
+          <View style={styles.sidebarItemRow}>
+            <View style={styles.sidebarItemContent}>
+              <Feather name="calendar" size={20} color="#FFFFFF" style={styles.itemIcon} />
+              <Text style={styles.sidebarItemText}>Appointments</Text>
+            </View>
           </View>
-          <View style={styles.sidebarContent}>
-            <ScrollView 
-              showsVerticalScrollIndicator={true}
-              indicatorStyle="white"
-            >
-              {/* Section Titles */}
-              <Text style={styles.sidebarSection}>Account</Text>
-              <Text style={styles.sidebarSection}>Financial</Text>
-              <Text style={styles.sidebarSection}>Marketing & Promotions</Text>
-              <Text style={styles.sidebarSection}>Communication Hub</Text>
-              <Text style={styles.sidebarSection}>Analytics & Reports</Text>
-              <TouchableOpacity onPress={() => {
-                navigation.navigate('Settings');
-                toggleMenu(); // Close the menu after navigation
-              }}>
-                <Text style={styles.sidebarSection}>Settings</Text>
-                </TouchableOpacity>
-              <Text style={styles.sidebarSection}>Support & Resources</Text>
-            </ScrollView>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.sidebarItem}
+          onPress={() => {
+            navigation.navigate('MessagesScreen');
+            toggleMenu();
+          }}
+        >
+          <View style={styles.sidebarItemRow}>
+            <View style={styles.sidebarItemContent}>
+              <Feather name="message-square" size={20} color="#FFFFFF" style={styles.itemIcon} />
+              <Text style={styles.sidebarItemText}>Messages</Text>
+              {unreadCount > 0 && (
+                <View style={styles.menuBadge}>
+                  <Text style={styles.menuBadgeText}>{unreadCount}</Text>
+                </View>
+              )}
+            </View>
           </View>
-          <View style={styles.sidebarFooter}>
-            <TouchableOpacity 
-              style={styles.footerLink}
-              onPress={() => {
-                navigation.navigate('TermsOfService');
-                toggleMenu(); // Close the menu after navigation
-              }}
-            >
-              <Text style={styles.footerText}>Terms of Service</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.footerLink}
-              onPress={() => {
-                navigation.navigate('PrivacyPolicy');
-                toggleMenu(); // Close the menu after navigation
-              }}
-            >
-              <Text style={styles.footerText}>Privacy Policy</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <Feather name="log-out" size={18} color="#FF0000" />
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.sidebarItem}
+          onPress={() => {
+            navigation.navigate('Settings');
+            toggleMenu();
+          }}
+        >
+          <View style={styles.sidebarItemRow}>
+            <View style={styles.sidebarItemContent}>
+              <Feather name="settings" size={20} color="#FFFFFF" style={styles.itemIcon} />
+              <Text style={styles.sidebarItemText}>Settings</Text>
+            </View>
           </View>
-        </LinearGradient>
-      </Animated.View>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.sidebarItem}
+          onPress={() => {
+            navigation.navigate('HelpCenter');
+            toggleMenu();
+          }}
+        >
+          <View style={styles.sidebarItemRow}>
+            <View style={styles.sidebarItemContent}>
+              <Feather name="help-circle" size={20} color="#FFFFFF" style={styles.itemIcon} />
+              <Text style={styles.sidebarItemText}>Help & Support</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+    
+    <View style={styles.sidebarFooter}>
+      {/* Terms and Privacy Policy Links */}
+      <View style={styles.footerLinksContainer}>
+        <TouchableOpacity 
+          style={styles.footerLink}
+          onPress={() => {
+            navigation.navigate('TermsOfService');
+            toggleMenu();
+          }}
+        >
+          <Text style={styles.footerText}>Terms of Service</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.footerLink}
+          onPress={() => {
+            navigation.navigate('PrivacyPolicy');
+            toggleMenu();
+          }}
+        >
+          <Text style={styles.footerText}>Privacy Policy</Text>
+        </TouchableOpacity>
+      </View>
       
+      <TouchableOpacity 
+        style={styles.sidebarItem}
+        onPress={handleLogout}
+      >
+        <View style={styles.sidebarItemRow}>
+          <View style={styles.sidebarItemContent}>
+            <Feather name="log-out" size={20} color="#FF0000" style={styles.itemIcon} />
+            <Text style={[styles.sidebarItemText, styles.logoutText]}>Logout</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </View>
+  </LinearGradient>
+</Animated.View>
+
+
       {/* Bottom Navigation Bar */}
       <View style={styles.navbar}>
         <TouchableOpacity style={styles.navItem}>
@@ -475,18 +550,17 @@ const GuestLandingPage = ({ navigation }) => {
         </TouchableOpacity>
         
         <TouchableOpacity 
-  style={styles.navItem}
-  onPress={() => navigation.navigate('MessagesScreen')}
->
-  <View style={styles.iconWithBadge}>
-    <Feather name="message-square" size={24} color="white" />
-    {unreadCount > 0 && (
-      <NotificationBadge count={unreadCount} />
-    )}
-  </View>
-  <Text style={styles.navText}>Messages</Text>
-</TouchableOpacity>
-
+          style={styles.navItem}
+          onPress={() => navigation.navigate('MessagesScreen')}
+        >
+          <View style={styles.iconWithBadge}>
+            <Feather name="message-square" size={24} color="white" />
+            {unreadCount > 0 && (
+              <NotificationBadge count={unreadCount} />
+            )}
+          </View>
+          <Text style={styles.navText}>Messages</Text>
+        </TouchableOpacity>
         
         <TouchableOpacity 
           style={styles.navItem}
@@ -499,7 +573,6 @@ const GuestLandingPage = ({ navigation }) => {
     </LinearGradient>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -568,6 +641,43 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 10,
   },
+  sidebarItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+  },
+  sidebarItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sidebarItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  itemIcon: {
+    marginRight: 12,
+  },
+  sidebarItemText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  menuBadge: {
+    position: 'absolute',
+    right: -25,
+    top: -5,
+    backgroundColor: '#FF0000',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   sidebarFooter: {
     borderTopWidth: 1,
     borderTopColor: '#444',
@@ -589,7 +699,6 @@ const styles = StyleSheet.create({
   logoutText: {
     color: '#FF0000',
     fontSize: 16,
-    marginLeft: 8,
     fontWeight: 'bold',
   },
   content: {
@@ -920,8 +1029,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: -15,
     borderWidth: 3,
-    borderColor: '#000',
+    borderColor: '#FFFFFF', 
     overflow: 'hidden',
+  },
+  iconWithBadge: {
+    position: 'relative',
   },
 });
 

@@ -26,7 +26,7 @@ const RegisterScreen = ({ navigation }) => {
       return;
     }
     if (formData.role === 'client' && (!formData.username || !formData.phoneNumber)) {
-      Alert.alert('Error', 'Username and phone number are required for guests');
+      Alert.alert('Error', 'Username and phone number are required for clients');
       return;
     }
     if (formData.role === 'barbershop' &&
@@ -86,7 +86,7 @@ const RegisterScreen = ({ navigation }) => {
               onPress={() => updateFormData('role', role)}
             >
               <Text style={styles.roleText}>
-                {role === 'client' ? 'New Guests' :
+                {role === 'client' ? 'New Clients' :
                 role.charAt(0).toUpperCase() + role.slice(1)}
               </Text>
             </TouchableOpacity>

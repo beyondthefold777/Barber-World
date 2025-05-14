@@ -1,11 +1,14 @@
 import React, { useEffect } from 'react';
-import { View, Image, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+// Get the screen dimensions
+const { width, height } = Dimensions.get('window');
+
 const SplashScreen = () => {
   const navigation = useNavigation();
-
+  
   useEffect(() => {
     const timeout = setTimeout(() => {
       navigation.replace('Register');
@@ -33,8 +36,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    width: 200,
-    height: 200,
+    width: width * 0.6, // 60% of screen width
+    height: height * 0.3, // 30% of screen height
     resizeMode: 'contain',
   },
 });

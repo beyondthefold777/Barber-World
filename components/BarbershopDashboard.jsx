@@ -146,21 +146,6 @@ const BarbershopDashboard = () => {
             </TouchableOpacity>
           </View>
         </View>
-        <View style={styles.setupProfileCard}>
-          <View style={styles.setupProfileContent}>
-            <Feather name="scissors" size={40} color="white" />
-            <Text style={styles.setupProfileTitle}>Complete Your Profile</Text>
-            <Text style={styles.setupProfileText}>
-              Make sure your shop profile is up to date to attract more clients
-            </Text>
-            <TouchableOpacity 
-              style={styles.setupProfileButton}
-              onPress={() => navigation.navigate('CustomizeShop')}
-            >
-              <Text style={styles.setupProfileButtonText}>Update Profile</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </ScrollView>
       {/* Animated Sidebar */}
       <Animated.View 
@@ -219,54 +204,54 @@ const BarbershopDashboard = () => {
           </ScrollView>
         </LinearGradient>
       </Animated.View>
-      {/* Bottom Navigation Bar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => navigation.navigate('MessagesScreen')}
-        >
-          <View>
-            <Feather name="message-square" size={24} color="white" />
-            {unreadCount > 0 && <NotificationBadge count={unreadCount} />}
-          </View>
-          <Text style={styles.navText}>Messages</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => navigation.navigate('AppointmentList')}
-        >
-          <Feather name="calendar" size={24} color="white" />
-          <Text style={styles.navText}>Appointments</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.centerButtonContainer}>
-          <TouchableOpacity>
-            <LinearGradient
-              colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.clipperButton}
-            />
-          </TouchableOpacity>
-        </View>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => navigation.navigate('ProfileSettings')}
-        >
-          <Feather name="user" size={24} color="white" />
-          <Text style={styles.navText}>Profile</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => navigation.navigate('CustomizeShop')}
-        >
-          <Feather name="settings" size={24} color="white" />
-          <Text style={styles.navText}>Settings</Text>
-        </TouchableOpacity>
-      </View>
+     {/* Bottom Navigation Bar */}
+<View style={styles.navbar}>
+  <TouchableOpacity 
+    style={styles.navItem}
+    onPress={() => navigation.navigate('BarbershopDashboard')}
+  >
+    <Feather name="home" size={24} color="white" />
+    <Text style={styles.navText}>Home</Text>
+  </TouchableOpacity>
+  
+  <TouchableOpacity 
+    style={styles.navItem}
+    onPress={() => navigation.navigate('MessagesScreen')}
+  >
+    <View style={styles.iconWithBadge}>
+      <Feather name="message-square" size={24} color="white" />
+      {unreadCount > 0 && <NotificationBadge count={unreadCount} />}
+    </View>
+    <Text style={styles.navText}>Messages</Text>
+  </TouchableOpacity>
+  
+  <TouchableOpacity>
+    <LinearGradient
+      colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.clipperButton}
+    />
+  </TouchableOpacity>
+  
+  <TouchableOpacity 
+    style={styles.navItem}
+    onPress={() => navigation.navigate('ProfileSettings')}
+  >
+    <Feather name="user" size={24} color="white" />
+    <Text style={styles.navText}>Profile</Text>
+  </TouchableOpacity>
+  
+  <TouchableOpacity 
+    style={styles.navItem}
+    onPress={() => navigation.navigate('Settings')}
+
+  >
+    <Feather name="settings" size={24} color="white" />
+    <Text style={styles.navText}>Settings</Text>
+  </TouchableOpacity>
+</View>
+
     </LinearGradient>
   );
 };
@@ -428,46 +413,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-  setupProfileCard: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 15,
-    overflow: 'hidden',
-    marginHorizontal: 20,
-    marginBottom: 25,
-    elevation: 5,
-  },
-  setupProfileContent: {
-    padding: 25,
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  setupProfileTitle: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 15,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  setupProfileText: {
-    color: 'white',
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-    opacity: 0.9,
-  },
-  setupProfileButton: {
-    backgroundColor: '#FF0000',
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    borderRadius: 25,
-    marginTop: 5,
-  },
-  setupProfileButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   navbar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -484,9 +429,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 5,
   },
+  navText: {
+    color: 'white',
+    fontSize: 12,
+    marginTop: 5,
+  },
   centerButtonContainer: {
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'absolute',
+    left: '50%',
+    marginLeft: -30,
   },
   clipperButton: {
     width: 60,

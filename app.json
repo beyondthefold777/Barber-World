@@ -1,18 +1,22 @@
 {
   "expo": {
-    "name": "barberworldjs",
+    "name": "Barberworld",
     "slug": "barberworldjs",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "scheme": "barberworld",
+    "backgroundColor": "#121212",
+    "splash": {
+      "backgroundColor": "#121212"
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#121212",
+      "barStyle": "light-content",
+      "translucent": false
+    },
     "plugins": [
       [
         "expo-notifications",
@@ -32,25 +36,33 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.yourcompany.barberworld",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "This app accesses your photos to let you upload profile pictures and shop images."
+        "NSPhotoLibraryUsageDescription": "This app accesses your photos to let you upload profile pictures and shop images.",
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent",
+        "UIViewControllerBasedStatusBarAppearance": false
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#121212"
       },
       "package": "com.yourcompany.barberworld",
       "permissions": [
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "NOTIFICATIONS",
-        "SCHEDULE_EXACT_ALARM",
-        "POST_NOTIFICATIONS"
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "424efd52-9459-4c0e-aa16-0fe73acd50a5"
+      }
     }
   }
 }

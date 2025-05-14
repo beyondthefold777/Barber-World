@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   confirmedStatus: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#0000FF',
   },
   canceledStatus: {
     backgroundColor: '#F44336',
