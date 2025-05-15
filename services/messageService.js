@@ -63,11 +63,7 @@ const getConversations = async () => {
     return { success: false, message: 'An unexpected error occurred', conversations: [] };
   }
 };
-
-/**
- * Get messages for a specific conversation or recipient
- * @param {string|object} recipientIdOrOptions - ID of the recipient (user or shop) or an object with conversationId
- */
+/** * Get messages for a specific conversation or recipient * @param {string|object} recipientIdOrOptions - ID of the recipient (user or shop) or an object with conversationId */
 const getMessages = async (recipientIdOrOptions) => {
   try {
     let endpoint;
@@ -79,8 +75,9 @@ const getMessages = async (recipientIdOrOptions) => {
       console.log('Getting messages using conversation ID:', recipientIdOrOptions.conversationId);
     } else {
       // We have a recipient ID
-      endpoint = `/api/messages/${recipientIdOrOptions}`;
-      console.log('Getting messages using recipient ID:', recipientIdOrOptions);
+      const recipientId = typeof recipientIdOrOptions === 'object' ? recipientIdOrOptions.recipientId : recipientIdOrOptions;
+      endpoint = `/api/messages/${recipientId}`;
+      console.log('Getting messages using recipient ID:', recipientId);
     }
     
     const response = await makeApiRequest({

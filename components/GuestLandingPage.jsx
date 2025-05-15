@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -63,7 +63,21 @@ const GuestLandingPage = ({ navigation }) => {
       // Use the existing searchBarbershops method from authService
       const results = await authService.searchBarbershops(searchParams);
       console.log('Search results received:', results.length);
-      setSearchResults(results);
+      
+      // Process results to ensure distance values are consistent
+      const processedResults = results.map(shop => {
+        // If shop doesn't have a distance, assign a fixed one based on shop ID
+        if (!shop.distance) {
+          // Use the shop's ID to generate a consistent "random" distance
+          // This ensures the same shop always gets the same distance
+          const idSum = shop._id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+          const fixedDistance = ((idSum % 100) / 10 + 0.1).toFixed(1);
+          return { ...shop, distance: fixedDistance };
+        }
+        return shop;
+      });
+      
+      setSearchResults(processedResults);
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
@@ -72,7 +86,6 @@ const GuestLandingPage = ({ navigation }) => {
     }
   };
 
-  // Updated renderBarbershop function with enhanced styling
   const renderBarbershop = ({ item, index }) => {
     // Make sure item has an _id before trying to use it
     if (!item || !item._id) {
@@ -136,7 +149,9 @@ const GuestLandingPage = ({ navigation }) => {
 
     // Use actual rating if available
     const rating = item.rating ? item.rating.toFixed(1) : (Math.random() * 2 + 3).toFixed(1);
-    const distance = item.distance ? item.distance.toFixed(1) : (Math.random() * 10).toFixed(1);
+    
+    // Use the distance that was set during handleSearch
+    const distance = item.distance || "0.0";
     
     // Format services for display
     const formatServices = () => {
@@ -170,9 +185,7 @@ const GuestLandingPage = ({ navigation }) => {
       
       return images;
     };
-
     const shopImages = getShopImages();
-
     return (
       <TouchableOpacity 
         style={[styles.barbershopCard, index % 2 === 0 ? styles.barbershopCardEven : styles.barbershopCardOdd]}
@@ -246,7 +259,7 @@ const GuestLandingPage = ({ navigation }) => {
       </TouchableOpacity>
     );
   };
-  
+
   return (
     <LinearGradient
       colors={['#000000', '#333333']}

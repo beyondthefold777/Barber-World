@@ -117,10 +117,10 @@ const BarbershopDashboard = () => {
             </View>
             
             <View style={styles.featureItem}>
-              <Feather name="user" size={20} color="#FF0000" />
-              <Text style={styles.featureText}>Update your account settings</Text>
-            </View>
-          </View>
+    <Feather name="message-square" size={20} color="#FF0000" />
+    <Text style={styles.featureText}>Message clients directly for appointment details</Text>
+  </View>
+</View>
         </View>
         
         <View style={styles.quickActionsContainer}>

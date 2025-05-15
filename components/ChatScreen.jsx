@@ -11,7 +11,8 @@ import {
   ActivityIndicator,
   Image,
   SafeAreaView,
-  Alert
+  Alert,
+  Keyboard
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -65,11 +66,22 @@ const ChatScreen = ({ route, navigation }) => {
       }
     }, 10000);
     
-    // Clean up interval on unmount
+    // Set up keyboard listeners to scroll to bottom when keyboard appears
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        if (flatListRef.current && messages.length > 0) {
+          flatListRef.current.scrollToEnd({ animated: true });
+        }
+      }
+    );
+    
+    // Clean up on unmount
     return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
       }
+      keyboardDidShowListener.remove();
     };
   }, []);
   
@@ -245,32 +257,34 @@ const ChatScreen = ({ route, navigation }) => {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardAvoidingView}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 90}
         >
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#FF0000" />
-              <Text style={styles.loadingText}>Loading messages...</Text>
-            </View>
-          ) : (
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              renderItem={renderMessage}
-              keyExtractor={(item) => item._id}
-              contentContainerStyle={styles.messagesList}
-              onContentSizeChange={() => {
-                if (flatListRef.current && messages.length > 0) {
-                  flatListRef.current.scrollToEnd({ animated: false });
-                }
-              }}
-              onLayout={() => {
-                if (flatListRef.current && messages.length > 0) {
-                  flatListRef.current.scrollToEnd({ animated: false });
-                }
-              }}
-            />
-          )}
+          <View style={styles.messagesContainer}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#FF0000" />
+                <Text style={styles.loadingText}>Loading messages...</Text>
+              </View>
+            ) : (
+              <FlatList
+                ref={flatListRef}
+                data={messages}
+                renderItem={renderMessage}
+                keyExtractor={(item) => item._id}
+                contentContainerStyle={styles.messagesList}
+                onContentSizeChange={() => {
+                  if (flatListRef.current && messages.length > 0) {
+                    flatListRef.current.scrollToEnd({ animated: false });
+                  }
+                }}
+                onLayout={() => {
+                  if (flatListRef.current && messages.length > 0) {
+                    flatListRef.current.scrollToEnd({ animated: false });
+                  }
+                }}
+              />
+            )}
+          </View>
           
           <View style={styles.inputContainer}>
             <TextInput
@@ -280,6 +294,7 @@ const ChatScreen = ({ route, navigation }) => {
               value={newMessage}
               onChangeText={setNewMessage}
               multiline
+              color="#FFFFFF"
             />
             <TouchableOpacity
               style={[styles.sendButton, !newMessage.trim() || sending ? styles.disabledSendButton : null]}
@@ -307,6 +322,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   keyboardAvoidingView: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  messagesContainer: {
     flex: 1,
   },
   headerTitleContainer: {
