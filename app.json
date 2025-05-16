@@ -34,7 +34,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.barberworld",
+      "bundleIdentifier": "app.barberworld",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "This app accesses your photos to let you upload profile pictures and shop images.",
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
@@ -46,15 +46,13 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#121212"
       },
-      "package": "com.yourcompany.barberworld",
+      "package": "app.barberworld",
       "permissions": [
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.NOTIFICATIONS",
-        "android.permission.SCHEDULE_EXACT_ALARM",
-        "android.permission.POST_NOTIFICATIONS",
-        "android.permission.RECORD_AUDIO"
-      ]
+        "android.permission.READ_EXTERNAL_STORAGE"
+      ],
+      "targetSdkVersion": 33,
+      "minSdkVersion": 21,
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"

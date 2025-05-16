@@ -68,7 +68,6 @@ const ContactSupportScreen = ({ navigation }) => {
       Alert.alert('Error', 'Please enter your email address');
       return;
     }
-
     try {
       setLoading(true);
       
@@ -164,9 +163,9 @@ const ContactSupportScreen = ({ navigation }) => {
                   {category || 'Select a category'}
                 </Text>
                 <Feather 
-                  name={showCategoryDropdown ? "chevron-up" : "chevron-down"} 
-                  size={20} 
-                  color="#999" 
+                  name={showCategoryDropdown ? "chevron-up" : "chevron-down"}
+                  size={20}
+                  color="#999"
                 />
               </TouchableOpacity>
               
@@ -221,30 +220,6 @@ const ContactSupportScreen = ({ navigation }) => {
               <Text style={styles.submitButtonText}>Submit Request</Text>
             )}
           </TouchableOpacity>
-          <View style={styles.alternativeContactContainer}>
-            <Text style={styles.alternativeContactTitle}>Other ways to contact us</Text>
-            
-            <View style={styles.contactOption}>
-              <View style={styles.contactIconContainer}>
-                <MaterialIcons name="email" size={24} color="#FF0000" />
-              </View>
-              <View style={styles.contactDetails}>
-                <Text style={styles.contactLabel}>Email</Text>
-                <Text style={styles.contactValue}>support@barberworld.com</Text>
-              </View>
-            </View>
-            
-            <View style={styles.contactOption}>
-              <View style={styles.contactIconContainer}>
-                <MaterialIcons name="phone" size={24} color="#FF0000" />
-              </View>
-              <View style={styles.contactDetails}>
-                <Text style={styles.contactLabel}>Phone</Text>
-                <Text style={styles.contactValue}>(555) 123-4567</Text>
-                <Text style={styles.contactHours}>Mon-Fri, 9am-5pm EST</Text>
-              </View>
-            </View>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
@@ -363,48 +338,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  alternativeContactContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 30,
-  },
-  alternativeContactTitle: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 15,
-  },
-  contactOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  contactIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 0, 0, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 15,
-  },
-  contactDetails: {
-    flex: 1,
-  },
-  contactLabel: {
-    color: '#999',
-    fontSize: 14,
-  },
-  contactValue: {
-    color: 'white',
-    fontSize: 16,
-  },
-  contactHours: {
-    color: '#999',
-    fontSize: 12,
-    marginTop: 2,
   },
 });
 

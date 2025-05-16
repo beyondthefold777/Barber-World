@@ -14,18 +14,8 @@ import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
 
 const SettingsScreen = ({ navigation }) => {
   const [settings, setSettings] = useState({
-    pushNotifications: true,
-    emailNotifications: true,
-    smsNotifications: false,
     darkMode: true,
     locationServices: true,
-    dataCollection: true,
-    appointmentReminders: true,
-    marketingEmails: false,
-    autoCheckIn: false,
-    biometricLogin: false,
-    language: 'English',
-    currency: 'USD',
   });
 
   const handleToggleSetting = (setting) => {
@@ -87,6 +77,7 @@ const SettingsScreen = ({ navigation }) => {
             <Feather name="chevron-right" size={24} color="#888" />
           </TouchableOpacity>
         </View>
+
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Account</Text>
           
@@ -117,52 +108,8 @@ const SettingsScreen = ({ navigation }) => {
             </View>
             <Feather name="chevron-right" size={20} color="#888" />
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => navigation.navigate('PaymentMethods')}
-          >
-            <View style={styles.settingIconContainer}>
-              <Feather name="credit-card" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Payment Methods</Text>
-              <Text style={styles.settingDescription}>Manage your payment options</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
         </View>
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
-          
-          {renderSettingToggle(
-            'Push Notifications',
-            'Receive push notifications for appointments and updates',
-            'pushNotifications',
-            <Feather name="bell" size={24} color="#FF0000" />
-          )}
-          
-          {renderSettingToggle(
-            'Email Notifications',
-            'Receive email notifications for bookings and receipts',
-            'emailNotifications',
-            <MaterialIcons name="email" size={24} color="#FF0000" />
-          )}
-          
-          {renderSettingToggle(
-            'SMS Notifications',
-            'Receive text message reminders for upcoming appointments',
-            'smsNotifications',
-            <MaterialIcons name="sms" size={24} color="#FF0000" />
-          )}
-          
-          {renderSettingToggle(
-            'Appointment Reminders',
-            'Get reminders before your scheduled appointments',
-            'appointmentReminders',
-            <Feather name="calendar" size={24} color="#FF0000" />
-          )}
-        </View>
+
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>App Preferences</Text>
           
@@ -179,105 +126,8 @@ const SettingsScreen = ({ navigation }) => {
             'locationServices',
             <Feather name="map-pin" size={24} color="#FF0000" />
           )}
-          
-          {renderSettingToggle(
-            'Auto Check-In',
-            'Automatically check in when you arrive at your appointment',
-            'autoCheckIn',
-            <Feather name="check-circle" size={24} color="#FF0000" />
-          )}
-          
-          {renderSettingToggle(
-            'Biometric Login',
-            'Use fingerprint or face recognition to log in',
-            'biometricLogin',
-            <MaterialIcons name="fingerprint" size={24} color="#FF0000" />
-          )}
         </View>
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Privacy</Text>
-          
-          {renderSettingToggle(
-            'Data Collection',
-            'Allow anonymous usage data to improve our services',
-            'dataCollection',
-            <Feather name="database" size={24} color="#FF0000" />
-          )}
-          
-          {renderSettingToggle(
-            'Marketing Emails',
-            'Receive promotional emails and special offers',
-            'marketingEmails',
-            <MaterialIcons name="local-offer" size={24} color="#FF0000" />
-          )}
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => navigation.navigate('PrivacySecurity')}
-          >
-            <View style={styles.settingIconContainer}>
-              <Feather name="shield" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Privacy & Security</Text>
-              <Text style={styles.settingDescription}>Manage your privacy settings</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Regional Settings</Text>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => {
-              Alert.alert(
-                'Select Language',
-                'Choose your preferred language',
-                [
-                  { text: 'English', onPress: () => console.log('English selected') },
-                  { text: 'Spanish', onPress: () => console.log('Spanish selected') },
-                  { text: 'French', onPress: () => console.log('French selected') },
-                  { text: 'Cancel', style: 'cancel' }
-                ]
-              );
-            }}
-          >
-            <View style={styles.settingIconContainer}>
-              <Ionicons name="language" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Language</Text>
-              <Text style={styles.settingValue}>{settings.language}</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => {
-              Alert.alert(
-                'Select Currency',
-                'Choose your preferred currency',
-                [
-                  { text: 'USD ($)', onPress: () => console.log('USD selected') },
-                  { text: 'EUR (€)', onPress: () => console.log('EUR selected') },
-                  { text: 'GBP (£)', onPress: () => console.log('GBP selected') },
-                  { text: 'Cancel', style: 'cancel' }
-                ]
-              );
-            }}
-          >
-            <View style={styles.settingIconContainer}>
-              <Feather name="dollar-sign" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Currency</Text>
-              <Text style={styles.settingValue}>{settings.currency}</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-        </View>
+
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Support</Text>
           
@@ -308,21 +158,8 @@ const SettingsScreen = ({ navigation }) => {
             </View>
             <Feather name="chevron-right" size={20} color="#888" />
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => navigation.navigate('Feedback')}
-          >
-            <View style={styles.settingIconContainer}>
-              <MaterialIcons name="feedback" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Send Feedback</Text>
-              <Text style={styles.settingDescription}>Help us improve the app</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
         </View>
+
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>About</Text>
           
@@ -386,7 +223,7 @@ const SettingsScreen = ({ navigation }) => {
             );
           }}
         >
-                <MaterialIcons name="delete-forever" size={24} color="#FF0000" />
+          <MaterialIcons name="delete-forever" size={24} color="#FF0000" />
           <Text style={styles.dangerButtonText}>Delete Account</Text>
         </TouchableOpacity>
         

@@ -249,7 +249,7 @@ const App = () => {
                 <Stack.Screen name="PaymentMethod" component={PaymentMethodScreen} options={{ headerShown: true, title: 'Payment Methods' }} />
                 <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: true, title: 'Change Password' }} />
                 <Stack.Screen name="AccountDetails" component={AccountDetailsScreen} options={{ headerShown: true, title: 'Account Details' }} />
-                <Stack.Screen name="ContactSupport" component={ContactSupportScreen} options={{ headerShown: true, title: 'Contact Support' }} />
+                <Stack.Screen name="ContactSupport" component={ContactSupportScreen} options={{ headerShown: false, title: 'Contact Support' }} />
                 <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: true, title: 'Help Center' }} />
                 
                 {/* Update the existing Terms and Privacy screens to use the new components */}
