@@ -117,7 +117,6 @@ const AppointmentsScreen = ({ navigation }) => {
     logScreen("Could not determine user ID from any source");
     return null;
   };
-
   const fetchAppointments = async () => {
     logScreen("Starting to fetch appointments");
     
@@ -133,8 +132,9 @@ const AppointmentsScreen = ({ navigation }) => {
         logScreen(`Token from Auth context: ${token ? 'Found' : 'Not found'}`);
       }
       
-      // Get user ID
-      const userId = await getCurrentUserId();
+      // Get client ID
+      const clientId = await getCurrentUserId();
+      logScreen(`Client ID: ${clientId}`);
       
       // Log token details (first few characters for security)
       if (token) {
@@ -166,69 +166,42 @@ const AppointmentsScreen = ({ navigation }) => {
         appointmentsData = [];
       }
       
-      // Filter appointments to only include those for the current user
-      if (userId) {
-        logScreen(`Attempting to filter appointments for user ID: ${userId}`);
+      // Filter appointments to only include those for the current client
+      if (clientId) {
+        logScreen(`Filtering appointments for client ID: ${clientId}`);
         
         // Log all clientIds for debugging
         appointmentsData.forEach((app, index) => {
-          logScreen(`Appointment ${index}: clientId=${app.clientId}, userId=${app.userId}`);
+          logScreen(`Appointment ${index}: clientId=${app.clientId || 'undefined'}`);
         });
         
         // Try different ID formats - MongoDB sometimes returns different formats
-        const possibleUserIds = [
-          userId,
-          userId.toString(),
+        const possibleClientIds = [
+          clientId,
+          clientId.toString(),
           // Add ObjectId format if needed
         ];
         
         const filteredAppointments = appointmentsData.filter(appointment => {
-          // Check various possible ID fields and formats
-          const clientIdMatch = possibleUserIds.includes(appointment.clientId);
-          const userIdMatch = appointment.userId && possibleUserIds.includes(appointment.userId);
-          const clientObjMatch = appointment.client && 
-                                appointment.client._id && 
-                                possibleUserIds.includes(appointment.client._id);
+          // Check if the appointment's clientId matches our user ID
+          if (!appointment.clientId) return false;
           
-          // For debugging
-          if (clientIdMatch || userIdMatch || clientObjMatch) {
+          const appointmentClientId = appointment.clientId.toString();
+          const isMatch = possibleClientIds.some(id => appointmentClientId.includes(id));
+          
+          if (isMatch) {
             logScreen(`Match found for appointment: ${appointment._id}`);
           }
           
-          return clientIdMatch || userIdMatch || clientObjMatch;
+          return isMatch;
         });
         
-        // If no appointments were found with exact ID match, try substring matching
-        // This is a fallback for when IDs might be formatted differently
-        if (filteredAppointments.length === 0) {
-          logScreen(`No exact matches found, trying substring matching`);
-          
-          const fallbackAppointments = appointmentsData.filter(appointment => {
-            const clientIdStr = String(appointment.clientId || '');
-            const userIdStr = String(appointment.userId || '');
-            const clientObjIdStr = appointment.client && appointment.client._id ? 
-                                  String(appointment.client._id) : '';
-            
-            // Check if any ID contains the user ID or vice versa
-            return clientIdStr.includes(userId) || 
-                   userId.includes(clientIdStr) ||
-                   userIdStr.includes(userId) || 
-                   userId.includes(userIdStr) ||
-                   clientObjIdStr.includes(userId) || 
-                   userId.includes(clientObjIdStr);
-          });
-          
-          if (fallbackAppointments.length > 0) {
-            logScreen(`Found ${fallbackAppointments.length} appointments with substring matching`);
-            appointmentsData = fallbackAppointments;
-          } else {
-            // If still no matches, show all appointments as a last resort
-            // This is just for debugging - you may want to remove this in production
-            logScreen(`No matches found even with substring matching. Showing all appointments for debugging.`);
-          }
-        } else {
-          logScreen(`Filtered from ${appointmentsData.length} to ${filteredAppointments.length} appointments for user ${userId}`);
+        if (filteredAppointments.length > 0) {
+          logScreen(`Found ${filteredAppointments.length} appointments for client ${clientId}`);
           appointmentsData = filteredAppointments;
+        } else {
+          logScreen(`No appointments found for client ${clientId}. Showing all appointments for debugging.`);
+          // Keep all appointments for debugging purposes
         }
       }
       
@@ -259,9 +232,11 @@ const AppointmentsScreen = ({ navigation }) => {
         logScreen("First appointment details:");
         logScreen(`- ID: ${firstAppointment._id}`);
         logScreen(`- Client ID: ${firstAppointment.clientId}`);
-        logScreen(`- Shop: ${getShopName(firstAppointment)}`);
+        logScreen(`- Shop ID: ${firstAppointment.shopId}`);
         logScreen(`- Status: ${firstAppointment.status}`);
         logScreen(`- Date: ${firstAppointment.date}`);
+        logScreen(`- Time Slot: ${firstAppointment.timeSlot}`);
+        logScreen(`- Service: ${firstAppointment.service}`);
       } else {
         logScreen("No appointments available to display");
       }
@@ -277,7 +252,9 @@ const AppointmentsScreen = ({ navigation }) => {
       setRefreshing(false);
     }
   };
-
+  
+  
+  // Add useEffect to call fetchAppointments when component mounts
   useEffect(() => {
     logScreen("Component mounted, fetching appointments");
     fetchAppointments();
@@ -291,13 +268,15 @@ const AppointmentsScreen = ({ navigation }) => {
     // Clean up the listener when component unmounts
     return unsubscribe;
   }, [navigation]);
-
+  
+  // Add handleRefresh function to call fetchAppointments
   const handleRefresh = () => {
     logScreen("Manual refresh triggered");
     setRefreshing(true);
     fetchAppointments();
   };
 
+  
   const handleCancelAppointment = async (appointmentId) => {
     logScreen(`Cancel appointment requested for ID: ${appointmentId}`);
     
@@ -367,9 +346,9 @@ const AppointmentsScreen = ({ navigation }) => {
       // Create a date that accounts for timezone offset
       // This ensures we're displaying the correct day regardless of timezone
       const options = { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
         day: 'numeric',
         timeZone: 'UTC'  // Use UTC to prevent timezone shifts
       };
@@ -439,8 +418,8 @@ const AppointmentsScreen = ({ navigation }) => {
       // Format time with timezone consideration
       // Using UTC ensures we display the exact time that was booked
       const options = { 
-        hour: 'numeric', 
-        minute: '2-digit', 
+        hour: 'numeric',
+        minute: '2-digit',
         hour12: true,
         timeZone: 'UTC'  // Use UTC to prevent timezone shifts
       };

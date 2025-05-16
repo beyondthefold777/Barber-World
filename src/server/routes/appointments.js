@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
 const Shop = require('../models/shop.model');
 
@@ -40,8 +41,7 @@ router.get('/available-slots/:date', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
-// Create new appointment
+/// Create new appointment - FIXED VERSION
 router.post('/', async (req, res) => {
   try {
     console.log('Received appointment request:', req.body);
@@ -51,10 +51,15 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Shop ID is required' });
     }
     
-    // Create appointment object
+    // Validate clientId is present
+    if (!req.body.clientId) {
+      return res.status(400).json({ message: 'Client ID is required' });
+    }
+    
+    // Create appointment object with proper ObjectId conversion
     const appointment = new Appointment({
-      clientId: req.body.clientId || '64f5e3c2e4b1234567890123',
-      shopId: req.body.shopId,
+      clientId: new mongoose.Types.ObjectId(req.body.clientId),
+      shopId: new mongoose.Types.ObjectId(req.body.shopId),
       date: new Date(req.body.date),
       timeSlot: req.body.timeSlot,
       service: req.body.service || 'Regular Haircut',
@@ -63,34 +68,7 @@ router.post('/', async (req, res) => {
     
     // Save to database
     const newAppointment = await appointment.save();
-    console.log('Successfully saved appointment');
-    res.status(201).json(newAppointment);
-  } catch (error) {
-    console.log('Error saving appointment:', error);
-    res.status(400).json({ message: error.message });
-  }
-});
-
-// Create new appointment
-router.post('/', async (req, res) => {
-  console.log('Received appointment request:', req.body);
-  
-  if (!req.body.shopId) {
-    return res.status(400).json({ message: 'Shop ID is required' });
-  }
-  
-  const appointment = new Appointment({
-    clientId: req.body.clientId || '64f5e3c2e4b1234567890123',
-    shopId: req.body.shopId,
-    date: new Date(req.body.date),
-    timeSlot: req.body.timeSlot,
-    service: req.body.service || 'Regular Haircut',
-    status: 'confirmed'
-  });
-  
-  try {
-    const newAppointment = await appointment.save();
-    console.log('Successfully saved appointment');
+    console.log('Successfully saved appointment:', newAppointment);
     res.status(201).json(newAppointment);
   } catch (error) {
     console.log('Error saving appointment:', error);
@@ -143,7 +121,11 @@ router.get('/client/:clientId', async (req, res) => {
 router.get('/user', async (req, res) => {
   try {
     // Get userId from token or query parameter
-    const userId = req.user ? req.user.id : req.query.userId || '64f5e3c2e4b1234567890123';
+    const userId = req.user ? req.user.id : req.query.userId;
+    
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
     
     console.log(`Fetching appointments for user: ${userId}`);
     

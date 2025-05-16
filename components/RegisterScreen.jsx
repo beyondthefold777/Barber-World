@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert,
 import { LinearGradient } from 'expo-linear-gradient';
 import { authService } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearUserData, storeUserData } from './utils/storageUtils';
 
 const RegisterScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({
@@ -34,14 +35,30 @@ const RegisterScreen = ({ navigation }) => {
       Alert.alert('Error', 'All business information is required for barbershops');
       return;
     }
-
+    
     try {
       setLoading(true);
-      const response = await authService.register(formData);
       
-      // Store token and user role
-      await AsyncStorage.setItem('userToken', response.token);
-      await AsyncStorage.setItem('userRole', response.user.role);
+      // Clear any previous user data first
+      await clearUserData();
+      
+      console.log('Registering with data:', formData);
+      const response = await authService.register(formData);
+      console.log('Registration response:', response);
+      
+      if (!response || !response.token || !response.user) {
+        throw new Error('Invalid registration response');
+      }
+      
+      // Store user data using the utility function
+      await storeUserData(response.user, response.token);
+      
+      console.log('Stored new user data in AsyncStorage:', {
+        id: response.user.id,
+        email: response.user.email,
+        username: response.user.username,
+        role: response.user.role
+      });
       
       // Navigate based on user role
       if (formData.role === 'client') {
@@ -56,9 +73,9 @@ const RegisterScreen = ({ navigation }) => {
         'Your account has been created successfully.',
         [{ text: 'OK' }]
       );
-      
     } catch (error) {
-      Alert.alert('Registration Failed', error.message);
+      console.error('Registration error:', error);
+      Alert.alert('Registration Failed', error.message || 'An error occurred during registration');
     } finally {
       setLoading(false);
     }
