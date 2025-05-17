@@ -2318,6 +2318,72 @@ app.put('/api/messages/read/:conversationId', authMiddleware, async (req, res) =
     }
   });
   
+  // DELETE USER ACCOUNT
+app.delete('/api/user/delete-account', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log(`Starting account deletion for user ${userId}`);
+
+    // Delete user data without using a session for now
+    // 1. Find all shops owned by this user
+    const userShops = await Shop.find({ userId: userId });
+    const shopIds = userShops.map(shop => shop._id);
+    
+    // 2. Delete all appointments
+    await Appointment.deleteMany({
+      $or: [
+        { clientId: userId },
+        { shopId: { $in: shopIds } }
+      ]
+    });
+    
+    // 3. Delete all messages
+    await Message.deleteMany({
+      $or: [
+        { sender: userId },
+        { recipient: userId }
+      ]
+    });
+    
+    // 4. Delete all conversations
+    await Conversation.deleteMany({
+      participants: userId
+    });
+    
+    // 5. Update other users to remove conversation references
+    await User.updateMany(
+      { conversations: { $in: await Conversation.find({ participants: userId }).distinct('_id') } },
+      { $pull: { conversations: { $in: await Conversation.find({ participants: userId }).distinct('_id') } } }
+    );
+    
+    // 6. Remove user's reviews from shops
+    await Shop.updateMany(
+      { "reviews.userId": userId },
+      { $pull: { reviews: { userId: userId } } }
+    );
+    
+    // 7. Delete all shops owned by the user
+    await Shop.deleteMany({ userId: userId });
+    
+    // 8. Finally, delete the user account
+    await User.findByIdAndDelete(userId);
+    
+    console.log(`Successfully deleted user ${userId} and all associated data`);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Account and all associated data deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting user account:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting user account',
+      error: error.message
+    });
+  }
+});
+
 
 // Global error handler
 app.use((err, req, res, next) => {

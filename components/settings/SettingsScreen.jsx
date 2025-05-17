@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   View,
   Text,
@@ -7,22 +7,169 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
-  Image
+  Image,
+  ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import AuthContext from '../../context/AuthContext';
+import config from '../../config/environment';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
 const SettingsScreen = ({ navigation }) => {
   const [settings, setSettings] = useState({
     darkMode: true,
     locationServices: true,
   });
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Use the AuthContext with your specific implementation
+  const { token, user, logout } = useContext(AuthContext);
 
   const handleToggleSetting = (setting) => {
     setSettings({
       ...settings,
       [setting]: !settings[setting]
     });
+  };
+
+  // Using the same approach as your message service
+  const makeApiRequest = async ({ method = 'GET', endpoint, data = null }) => {
+    try {
+      // Get token if available, but don't require it
+      const storedToken = await AsyncStorage.getItem('userToken');
+      const headers = { 'Content-Type': 'application/json' };
+      
+      if (storedToken) {
+        // Use Authorization header instead of x-auth-token
+        headers['Authorization'] = `Bearer ${storedToken}`;
+        
+        // Keep x-auth-token for backward compatibility if needed
+        headers['x-auth-token'] = storedToken;
+      }
+      
+      console.log(`Making ${method} request to ${endpoint} with token: ${storedToken ? 'Yes' : 'No'}`);
+      
+      const response = await axios({
+        method,
+        url: `${config.API_URL}${endpoint}`,
+        data,
+        headers,
+        timeout: 10000 // 10 second timeout
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error(`API request failed: ${error.message}`);
+      console.error('Error details:', error.response?.data || 'No response data');
+      
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Network error. Please check your connection.'
+      };
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      setIsDeleting(true);
+      
+      console.log('Attempting to delete account...');
+      
+      // Use the makeApiRequest function that works with your other API calls
+      const response = await makeApiRequest({
+        method: 'DELETE',
+        endpoint: '/api/user/delete-account'
+      });
+      
+      console.log('Delete account response:', response);
+      
+      if (response.success) {
+        Alert.alert(
+          'Account Deleted',
+          'Your account and all associated data have been permanently deleted.',
+          [
+            {
+              text: 'OK',
+              onPress: async () => {
+                await logout();
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'Login' }],
+                });
+              }
+            }
+          ]
+        );
+      } else {
+        // Handle error from the API
+        Alert.alert(
+          'Error',
+          response.message || 'Failed to delete account. Please try again later.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error in handleDeleteAccount:', error);
+      
+      Alert.alert(
+        'Error',
+        'An unexpected error occurred. Please try again later.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action CANNOT be undone and all your data will be permanently deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            // Show second confirmation for extra security
+            Alert.alert(
+              'Final Confirmation',
+              'Please confirm that you want to permanently delete your account and all associated data.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Permanently Delete',
+                  style: 'destructive',
+                  onPress: handleDeleteAccount
+                }
+              ]
+            );
+          }
+        }
+      ]
+    );
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          onPress: async () => {
+            await logout();
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Login' }],
+            });
+          }
+        }
+      ]
+    );
   };
 
   const renderSettingToggle = (title, description, settingKey, icon) => (
@@ -77,7 +224,6 @@ const SettingsScreen = ({ navigation }) => {
             <Feather name="chevron-right" size={24} color="#888" />
           </TouchableOpacity>
         </View>
-
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Account</Text>
           
@@ -109,7 +255,6 @@ const SettingsScreen = ({ navigation }) => {
             <Feather name="chevron-right" size={20} color="#888" />
           </TouchableOpacity>
         </View>
-
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>App Preferences</Text>
           
@@ -127,7 +272,6 @@ const SettingsScreen = ({ navigation }) => {
             <Feather name="map-pin" size={24} color="#FF0000" />
           )}
         </View>
-
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Support</Text>
           
@@ -159,7 +303,6 @@ const SettingsScreen = ({ navigation }) => {
             <Feather name="chevron-right" size={20} color="#888" />
           </TouchableOpacity>
         </View>
-
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>About</Text>
           
@@ -202,52 +345,22 @@ const SettingsScreen = ({ navigation }) => {
         
         <TouchableOpacity 
           style={styles.dangerButton}
-          onPress={() => {
-            Alert.alert(
-              'Delete Account',
-              'Are you sure you want to delete your account? This action cannot be undone.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Delete', 
-                  style: 'destructive',
-                  onPress: () => {
-                    // Navigate to login after confirmation
-                    navigation.reset({
-                      index: 0,
-                      routes: [{ name: 'Login' }],
-                    });
-                  }
-                }
-              ]
-            );
-          }}
+          disabled={isDeleting}
+          onPress={confirmDeleteAccount}
         >
-          <MaterialIcons name="delete-forever" size={24} color="#FF0000" />
-          <Text style={styles.dangerButtonText}>Delete Account</Text>
+          {isDeleting ? (
+            <ActivityIndicator size="small" color="#FF0000" style={{ marginRight: 10 }} />
+          ) : (
+            <MaterialIcons name="delete-forever" size={24} color="#FF0000" />
+          )}
+          <Text style={styles.dangerButtonText}>
+            {isDeleting ? 'Deleting Account...' : 'Delete Account'}
+          </Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
           style={styles.logoutButton}
-          onPress={() => {
-            Alert.alert(
-              'Logout',
-              'Are you sure you want to log out?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Logout', 
-                  onPress: () => {
-                    // Navigate to login screen
-                    navigation.reset({
-                      index: 0,
-                      routes: [{ name: 'Login' }],
-                    });
-                  }
-                }
-              ]
-            );
-          }}
+          onPress={handleLogout}
         >
           <MaterialIcons name="logout" size={24} color="#FFFFFF" />
           <Text style={styles.logoutText}>Logout</Text>
@@ -322,7 +435,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 5,
   },
-  profileEmail: {
+   profileEmail: {
     color: '#BBB',
     fontSize: 14,
   },
@@ -380,7 +493,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 0, 0, 0.1)',
     padding: 15,
     borderRadius: 8,
-    marginBottom: 15,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#FF0000',
   },
