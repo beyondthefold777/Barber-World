@@ -988,6 +988,27 @@ app.post('/api/reset-password', async (req, res) => {
   }
 });
 
+// Simple account deletion route
+app.delete('/api/account', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    
+    // Find and delete the user
+    const User = require('./models/User');
+    const result = await User.findByIdAndDelete(userId);
+    
+    if (!result) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    res.status(200).json({ success: true, message: 'Account successfully deleted' });
+  } catch (error) {
+    console.error('Error deleting account:', error.message);
+    res.status(500).json({ success: false, message: 'Error deleting account' });
+  }
+});
+
+
 // Contact support endpoint
 app.post('/api/contact-support', async (req, res) => {
   try {

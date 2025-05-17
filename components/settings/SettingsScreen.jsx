@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,25 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
-  Image
+  ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../context/AuthContext';
+import config from '../../config/environment';
+
+const API_URL = config.apiUrl;
+
+// Add logging utility
+const logScreen = (message) => {
+  console.log(`[SETTINGS SCREEN] ${new Date().toISOString()} - ${message}`);
+};
 
 const SettingsScreen = ({ navigation }) => {
+  const { userToken, userId, logout } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
   const [settings, setSettings] = useState({
     pushNotifications: true,
     emailNotifications: true,
@@ -28,11 +41,198 @@ const SettingsScreen = ({ navigation }) => {
     currency: 'USD',
   });
 
-  const handleToggleSetting = (setting) => {
-    setSettings({
+  useEffect(() => {
+    logScreen("Settings screen mounted");
+    logScreen(`Auth context values - userToken: ${userToken ? 'exists' : 'null'}, userId: ${userId || 'null'}`);
+    
+    // You could load user settings from API or AsyncStorage here
+    const loadSettings = async () => {
+      try {
+        const savedSettings = await AsyncStorage.getItem('userSettings');
+        if (savedSettings) {
+          setSettings(JSON.parse(savedSettings));
+          logScreen("Loaded settings from AsyncStorage");
+        }
+      } catch (error) {
+        logScreen(`Error loading settings: ${error.message}`);
+      }
+    };
+    
+    loadSettings();
+  }, [userToken, userId]);
+
+  const handleToggleSetting = async (setting) => {
+    const newSettings = {
       ...settings,
       [setting]: !settings[setting]
-    });
+    };
+    
+    setSettings(newSettings);
+    
+    // Save settings to AsyncStorage
+    try {
+      await AsyncStorage.setItem('userSettings', JSON.stringify(newSettings));
+      logScreen(`Updated setting: ${setting} to ${!settings[setting]}`);
+    } catch (error) {
+      logScreen(`Error saving settings: ${error.message}`);
+    }
+  };
+
+const handleDeleteAccount = async () => {
+  Alert.alert(
+    'Delete Account',
+    'Are you sure you want to delete your account? This action cannot be undone.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setIsLoading(true);
+            logScreen('Starting account deletion process');
+            
+            // Get token from context or AsyncStorage
+            let token = userToken;
+            if (!token) {
+              token = await AsyncStorage.getItem('userToken');
+              logScreen(`Token from AsyncStorage: ${token ? 'Found' : 'Not found'}`);
+            }
+            
+            // Check if token exists
+            if (!token) {
+              logScreen('No token found for account deletion');
+              Alert.alert('Error', 'You need to be logged in to delete your account');
+              setIsLoading(false);
+              return;
+            }
+            
+            // Get user ID from context or AsyncStorage
+            let id = userId;
+            if (!id) {
+              const userData = await AsyncStorage.getItem('userData');
+              if (userData) {
+                const parsed = JSON.parse(userData);
+                id = parsed.id || parsed._id || parsed.userId;
+                logScreen(`User ID from AsyncStorage: ${id}`);
+              }
+            }
+            
+            if (!id) {
+              logScreen('No user ID found for account deletion');
+              Alert.alert('Error', 'User ID not found. Please log in again.');
+              setIsLoading(false);
+              return;
+            }
+            
+            logScreen(`Using token for deletion: ${token ? 'YES' : 'NO'}`);
+            logScreen(`Using user ID for deletion: ${id}`);
+            
+            // Log token details (first few characters for security)
+            const tokenPreview = token.substring(0, 10) + '...';
+            logScreen(`Token preview: ${tokenPreview}`);
+            
+            // Make the API call to the correct endpoint
+            logScreen(`Attempting to delete account with ID: ${id}`);
+            
+            const response = await axios({
+              method: 'delete',
+              url: `${API_URL}/api/account`, // Updated to match the server endpoint
+              headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            logScreen(`Delete account response: ${response.status}`);
+            
+            if (response.status === 200 || response.status === 204) {
+              // Success - proceed with logout
+              await handleSuccessfulDeletion();
+            } else {
+              logScreen(`Unexpected response status: ${response.status}`);
+              throw new Error(`Unexpected response status: ${response.status}`);
+            }
+          } catch (error) {
+            logScreen(`Delete account error: ${error.message}`);
+            console.error('Delete account error:', error);
+            Alert.alert(
+              'Error',
+              'Unable to delete account. Please try again later.'
+            );
+          } finally {
+            setIsLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+  
+  const handleSuccessfulDeletion = async () => {
+    // Clear all storage
+    await AsyncStorage.clear();
+    logScreen('AsyncStorage cleared after account deletion');
+    
+    // Use the logout function from AuthContext
+    if (logout) {
+      logout();
+      logScreen('Logged out via AuthContext');
+    }
+    
+    Alert.alert(
+      'Account Deleted',
+      'Your account has been successfully deleted.',
+      [{ 
+        text: 'OK', 
+        onPress: () => {
+          logScreen('Navigating to Login screen');
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+        }
+      }]
+    );
+  };
+
+  const handleLogout = async () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          onPress: async () => {
+            try {
+              logScreen('User confirmed logout');
+              
+              // Use the logout function from AuthContext
+              if (logout) {
+                logout();
+                logScreen('Logged out via AuthContext');
+              } else {
+                // Fallback if logout function is not available
+                await AsyncStorage.clear();
+                logScreen('AsyncStorage cleared for logout');
+              }
+              
+              // Navigate to login screen
+              logScreen('Navigating to Login screen');
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
+            } catch (error) {
+              logScreen(`Logout error: ${error.message}`);
+              console.error('Logout error:', error);
+              Alert.alert('Error', 'Failed to log out. Please try again.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const renderSettingToggle = (title, description, settingKey, icon) => (
@@ -68,6 +268,7 @@ const SettingsScreen = ({ navigation }) => {
         <Text style={styles.headerTitle}>Settings</Text>
         <View style={{ width: 44 }} />
       </View>
+      
       <ScrollView style={styles.content}>
         {/* Account Section */}
         <View style={styles.accountSection}>
@@ -87,330 +288,93 @@ const SettingsScreen = ({ navigation }) => {
             <Feather name="chevron-right" size={24} color="#888" />
           </TouchableOpacity>
         </View>
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => navigation.navigate('AccountDetails')}
-          >
-            <View style={styles.settingIconContainer}>
-              <Feather name="user" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Personal Information</Text>
-              <Text style={styles.settingDescription}>Manage your profile details</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => navigation.navigate('ChangePassword')}
-          >
-            <View style={styles.settingIconContainer}>
-              <Feather name="lock" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Change Password</Text>
-              <Text style={styles.settingDescription}>Update your password</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => navigation.navigate('PaymentMethods')}
-          >
-            <View style={styles.settingIconContainer}>
-              <Feather name="credit-card" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Payment Methods</Text>
-              <Text style={styles.settingDescription}>Manage your payment options</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-        </View>
+        
+        {/* Notifications Section */}
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Notifications</Text>
           
           {renderSettingToggle(
             'Push Notifications',
-            'Receive push notifications for appointments and updates',
+            'Receive push notifications for important updates',
             'pushNotifications',
-            <Feather name="bell" size={24} color="#FF0000" />
+            <Ionicons name="notifications" size={22} color="#FF0000" />
           )}
           
           {renderSettingToggle(
             'Email Notifications',
-            'Receive email notifications for bookings and receipts',
+            'Receive email notifications for important updates',
             'emailNotifications',
-            <MaterialIcons name="email" size={24} color="#FF0000" />
+            <MaterialIcons name="email" size={22} color="#FF0000" />
           )}
           
           {renderSettingToggle(
             'SMS Notifications',
-            'Receive text message reminders for upcoming appointments',
+            'Receive text messages for important updates',
             'smsNotifications',
-            <MaterialIcons name="sms" size={24} color="#FF0000" />
+            <MaterialIcons name="sms" size={22} color="#FF0000" />
           )}
           
           {renderSettingToggle(
             'Appointment Reminders',
-            'Get reminders before your scheduled appointments',
+            'Receive reminders before your appointments',
             'appointmentReminders',
-            <Feather name="calendar" size={24} color="#FF0000" />
+            <MaterialIcons name="event" size={22} color="#FF0000" />
           )}
         </View>
+        
+        {/* Privacy Section */}
         <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>App Preferences</Text>
-          
-          {renderSettingToggle(
-            'Dark Mode',
-            'Use dark theme throughout the app',
-            'darkMode',
-            <Feather name="moon" size={24} color="#FF0000" />
-          )}
+          <Text style={styles.sectionTitle}>Privacy & Security</Text>
           
           {renderSettingToggle(
             'Location Services',
-            'Allow the app to access your location for nearby shops',
+            'Allow app to access your location',
             'locationServices',
-            <Feather name="map-pin" size={24} color="#FF0000" />
+            <MaterialIcons name="location-on" size={22} color="#FF0000" />
           )}
-          
-          {renderSettingToggle(
-            'Auto Check-In',
-            'Automatically check in when you arrive at your appointment',
-            'autoCheckIn',
-            <Feather name="check-circle" size={24} color="#FF0000" />
-          )}
-          
-          {renderSettingToggle(
-            'Biometric Login',
-            'Use fingerprint or face recognition to log in',
-            'biometricLogin',
-            <MaterialIcons name="fingerprint" size={24} color="#FF0000" />
-          )}
-        </View>
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Privacy</Text>
           
           {renderSettingToggle(
             'Data Collection',
-            'Allow anonymous usage data to improve our services',
+            'Allow app to collect usage data',
             'dataCollection',
-            <Feather name="database" size={24} color="#FF0000" />
+            <MaterialIcons name="data-usage" size={22} color="#FF0000" />
           )}
           
           {renderSettingToggle(
             'Marketing Emails',
-            'Receive promotional emails and special offers',
+            'Receive promotional emails',
             'marketingEmails',
-            <MaterialIcons name="local-offer" size={24} color="#FF0000" />
+            <MaterialIcons name="campaign" size={22} color="#FF0000" />
           )}
           
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => navigation.navigate('PrivacySecurity')}
-          >
-            <View style={styles.settingIconContainer}>
-              <Feather name="shield" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Privacy & Security</Text>
-              <Text style={styles.settingDescription}>Manage your privacy settings</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Regional Settings</Text>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => {
-              Alert.alert(
-                'Select Language',
-                'Choose your preferred language',
-                [
-                  { text: 'English', onPress: () => console.log('English selected') },
-                  { text: 'Spanish', onPress: () => console.log('Spanish selected') },
-                  { text: 'French', onPress: () => console.log('French selected') },
-                  { text: 'Cancel', style: 'cancel' }
-                ]
-              );
-            }}
-          >
-            <View style={styles.settingIconContainer}>
-              <Ionicons name="language" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Language</Text>
-              <Text style={styles.settingValue}>{settings.language}</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => {
-              Alert.alert(
-                'Select Currency',
-                'Choose your preferred currency',
-                [
-                  { text: 'USD ($)', onPress: () => console.log('USD selected') },
-                  { text: 'EUR (€)', onPress: () => console.log('EUR selected') },
-                  { text: 'GBP (£)', onPress: () => console.log('GBP selected') },
-                  { text: 'Cancel', style: 'cancel' }
-                ]
-              );
-            }}
-          >
-            <View style={styles.settingIconContainer}>
-              <Feather name="dollar-sign" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Currency</Text>
-              <Text style={styles.settingValue}>{settings.currency}</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Support</Text>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => navigation.navigate('HelpCenter')}
-          >
-            <View style={styles.settingIconContainer}>
-              <Feather name="help-circle" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Help Center</Text>
-              <Text style={styles.settingDescription}>Get help with using the app</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => navigation.navigate('ContactSupport')}
-          >
-            <View style={styles.settingIconContainer}>
-              <Feather name="message-circle" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Contact Support</Text>
-              <Text style={styles.settingDescription}>Reach out to our support team</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => navigation.navigate('Feedback')}
-          >
-            <View style={styles.settingIconContainer}>
-              <MaterialIcons name="feedback" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Send Feedback</Text>
-              <Text style={styles.settingDescription}>Help us improve the app</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>About</Text>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => navigation.navigate('TermsOfService')}
-          >
-            <View style={styles.settingIconContainer}>
-              <Feather name="file-text" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Terms of Service</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => navigation.navigate('PrivacyPolicy')}
-          >
-            <View style={styles.settingIconContainer}>
-              <Feather name="shield" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Privacy Policy</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#888" />
-          </TouchableOpacity>
-          
-          <View style={styles.optionItem}>
-            <View style={styles.settingIconContainer}>
-              <Feather name="info" size={24} color="#FF0000" />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>App Version</Text>
-              <Text style={styles.settingValue}>1.0.0</Text>
-            </View>
-          </View>
+          {renderSettingToggle(
+            'Biometric Login',
+            'Use fingerprint or face ID to login',
+            'biometricLogin',
+            <MaterialIcons name="fingerprint" size={22} color="#FF0000" />
+          )}
         </View>
         
+        {/* Danger Zone */}
         <TouchableOpacity 
           style={styles.dangerButton}
-          onPress={() => {
-            Alert.alert(
-              'Delete Account',
-              'Are you sure you want to delete your account? This action cannot be undone.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Delete', 
-                  style: 'destructive',
-                  onPress: () => {
-                    // Navigate to login after confirmation
-                    navigation.reset({
-                      index: 0,
-                      routes: [{ name: 'Login' }],
-                    });
-                  }
-                }
-              ]
-            );
-          }}
+          onPress={handleDeleteAccount}
+          disabled={isLoading}
         >
-                <MaterialIcons name="delete-forever" size={24} color="#FF0000" />
-          <Text style={styles.dangerButtonText}>Delete Account</Text>
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#FF0000" style={{ marginRight: 10 }} />
+          ) : (
+            <MaterialIcons name="delete-forever" size={24} color="#FF0000" />
+          )}
+          <Text style={styles.dangerButtonText}>
+            {isLoading ? 'Deleting Account...' : 'Delete Account'}
+          </Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
           style={styles.logoutButton}
-          onPress={() => {
-            Alert.alert(
-              'Logout',
-              'Are you sure you want to log out?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Logout', 
-                  onPress: () => {
-                    // Navigate to login screen
-                    navigation.reset({
-                      index: 0,
-                      routes: [{ name: 'Login' }],
-                    });
-                  }
-                }
-              ]
-            );
-          }}
+          onPress={handleLogout}
+          disabled={isLoading}
         >
           <MaterialIcons name="logout" size={24} color="#FFFFFF" />
           <Text style={styles.logoutText}>Logout</Text>
@@ -446,7 +410,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  accountSection: {
+   accountSection: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 10,
     padding: 15,
