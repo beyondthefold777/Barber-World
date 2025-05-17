@@ -26,7 +26,7 @@ const SchedulingScreen = ({ route, navigation }) => {
   const shopName = route.params?.shopName || 'Barbershop';
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
-  const [selectedStyle, setSelectedStyle] = useState('');
+  const [selectedStyle, setSelectedStyle] = useState({ value: '', label: '', price: '' });
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedStyleLabel, setSelectedStyleLabel] = useState('Select Style');
   const [loading, setLoading] = useState(false);
@@ -68,7 +68,11 @@ const SchedulingScreen = ({ route, navigation }) => {
   const closeMenu = () => setMenuVisible(false);
 
   const handleStyleSelect = (style) => {
-    setSelectedStyle(style.value);
+    setSelectedStyle({
+      value: style.value,
+      label: style.label,
+      price: style.price
+    });
     setSelectedStyleLabel(`${style.label} - ${style.price}`);
     closeMenu();
   };
@@ -78,7 +82,7 @@ const SchedulingScreen = ({ route, navigation }) => {
     try {
       console.log(`Fetching time slots for date: ${date} and shop: ${shopId}`);
       
-      // Pass the shopId to get time slots for this specific shop
+      // Pass the shopid to get time slots for this specific shop
       const response = await appointmentService.getTimeSlots(date, shopId);
       console.log('Time slots API response:', JSON.stringify(response));
       
@@ -109,7 +113,7 @@ const SchedulingScreen = ({ route, navigation }) => {
   };
 
   const handleBooking = async () => {
-    if (!selectedDate || !selectedTime || !selectedStyle) {
+    if (!selectedDate || !selectedTime || !selectedStyle.value) {
       Alert.alert('Please select date, time, and hairstyle');
       return;
     }
@@ -123,9 +127,9 @@ const SchedulingScreen = ({ route, navigation }) => {
         shopId: shopId,
         date: selectedDate,
         timeSlot: selectedTime,
-        service: selectedStyle
+        service: selectedStyle.label
       };
-        
+      
       const result = await appointmentService.bookAppointment(appointmentData);
       console.log('Booking result:', result);
       
@@ -137,17 +141,17 @@ const SchedulingScreen = ({ route, navigation }) => {
       
       // Update the time slots to reflect the new booking
       setTimeSlots(prev => 
-        prev.map(slot => 
-          slot.timeSlot === selectedTime 
-            ? { ...slot, isBooked: true, status: 'booked', isUserBooked: true } 
+        prev.map(slot =>
+          slot.timeSlot === selectedTime
+            ? { ...slot, isBooked: true, status: 'booked', isUserBooked: true }
             : slot
         )
       );
-        
+      
       // Reset form
       setSelectedDate('');
       setSelectedTime('');
-      setSelectedStyle('');
+      setSelectedStyle({ value: '', label: '', price: '' });
       setSelectedStyleLabel('Select Style');
     } catch (error) {
       console.error('Booking error:', error);
@@ -239,9 +243,9 @@ const SchedulingScreen = ({ route, navigation }) => {
                         {sortedTimeSlots.length > 0 ? (
                           sortedTimeSlots.map((slot) => {
                             // Consider a slot booked if any of these conditions are true
-                            const isBooked = slot.isBooked || 
-                                           slot.status === 'booked' || 
-                                           slot.isUserBooked;
+                            const isBooked = slot.isBooked ||
+                                            slot.status === 'booked' ||
+                                            slot.isUserBooked;
                             
                             return (
                               <Button
@@ -278,8 +282,9 @@ const SchedulingScreen = ({ route, navigation }) => {
               style={styles.bookButton}
               onPress={handleBooking}
               loading={loading}
-              disabled={loading || !selectedDate || !selectedTime || !selectedStyle}
+              disabled={loading || !selectedDate || !selectedTime || !selectedStyle.value}
               buttonColor="#FF0000"
+               textColor="#FFFFFF"
             >
               {loading ? 'Booking...' : 'Book Appointment'}
             </Button>
@@ -403,7 +408,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999999',
   },
-  bookButton: {
+   bookButton: {
     marginTop: 30,
     marginBottom: 20,
     padding: 5,
