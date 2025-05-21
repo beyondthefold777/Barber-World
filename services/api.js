@@ -340,6 +340,7 @@ export const appointmentService = {
       throw error;
     }
   },
+  
   getUserAppointments: async (userToken) => {
     console.log('\n========== APPOINTMENT SERVICE: GET USER APPOINTMENTS ==========');
     console.log('1. Function called at:', new Date().toISOString());
@@ -433,35 +434,32 @@ export const appointmentService = {
       
       const clientId = userInfo.id || userInfo._id;
       console.log(`10. Using client ID: ${clientId}`);
-      
-      // Check if we have cached appointments
-      const cacheKey = `appointments_client_${clientId}`;
-      
-      console.log('11. Checking for cached appointments...');
-      try {
-        const cachedData = await AsyncStorage.getItem(cacheKey);
-        if (cachedData) {
-          const { appointments, timestamp } = JSON.parse(cachedData);
-          const cacheAge = Date.now() - timestamp;
-          
-          // Use cache if it's less than 5 minutes old
-          if (cacheAge < 5 * 60 * 1000) {
-            console.log(`12. Using cached appointments (${appointments.length} items, ${Math.round(cacheAge/1000)}s old)`);
-            console.log('========== APPOINTMENT SERVICE: COMPLETED FROM CACHE ==========\n');
-            return appointments;
-          }
-          console.log(`12. Cache expired (${Math.round(cacheAge/1000)}s old), fetching fresh data`);
-        } else {
-          console.log('12. No cached appointments found');
-        }
-      } catch (cacheError) {
-        console.log('12. ERROR checking cache:', cacheError.message);
-      }
-      
-      // Clear cache for testing
-      console.log('13. Clearing appointment cache for testing...');
-      await AsyncStorage.removeItem(cacheKey);
-      console.log('    Cache cleared');
+  
+// Check if we have cached appointments
+const cacheKey = `appointments_client_${clientId}`;
+    
+console.log('11. Checking for cached appointments...');
+try {
+  const cachedData = await AsyncStorage.getItem(cacheKey);
+  if (cachedData) {
+    const { appointments, timestamp } = JSON.parse(cachedData);
+    const cacheAge = Date.now() - timestamp;
+            
+    // MODIFIED: Use cache only if it's less than 30 seconds old
+    // This ensures frequent refreshes while still providing some caching benefit
+    if (cacheAge < 30 * 1000) { // 30 seconds instead of 5 minutes
+      console.log(`12. Using cached appointments (${appointments.length} items, ${Math.round(cacheAge/1000)}s old)`);
+      console.log('========== APPOINTMENT SERVICE: COMPLETED FROM CACHE ==========\n');
+      return appointments;
+    }
+    console.log(`12. Cache expired (${Math.round(cacheAge/1000)}s old), fetching fresh data`);
+  } else {
+    console.log('12. No cached appointments found');
+  }
+} catch (cacheError) {
+  console.log('12. ERROR checking cache:', cacheError.message);
+}
+  
       
       // Try different API endpoints to get client appointments
       console.log('14. Trying client-specific appointments endpoint...');
@@ -753,221 +751,254 @@ if (!endpointSuccess) {
     }
     return slots;
   },
-
-
-  bookAppointment: async (appointmentData, userToken) => {
+bookAppointment: async (appointmentData, userToken) => {
+  try {
+    console.log('Making appointment request with data:', appointmentData);
+    
+    // Debug: Check what user data we have in AsyncStorage
+    let userData = null;
     try {
-      console.log('Making appointment request with data:', appointmentData);
-      
-      // Debug: Check what user data we have in AsyncStorage
-      let userData = null;
-      try {
-        const userDataString = await AsyncStorage.getItem('userData');
-        if (userDataString) {
-          userData = JSON.parse(userDataString);
-          console.log('DEBUG - User data from AsyncStorage:', userData);
-          console.log('DEBUG - User ID from AsyncStorage:', userData.id || userData._id);
-        } else {
-          console.log('DEBUG - No user data found in AsyncStorage');
-        }
-      } catch (e) {
-        console.log('DEBUG - Error reading user data:', e);
-      }
-      
-      // Create the request body with the essential fields
-      const requestBody = {
-        date: appointmentData.date,
-        timeSlot: appointmentData.timeSlot,
-        service: appointmentData.service,
-        status: 'confirmed'
-      };
-      
-      // Include shopId if it exists in the appointment data
-      if (appointmentData.shopId) {
-        requestBody.shopId = appointmentData.shopId;
-        console.log('Including shopId in request:', appointmentData.shopId);
-        
-        // If we have a shopId but no shopName, try to fetch the shop name
-        if (!appointmentData.shopName && userToken) {
-          try {
-            const shopResponse = await fetch(`${API_URL}/api/shop/${appointmentData.shopId}`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${userToken}`,
-                'Accept': 'application/json'
-              }
-            });
-            
-            if (shopResponse.ok) {
-              const shopData = await shopResponse.json();
-              if (shopData && shopData.shop && shopData.shop.name) {
-                appointmentData.shopName = shopData.shop.name;
-                console.log('Retrieved shop name for appointment:', appointmentData.shopName);
-              }
-            }
-          } catch (shopError) {
-            console.log('Error fetching shop details:', shopError);
-          }
-        }
-      }
-      
-      // Get the current user's ID from AsyncStorage
-      let currentUserId = null;
-      if (userData) {
-        currentUserId = userData.id || userData._id;
-        console.log('DEBUG - Using user ID from AsyncStorage:', currentUserId);
-        
-        // Include clientId in the request
-        if (currentUserId) {
-          requestBody.clientId = currentUserId;
-        }
+      const userDataString = await AsyncStorage.getItem('userData');
+      if (userDataString) {
+        userData = JSON.parse(userDataString);
+        console.log('DEBUG - User data from AsyncStorage:', userData);
+        console.log('DEBUG - User ID from AsyncStorage:', userData.id || userData._id);
       } else {
-        console.log('DEBUG - No user ID available from AsyncStorage, trying to get from token');
-        
-        // Try to decode the token directly
+        console.log('DEBUG - No user data found in AsyncStorage');
+      }
+    } catch (e) {
+      console.log('DEBUG - Error reading user data:', e);
+    }
+    
+    // Create the request body with the essential fields
+    const requestBody = {
+      date: appointmentData.date,
+      timeSlot: appointmentData.timeSlot,
+      service: appointmentData.service,
+      status: 'confirmed'
+    };
+    
+    // Include shopId if it exists in the appointment data
+    if (appointmentData.shopId) {
+      requestBody.shopId = appointmentData.shopId;
+      console.log('Including shopId in request:', appointmentData.shopId);
+      
+      // If we have a shopId but no shopName, try to fetch the shop name
+      if (!appointmentData.shopName && userToken) {
         try {
-          // If you have a decodeToken function
-          if (typeof decodeToken === 'function') {
-            const decoded = decodeToken(userToken);
-            if (decoded && (decoded.id || decoded._id)) {
-              currentUserId = decoded.id || decoded._id;
-              console.log('DEBUG - User ID from token decode:', currentUserId);
-              
-              if (currentUserId) {
-                requestBody.clientId = currentUserId;
-              }
-            } else {
-              console.log('DEBUG - No user ID found in decoded token');
+          const shopResponse = await fetch(`${API_URL}/api/shop/${appointmentData.shopId}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${userToken}`,
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (shopResponse.ok) {
+            const shopData = await shopResponse.json();
+            if (shopData && shopData.shop && shopData.shop.name) {
+              appointmentData.shopName = shopData.shop.name;
+              console.log('Retrieved shop name for appointment:', appointmentData.shopName);
+            }
+          }
+        } catch (shopError) {
+          console.log('Error fetching shop details:', shopError);
+        }
+      }
+    }
+    
+    // Get the current user's ID from AsyncStorage
+    let currentUserId = null;
+    if (userData) {
+      currentUserId = userData.id || userData._id;
+      console.log('DEBUG - Using user ID from AsyncStorage:', currentUserId);
+      
+      // Include clientId in the request
+      if (currentUserId) {
+        requestBody.clientId = currentUserId;
+      }
+    } else {
+      console.log('DEBUG - No user ID available from AsyncStorage, trying to get from token');
+      
+      // Try to decode the token directly
+      try {
+        // If you have a decodeToken function
+        if (typeof decodeToken === 'function') {
+          const decoded = decodeToken(userToken);
+          if (decoded && (decoded.id || decoded._id)) {
+            currentUserId = decoded.id || decoded._id;
+            console.log('DEBUG - User ID from token decode:', currentUserId);
+            
+            if (currentUserId) {
+              requestBody.clientId = currentUserId;
             }
           } else {
-            console.log('DEBUG - decodeToken function not available');
+            console.log('DEBUG - No user ID found in decoded token');
           }
-        } catch (decodeError) {
-          console.log('DEBUG - Error decoding token:', decodeError);
+        } else {
+          console.log('DEBUG - decodeToken function not available');
         }
-        
-        // If we still don't have a user ID, try to get user info from API
-        if (!currentUserId) {
-          console.log('DEBUG - Trying to get user info from API');
-          try {
-            const response = await fetch(`${API_URL}/api/auth/me`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${userToken}`,
-                'Accept': 'application/json'
-              }
-            });
-            
-            if (response.ok) {
-              const userInfo = await response.json();
-              console.log('DEBUG - User info from API:', userInfo);
-              
-              // Try to get the ID from various possible locations in the response
-              currentUserId = userInfo.id || userInfo._id || 
-                             (userInfo.user ? (userInfo.user.id || userInfo.user._id) : null);
-              
-              console.log('DEBUG - User ID from API:', currentUserId);
-              
-              if (currentUserId) {
-                requestBody.clientId = currentUserId;
-                
-                // Save user data to AsyncStorage for future use
-                try {
-                  await AsyncStorage.setItem('userData', JSON.stringify({
-                    ...userInfo,
-                    id: currentUserId
-                  }));
-                  console.log('DEBUG - Saved user data to AsyncStorage');
-                } catch (saveError) {
-                  console.log('DEBUG - Error saving user data to AsyncStorage:', saveError);
-                }
-              }
-            } else {
-              console.log('DEBUG - Failed to get user info from API:', await response.text());
+      } catch (decodeError) {
+        console.log('DEBUG - Error decoding token:', decodeError);
+      }
+      
+      // If we still don't have a user ID, try to get user info from API
+      if (!currentUserId) {
+        console.log('DEBUG - Trying to get user info from API');
+        try {
+          const response = await fetch(`${API_URL}/api/auth/me`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${userToken}`,
+              'Accept': 'application/json'
             }
-          } catch (error) {
-            console.log('DEBUG - Error fetching user info from API:', error);
+          });
+          
+          if (response.ok) {
+            const userInfo = await response.json();
+            console.log('DEBUG - User info from API:', userInfo);
+            
+            // Try to get the ID from various possible locations in the response
+            currentUserId = userInfo.id || userInfo._id ||
+                            (userInfo.user ? (userInfo.user.id || userInfo.user._id) : null);
+            
+            console.log('DEBUG - User ID from API:', currentUserId);
+            
+            if (currentUserId) {
+              requestBody.clientId = currentUserId;
+              
+              // Save user data to AsyncStorage for future use
+              try {
+                await AsyncStorage.setItem('userData', JSON.stringify({
+                  ...userInfo,
+                  id: currentUserId
+                }));
+                console.log('DEBUG - Saved user data to AsyncStorage');
+              } catch (saveError) {
+                console.log('DEBUG - Error saving user data to AsyncStorage:', saveError);
+              }
+            }
+          } else {
+            console.log('DEBUG - Failed to get user info from API:', await response.text());
           }
+        } catch (error) {
+          console.log('DEBUG - Error fetching user info from API:', error);
         }
       }
+    }
+    
+    // Final check for clientId
+    if (!requestBody.clientId) {
+      console.log('WARNING: No clientId found. Appointment will fail or use default ID.');
       
-      // Final check for clientId
-      if (!requestBody.clientId) {
-        console.log('WARNING: No clientId found. Appointment will fail or use default ID.');
-        
-        // You could throw an error here to prevent creating an appointment without a valid clientId
-        // throw new Error('No client ID available. Cannot create appointment.');
+      // You could throw an error here to prevent creating an appointment without a valid clientId
+      // throw new Error('No client ID available. Cannot create appointment.');
+    }
+    
+    console.log('DEBUG - Final request body:', requestBody);
+    
+    const response = await fetch(`${API_URL}/api/appointments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${userToken}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('Error response from server:', errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('Server response:', data);
+    
+    // Store the appointment in AsyncStorage with the correct date
+    try {
+      // Get existing appointments
+      const storedAppointments = await AsyncStorage.getItem('userAppointments');
+      let appointments = storedAppointments ? JSON.parse(storedAppointments) : [];
+      
+      // Add shop name and other details to the appointment data
+      const enhancedAppointment = {
+        ...data,
+        shopName: appointmentData.shopName || 'Barbershop',
+        userId: currentUserId, // Store the user ID explicitly for local reference
+        clientId: currentUserId, // Also store as clientId to match backend model
+        // Ensure the date is stored as a string in ISO format to prevent timezone issues
+        date: data.date
+      };
+      
+      // Ensure shopId is stored in the appointment
+      if (appointmentData.shopId) {
+        enhancedAppointment.shopId = appointmentData.shopId;
+      } else if (data.shopId) {
+        enhancedAppointment.shopId = data.shopId;
       }
       
-      console.log('DEBUG - Final request body:', requestBody);
-      
-      const response = await fetch(`${API_URL}/api/appointments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${userToken}`
-        },
-        body: JSON.stringify(requestBody)
+      console.log('Enhanced appointment with IDs:', {
+        userId: enhancedAppointment.userId,
+        clientId: enhancedAppointment.clientId,
+        shopId: enhancedAppointment.shopId,
+        shopName: enhancedAppointment.shopName,
+        date: enhancedAppointment.date
       });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log('Error response from server:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      // Add the new appointment to the array
+      appointments.push(enhancedAppointment);
       
-      const data = await response.json();
-      console.log('Server response:', data);
+      // Save back to AsyncStorage
+      await AsyncStorage.setItem('userAppointments', JSON.stringify(appointments));
+      console.log('Appointment saved to AsyncStorage');
       
-      // Store the appointment in AsyncStorage with the correct date
-      try {
-        // Get existing appointments
-        const storedAppointments = await AsyncStorage.getItem('userAppointments');
-        let appointments = storedAppointments ? JSON.parse(storedAppointments) : [];
+      // *** IMPORTANT: Clear ALL appointment-related caches to ensure fresh data ***
+      if (currentUserId) {
+        // Clear the specific client's appointments cache
+        const clientCacheKey = `appointments_client_${currentUserId}`;
+        await AsyncStorage.removeItem(clientCacheKey);
+        console.log(`Cleared appointments cache for client ${currentUserId}`);
         
-        // Add shop name and other details to the appointment data
-        const enhancedAppointment = {
-          ...data,
-          shopName: appointmentData.shopName || 'Barbershop',
-          userId: currentUserId, // Store the user ID explicitly for local reference
-          clientId: currentUserId, // Also store as clientId to match backend model
-          // Ensure the date is stored as a string in ISO format to prevent timezone issues
-          date: data.date
-        };
-        
-        // Ensure shopId is stored in the appointment
+        // Clear shop-specific cache if applicable
         if (appointmentData.shopId) {
-          enhancedAppointment.shopId = appointmentData.shopId;
-        } else if (data.shopId) {
-          enhancedAppointment.shopId = data.shopId;
+          const shopCacheKey = `appointments_shop_${appointmentData.shopId}`;
+          await AsyncStorage.removeItem(shopCacheKey);
+          console.log(`Cleared shop appointments cache for shop ${appointmentData.shopId}`);
         }
         
-        console.log('Enhanced appointment with IDs:', {
-          userId: enhancedAppointment.userId,
-          clientId: enhancedAppointment.clientId,
-          shopId: enhancedAppointment.shopId,
-          shopName: enhancedAppointment.shopName,
-          date: enhancedAppointment.date
-        });
+        // Clear any other related caches
+        await AsyncStorage.removeItem('userAppointmentsTimestamp');
+        console.log('Cleared appointments timestamp cache');
         
-        // Add the new appointment to the array
-        appointments.push(enhancedAppointment);
+        // Clear any "all appointments" cache
+        await AsyncStorage.removeItem('all_appointments_cache');
+        console.log('Cleared all appointments cache');
         
-        // Save back to AsyncStorage
-        await AsyncStorage.setItem('userAppointments', JSON.stringify(appointments));
-        console.log('Appointment saved to AsyncStorage');
-      } catch (storageError) {
-        console.log('Error storing appointment in AsyncStorage:', storageError);
+        // Force immediate refresh of the appointments data
+        console.log('Forcing immediate refresh of appointments data...');
+        try {
+          // Call getUserAppointments with force refresh flag
+          // Note: We need to use the service object reference here
+          await appointmentService.getUserAppointments(userToken, true);
+          console.log('Successfully refreshed appointments data after booking');
+        } catch (refreshError) {
+          console.log('Error refreshing appointments after booking:', refreshError);
+        }
+      } else {
+        console.log('WARNING: Could not clear appointments cache - no client ID available');
       }
-      
-      return data;
-    } catch (error) {
-      console.log('Network error:', error);
-      throw error;
+    } catch (storageError) {
+      console.log('Error storing appointment in AsyncStorage:', storageError);
     }
-  },
-  
+    
+    return data;
+  } catch (error) {
+    console.log('Network error:', error);
+    throw error;
+  }
+},
 
   // Helper function to get booked time slots
   getBookedTimeSlots: async (date, shopId, userToken) => {
@@ -1156,220 +1187,363 @@ if (!endpointSuccess) {
       return false;
     }
   },
- 
-  getUserAppointments: async (userToken) => {
+ getUserAppointments: async (userToken, forceRefresh = false) => {
+  console.log('\n========== APPOINTMENT SERVICE: GET USER APPOINTMENTS ==========');
+  console.log('1. Function called at:', new Date().toISOString());
+  console.log(`1a. Force refresh requested: ${forceRefresh}`);
+  
+  if (!userToken) {
+    console.log('2. ERROR: No user token provided');
+    console.log('========== APPOINTMENT SERVICE: ENDING WITH ERROR ==========\n');
+    throw new Error('No authentication token provided');
+  }
+  
+  console.log('2. User token available:', userToken ? `${userToken.substring(0, 5)}...${userToken.substring(userToken.length - 5)}` : 'null');
+  
+  try {
+    // First, try to get user info from AsyncStorage
+    console.log('3. Attempting to get user info from AsyncStorage...');
+    let userInfo = null;
+    
     try {
-      console.log('\n========== APPOINTMENT SERVICE: GET USER APPOINTMENTS ==========');
-      console.log('1. Function called at:', new Date().toISOString());
-          
-      if (!userToken) {
-        console.log('2. ERROR: No user token provided');
-        console.log('========== APPOINTMENT SERVICE: ENDING WITH ERROR ==========\n');
-        throw new Error('No authentication token provided');
+      const userDataString = await AsyncStorage.getItem('userData');
+      if (userDataString) {
+        userInfo = JSON.parse(userDataString);
+        console.log('4. User info retrieved from AsyncStorage');
+        console.log(`   User role: ${userInfo.role}`);
+        console.log(`   User ID: ${userInfo.id || userInfo._id}`);
+      } else {
+        console.log('4. No user info in AsyncStorage');
       }
-          
-      console.log('2. User token available:', userToken ? `${userToken.substring(0, 5)}...${userToken.substring(userToken.length - 5)}` : 'null');
-          
-      // Get the current user's ID from AsyncStorage
-      let currentUserId = null;
-      let userRole = null;
+    } catch (storageError) {
+      console.log('4. ERROR getting user info from AsyncStorage:', storageError.message);
+    }
+    
+    // If no user info in AsyncStorage, try to decode from token
+    if (!userInfo) {
+      console.log('5. Attempting to decode user info from token...');
       try {
-        const userData = await AsyncStorage.getItem('userData');
-        if (userData) {
-          const parsedUserData = JSON.parse(userData);
-          currentUserId = parsedUserData.id || parsedUserData._id;
-          userRole = parsedUserData.role;
-          console.log('3. Found current user ID from AsyncStorage:', currentUserId);
-          console.log('   User role:', userRole);
+        const decoded = decodeToken(userToken);
+        if (decoded && decoded.id) {
+          userInfo = {
+            _id: decoded.id,
+            id: decoded.id,
+            role: decoded.role
+          };
+          console.log('6. User info decoded from token');
+          console.log(`   User role: ${userInfo.role}`);
+          console.log(`   User ID: ${userInfo._id || userInfo.id}`);
+        } else {
+          console.log('6. Failed to decode valid user info from token');
         }
-      } catch (userDataError) {
-        console.log('3. ERROR getting userData from AsyncStorage:', userDataError.message);
+      } catch (decodeError) {
+        console.log('6. ERROR decoding token:', decodeError.message);
       }
-          
-      // If we don't have a user ID, try to decode it from token
-      if (!currentUserId) {
-        console.log('4. No user ID in AsyncStorage, attempting to decode from token...');
-        try {
-          const decoded = decodeToken(userToken);
-          if (decoded && (decoded.id || decoded._id || decoded.userId || decoded.sub)) {
-            currentUserId = decoded.id || decoded._id || decoded.userId || decoded.sub;
-            userRole = decoded.role;
-            console.log('5. Successfully decoded user ID from token:', currentUserId);
-            console.log('   User role from token:', userRole);
-          } else {
-            console.log('5. Failed to decode valid user ID from token');
+    }
+    
+    // If still no user info, try to fetch from API
+    if (!userInfo) {
+      console.log('7. Fetching user info from API...');
+      try {
+        const userResponse = await fetch(`${API_URL}/api/auth/me`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${userToken}`,
+            'Accept': 'application/json'
           }
-        } catch (decodeError) {
-          console.log('5. ERROR decoding token:', decodeError.message);
-        }
-      }
-          
-      // Try to get all appointments from AsyncStorage first
-      console.log('6. Checking for appointments in AsyncStorage...');
-      const cacheKey = `appointments_user_${currentUserId}`;
-      const storedAppointments = await AsyncStorage.getItem(cacheKey);
-      
-      if (storedAppointments) {
-        console.log('7. Found cached appointments in AsyncStorage');
-        const parsedAppointments = JSON.parse(storedAppointments);
-        console.log(`   Cached appointments count: ${parsedAppointments.length}`);
+        });
         
-        // Return cached appointments if they exist
-        if (parsedAppointments.length > 0) {
-          console.log('8. Returning cached appointments');
-          console.log('========== APPOINTMENT SERVICE: COMPLETED FROM CACHE ==========\n');
-          return parsedAppointments;
+        if (!userResponse.ok) {
+          console.log(`8. Failed to get user info from API: ${userResponse.status}`);
+          throw new Error('Failed to get user information');
         }
+        
+        userInfo = await userResponse.json();
+        console.log('8. User info retrieved successfully from API');
+        console.log(`   User role: ${userInfo.role}`);
+        console.log(`   User ID: ${userInfo._id || userInfo.id}`);
+        
+        // Save to AsyncStorage for future use
+        await AsyncStorage.setItem('userData', JSON.stringify(userInfo));
+        console.log('   User info saved to AsyncStorage');
+      } catch (userError) {
+        console.log('8. ERROR getting user info from API:', userError.message);
+        console.log('   Cannot proceed without user information');
+        throw new Error('Failed to get user information');
       }
-      
-      console.log('9. Fetching all appointments from API...');
-      
-      // Make API request to get all appointments
-      const response = await fetch(`${API_URL}/api/appointments`, {
+    }
+    
+    // Ensure we have user info
+    if (!userInfo) {
+      console.log('9. No user info available, cannot fetch appointments');
+      throw new Error('User information not available');
+    }
+    
+    const clientId = userInfo.id || userInfo._id;
+    console.log(`10. Using client ID: ${clientId}`);
+    
+    // Check if we have cached appointments
+    const cacheKey = `appointments_client_${clientId}`;
+    
+    // Only check cache if we're not forcing a refresh
+    if (!forceRefresh) {
+      console.log('11. Checking for cached appointments...');
+      try {
+        const cachedData = await AsyncStorage.getItem(cacheKey);
+        if (cachedData) {
+          const { appointments, timestamp } = JSON.parse(cachedData);
+          const cacheAge = Date.now() - timestamp;
+          
+          // Use cache only if it's less than 30 seconds old
+          if (cacheAge < 30 * 1000) { // 30 seconds instead of 5 minutes
+            console.log(`12. Using cached appointments (${appointments.length} items, ${Math.round(cacheAge/1000)}s old)`);
+            console.log('========== APPOINTMENT SERVICE: COMPLETED FROM CACHE ==========\n');
+            return appointments;
+          }
+          console.log(`12. Cache expired (${Math.round(cacheAge/1000)}s old), fetching fresh data`);
+        } else {
+          console.log('12. No cached appointments found');
+        }
+      } catch (cacheError) {
+        console.log('12. ERROR checking cache:', cacheError.message);
+      }
+    } else {
+      console.log('11. Force refresh requested, skipping cache check');
+    }
+    
+    // Try different API endpoints to get client appointments
+    console.log('14. Trying client-specific appointments endpoint...');
+    
+    let appointments = [];
+    let endpointSuccess = false;
+    
+    // First try: Client-specific endpoint
+    try {
+      const clientAppointmentsResponse = await fetch(`${API_URL}/api/appointments/client/${clientId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${userToken}`,
           'Accept': 'application/json'
         }
       });
-          
-      console.log(`10. API response status: ${response.status}`);
-          
-      if (!response.ok) {
-        console.log(`11. ERROR: API request failed with status ${response.status}`);
-        try {
-          const errorData = await response.text();
-          console.log('    Error response:', errorData);
-        } catch (parseError) {
-          console.log('    Could not parse error response');
+      
+            if (clientAppointmentsResponse.ok) {
+        const clientAppointmentsData = await clientAppointmentsResponse.json();
+        console.log('15. Client-specific endpoint successful');
+        
+        if (Array.isArray(clientAppointmentsData)) {
+          appointments = clientAppointmentsData;
+          console.log(`16. Found ${appointments.length} appointments in array response`);
+          endpointSuccess = true;
+        } else if (clientAppointmentsData && clientAppointmentsData.appointments) {
+          appointments = clientAppointmentsData.appointments;
+          console.log(`16. Found ${appointments.length} appointments in object.appointments`);
+          endpointSuccess = true;
+        } else {
+          console.log('16. Unexpected response format from client-specific endpoint');
         }
-        console.log('========== APPOINTMENT SERVICE: ENDING WITH ERROR ==========\n');
-        return []; // Return empty array instead of throwing
+      } else {
+        console.log(`15. Client-specific endpoint failed: ${clientAppointmentsResponse.status}`);
       }
-          
-      const data = await response.json();
-      console.log('12. Server response for appointments:', typeof data, Array.isArray(data) ? `Array with ${data.length} items` : 'Object');
-          
-      // Process the appointments data
-      if (data && (data.appointments || Array.isArray(data))) {
-        const allAppointments = data.appointments || data;
-        console.log(`13. Processing ${allAppointments.length} appointments from API`);
+    } catch (clientAppointmentsError) {
+      console.log('15. ERROR with client-specific endpoint:', clientAppointmentsError.message);
+    }
+    
+    // Second try: Query parameter endpoint with clientId
+    if (!endpointSuccess) {
+      console.log('17. Trying query parameter endpoint with clientId...');
+      try {
+        const queryAppointmentsResponse = await fetch(`${API_URL}/api/appointments?clientId=${clientId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${userToken}`,
+            'Accept': 'application/json'
+          }
+        });
         
-        // Filter appointments for the current user based on user ID
-        console.log(`14. Filtering appointments for user ID: ${currentUserId}`);
-        
-        // For clients, we filter by userId in the appointment
-        // For barbershops, we filter by shopId in the appointment
-        let filteredAppointments = [];
-        if (userRole === 'client') {
-          console.log('15. User is a client, filtering by clientId in appointment');
-          filteredAppointments = allAppointments.filter(appointment => {
-            // Convert IDs to strings for comparison
-            const currentUserIdStr = String(currentUserId);
-            
-            // Check clientId (primary field for client identification)
-            const clientIdStr = appointment.clientId ? 
-              (typeof appointment.clientId === 'object' ? 
-                String(appointment.clientId._id || appointment.clientId.id) : 
-                String(appointment.clientId)) : 
-              '';
-            
-            // Log each appointment's clientId for debugging
-            console.log(`    Appointment ${appointment._id}: clientId = ${clientIdStr}, comparing with ${currentUserIdStr}`);
-            
-            // Match only if clientId matches the current user's ID
-            return clientIdStr === currentUserIdStr;
-          });
-        } else if (userRole === 'barbershop' || userRole === 'mainBarbershop') {
-          console.log('15. User is a barbershop, filtering by shopId in appointment');
-          filteredAppointments = allAppointments.filter(appointment => {
-            // Convert IDs to strings for comparison
-            const currentUserIdStr = String(currentUserId);
-            
-            // Get shopId as string, handling object or string cases
-            const shopIdStr = appointment.shopId ? 
-              (typeof appointment.shopId === 'object' ? 
-                String(appointment.shopId._id || appointment.shopId.id) : 
-                String(appointment.shopId)) : 
-              '';
-            
-            // Log each appointment's shopId for debugging
-            console.log(`    Appointment ${appointment._id}: shopId = ${shopIdStr}, comparing with ${currentUserIdStr}`);
-            
-            // Match if shopId matches the current user's ID
-            return shopIdStr === currentUserIdStr;
-          });
+        if (queryAppointmentsResponse.ok) {
+          const queryAppointmentsData = await queryAppointmentsResponse.json();
+          console.log('18. Query parameter endpoint successful');
+          
+          if (Array.isArray(queryAppointmentsData)) {
+            appointments = queryAppointmentsData;
+            console.log(`19. Found ${appointments.length} appointments in array response`);
+            endpointSuccess = true;
+          } else if (queryAppointmentsData && queryAppointmentsData.appointments) {
+            appointments = queryAppointmentsData.appointments;
+            console.log(`19. Found ${appointments.length} appointments in object.appointments`);
+            endpointSuccess = true;
+          } else {
+            console.log('19. Unexpected response format from query parameter endpoint');
+          }
+        } else {
+          console.log(`18. Query parameter endpoint failed: ${queryAppointmentsResponse.status}`);
         }
+      } catch (queryAppointmentsError) {
+        console.log('18. ERROR with query parameter endpoint:', queryAppointmentsError.message);
+      }
+    }
+    
+    // Third try: Get all appointments and filter client-side
+    if (!endpointSuccess) {
+      console.log('20. Trying all appointments endpoint and filtering...');
+      try {
+        const allAppointmentsResponse = await fetch(`${API_URL}/api/appointments`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${userToken}`,
+            'Accept': 'application/json'
+          }
+        });
         
-        console.log(`16. Found ${filteredAppointments.length} appointments for this user`);
-        
-        // Create a map to store shop names by shopId to avoid duplicate requests
-        const shopNamesMap = {};
-        
-        // Enhanced appointments with shop names
-        const enhancedAppointments = await Promise.all(
-          filteredAppointments.map(async (appointment) => {
-            const enhanced = { ...appointment };
+        if (allAppointmentsResponse.ok) {
+          const allAppointmentsData = await allAppointmentsResponse.json();
+          console.log('21. All appointments endpoint successful');
+          
+          let allAppointments = [];
+          if (Array.isArray(allAppointmentsData)) {
+            allAppointments = allAppointmentsData;
+          } else if (allAppointmentsData && allAppointmentsData.appointments) {
+            allAppointments = allAppointmentsData.appointments;
+          }
+          
+          console.log(`22. Found ${allAppointments.length} total appointments in the system`);
+          
+          // Filter for appointments where this user is the client
+          console.log(`23. Filtering for client ID: ${clientId}`);
+          
+          // Use string comparison for IDs to handle ObjectId vs string issues
+          const clientIdStr = String(clientId);
+          
+          const clientAppointments = allAppointments.filter(appointment => {
+            // Check for clientId field instead of userId
+            const appointmentClientId = appointment.clientId;
+            const appointmentClientIdStr = appointmentClientId ? String(appointmentClientId) : '';
             
-            // If this appointment has a shopId, try to get the shop name
-            if (appointment.shopId) {
-              // Check if we've already fetched this shop's name
-              if (shopNamesMap[appointment.shopId]) {
-                enhanced.shopName = shopNamesMap[appointment.shopId];
-              } else {
-                try {
-                  const shopResponse = await fetch(`${API_URL}/api/shop/${appointment.shopId}`, {
-                    method: 'GET',
-                    headers: {
-                      'Authorization': `Bearer ${userToken}`,
-                      'Accept': 'application/json'
-                    }
-                  });
-                  
-                  if (shopResponse.ok) {
-                    const shopData = await shopResponse.json();
-                    if (shopData && shopData.shop && shopData.shop.name) {
-                      // Store the shop name in our map for future use
-                      shopNamesMap[appointment.shopId] = shopData.shop.name;
-                      enhanced.shopName = shopData.shop.name;
-                      console.log(`    Found shop name for appointment ${appointment._id}: ${enhanced.shopName}`);
-                    }
-                  }
-                } catch (shopError) {
-                  console.log(`    Error fetching shop details for appointment ${appointment._id}:`, shopError.message);
+            // Log the clientId for debugging
+            console.log(`    Appointment ${appointment._id}: clientId = ${appointmentClientIdStr}, comparing with ${clientIdStr}`);
+            
+            // Only match if clientId matches the client's ID
+            const isMatch = appointmentClientIdStr === clientIdStr;
+            
+            if (isMatch) {
+              console.log(`    MATCH FOUND: Appointment ${appointment._id} has clientId ${appointmentClientIdStr}`);
+            }
+            
+            return isMatch;
+          });
+          
+          console.log(`24. Found ${clientAppointments.length} appointments for this client`);
+          appointments = clientAppointments;
+        } else {
+          console.log(`21. All appointments endpoint failed: ${allAppointmentsResponse.status}`);
+        }
+      } catch (allAppointmentsError) {
+        console.log('21. ERROR with all appointments endpoint:', allAppointmentsError.message);
+      }
+    }
+    
+    // Process appointments to ensure shop and barber information is included
+    if (appointments.length > 0) {
+      console.log('25. Processing appointments for shop and barber information');
+      
+      appointments = await Promise.all(appointments.map(async appointment => {
+        let processedAppointment = { ...appointment };
+        
+        // Ensure shop information is available
+        if (!processedAppointment.shopName && processedAppointment.shopId) {
+          if (typeof processedAppointment.shopId === 'object' && processedAppointment.shopId.name) {
+            processedAppointment.shopName = processedAppointment.shopId.name;
+          } else if (typeof processedAppointment.shopId === 'string' || typeof processedAppointment.shopId === 'object') {
+            const shopIdValue = typeof processedAppointment.shopId === 'object' ? 
+              (processedAppointment.shopId._id || processedAppointment.shopId.id) : processedAppointment.shopId;
+            
+            try {
+              const shopResponse = await fetch(`${API_URL}/api/shops/${shopIdValue}`, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${userToken}`,
+                  'Accept': 'application/json'
+                }
+              });
+              
+              if (shopResponse.ok) {
+                const shopData = await shopResponse.json();
+                if (shopData && shopData.name) {
+                  processedAppointment.shopName = shopData.name;
+                } else if (shopData && shopData.shop && shopData.shop.name) {
+                  processedAppointment.shopName = shopData.shop.name;
                 }
               }
+            } catch (shopError) {
+              console.log(`    Error fetching shop data for appointment ${processedAppointment._id}:`, shopError.message);
             }
+          }
+        }
+        
+        // Ensure barber information is available
+        if (!processedAppointment.barberName && processedAppointment.barberId) {
+          if (typeof processedAppointment.barberId === 'object' && 
+              (processedAppointment.barberId.firstName || processedAppointment.barberId.name)) {
+            processedAppointment.barberName = processedAppointment.barberId.name || 
+              `${processedAppointment.barberId.firstName} ${processedAppointment.barberId.lastName || ''}`;
+          } else if (typeof processedAppointment.barberId === 'string' || typeof processedAppointment.barberId === 'object') {
+            const barberIdValue = typeof processedAppointment.barberId === 'object' ? 
+              (processedAppointment.barberId._id || processedAppointment.barberId.id) : processedAppointment.barberId;
             
-            // If we couldn't get a shop name, use a default
-            if (!enhanced.shopName) {
-              enhanced.shopName = 'Barbershop';
+            try {
+              const barberResponse = await fetch(`${API_URL}/api/users/${barberIdValue}`, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${userToken}`,
+                  'Accept': 'application/json'
+                }
+              });
+              
+              if (barberResponse.ok) {
+                const barberData = await barberResponse.json();
+                if (barberData && barberData.user) {
+                  processedAppointment.barberName = `${barberData.user.firstName} ${barberData.user.lastName || ''}`;
+                } else if (barberData && barberData.firstName) {
+                  processedAppointment.barberName = `${barberData.firstName} ${barberData.lastName || ''}`;
+                }
+              }
+            } catch (barberError) {
+              console.log(`    Error fetching barber data for appointment ${processedAppointment._id}:`, barberError.message);
             }
-            
-            return enhanced;
-          })
-        );
+          }
+        }
         
-        // Store filtered appointments in AsyncStorage with user-specific key
-        await AsyncStorage.setItem(cacheKey, JSON.stringify(enhancedAppointments));
-        console.log(`17. Stored ${enhancedAppointments.length} appointments in AsyncStorage with key: ${cacheKey}`);
-        
-        console.log('18. Returning enhanced appointments from API');
-        console.log('========== APPOINTMENT SERVICE: COMPLETED SUCCESSFULLY ==========\n');
-        return enhancedAppointments;
-      }
-          
-      console.log('13. No appointments data found in API response');
-      console.log('========== APPOINTMENT SERVICE: COMPLETED WITH EMPTY RESULT ==========\n');
-      return [];
-    } catch (error) {
-      console.error('ERROR in getUserAppointments:', error.message);
-      console.error('Error stack:', error.stack);
-      console.log('========== APPOINTMENT SERVICE: ENDING WITH ERROR ==========\n');
-      return [];
+        return processedAppointment;
+      }));
     }
-  },
-  
+    
+    // Store appointments in AsyncStorage for future use
+    try {
+      await AsyncStorage.setItem(cacheKey, JSON.stringify({
+        appointments,
+        timestamp: Date.now()
+      }));
+      console.log(`26. Appointments saved to AsyncStorage with key: ${cacheKey}`);
+      console.log(`    Saved ${appointments.length} appointments`);
+    } catch (storageError) {
+      console.log('26. ERROR saving appointments to AsyncStorage:', storageError.message);
+    }
+    
+    console.log('27. Returning appointments to caller');
+    console.log(`    Returning ${appointments.length} appointments`);
+    console.log('========== APPOINTMENT SERVICE: COMPLETED SUCCESSFULLY ==========\n');
+    return appointments;
+    
+  } catch (error) {
+    console.log(`ERROR in getUserAppointments: ${error.message}`);
+    console.log('Error object:', error);
+    console.log('Error stack:', error.stack);
+    console.log('========== APPOINTMENT SERVICE: ENDING WITH ERROR ==========\n');
+    throw error;
+  }
+},
+
   
   cancelAppointment: async (appointmentId, userToken) => {
     try {

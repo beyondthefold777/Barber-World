@@ -29,9 +29,40 @@ const GuestLandingPage = ({ navigation }) => {
   const [hasSearched, setHasSearched] = useState(false);
   const slideAnim = useRef(new Animated.Value(-300)).current;
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const resultsPerPage = 5;
+  const [paginatedResults, setPaginatedResults] = useState([]);
+  
   // Add a fallback for the unread messages context
   const unreadMessagesContext = useUnreadMessages();
   const unreadCount = unreadMessagesContext ? unreadMessagesContext.unreadCount : 0;
+
+  // Update paginated results whenever search results or current page changes
+  useEffect(() => {
+    if (searchResults.length > 0) {
+      const totalPagesCount = Math.ceil(searchResults.length / resultsPerPage);
+      setTotalPages(totalPagesCount);
+      
+      // Ensure current page is valid
+      const validCurrentPage = Math.min(currentPage, totalPagesCount);
+      if (validCurrentPage !== currentPage) {
+        setCurrentPage(validCurrentPage);
+      }
+      
+      // Calculate start and end indices for the current page
+      const startIndex = (validCurrentPage - 1) * resultsPerPage;
+      const endIndex = Math.min(startIndex + resultsPerPage, searchResults.length);
+      
+      // Set the paginated results
+      setPaginatedResults(searchResults.slice(startIndex, endIndex));
+    } else {
+      setPaginatedResults([]);
+      setTotalPages(1);
+      setCurrentPage(1);
+    }
+  }, [searchResults, currentPage]);
 
   const toggleMenu = () => {
     const toValue = isOpen ? -300 : 0;
@@ -56,14 +87,14 @@ const GuestLandingPage = ({ navigation }) => {
     setLoading(true);
     setHasSearched(true);
     try {
-      const searchParams = searchType === 'location' 
-        ? { city, state }
+      const searchParams = searchType === 'location'
+         ? { city, state }
         : { zipCode };
-      
+        
       // Use the existing searchBarbershops method from authService
       const results = await authService.searchBarbershops(searchParams);
       console.log('Search results received:', results.length);
-      
+        
       // Process results to ensure distance values are consistent
       const processedResults = results.map(shop => {
         // If shop doesn't have a distance, assign a fixed one based on shop ID
@@ -76,13 +107,26 @@ const GuestLandingPage = ({ navigation }) => {
         }
         return shop;
       });
-      
+        
       setSearchResults(processedResults);
+      setCurrentPage(1); // Reset to first page on new search
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
     }
   };
 
@@ -110,7 +154,7 @@ const GuestLandingPage = ({ navigation }) => {
       let city = '';
       let state = '';
       let zip = '';
-      
+        
       // Try to get values from both possible locations
       if (item.address && typeof item.address === 'object') {
         city = item.address.city || item.city || '';
@@ -121,32 +165,31 @@ const GuestLandingPage = ({ navigation }) => {
         state = item.state || '';
         zip = item.zipCode || '';
       }
-      
+        
       let location = '';
-      
+        
       if (city) {
         location += city;
       }
-      
+        
       if (city && state) {
         location += ', ';
       }
-      
+        
       if (state) {
         location += state;
       }
-      
+        
       if ((city || state) && zip) {
         location += ' ';
       }
-      
+        
       if (zip) {
         location += zip;
       }
-      
+        
       return location || '';
     };
-
     // Use actual rating if available
     const rating = item.rating ? item.rating.toFixed(1) : (Math.random() * 2 + 3).toFixed(1);
     
@@ -166,23 +209,23 @@ const GuestLandingPage = ({ navigation }) => {
     // Get up to 3 images for the gallery preview
     const getShopImages = () => {
       let images = [];
-      
+        
       // First try to get images from the images array
       if (item.images && item.images.length > 0) {
         // Take up to 3 images from the array
         images = item.images.slice(0, 3).map(img => ({ uri: img }));
       }
-      
+        
       // If no images in the array but there's a profile image, use that
       if (images.length === 0 && item.profileImage) {
         images.push({ uri: item.profileImage });
       }
-      
+        
       // If still no images, use a default image
       if (images.length === 0) {
         images.push(require('../assets/clippers1.png'));
       }
-      
+        
       return images;
     };
     const shopImages = getShopImages();
@@ -211,7 +254,7 @@ const GuestLandingPage = ({ navigation }) => {
               </View>
             </View>
           </View>
-          
+                
           {/* Gallery Preview */}
           <View style={styles.imageGalleryContainer}>
             {shopImages.map((image, imgIndex) => (
@@ -224,23 +267,23 @@ const GuestLandingPage = ({ navigation }) => {
               </View>
             ))}
           </View>
-          
+                
           <View style={styles.cardDivider} />
-          
+                
           <View style={styles.cardBody}>
             <View style={styles.addressRow}>
               <Feather name="map-pin" size={16} color="#BBBBBB" style={styles.addressIcon} />
               <Text style={styles.barbershopAddress}>{formatAddress()}</Text>
             </View>
             <Text style={styles.barbershopLocation}>{formatLocation()}</Text>
-            
+                    
             <View style={styles.servicesContainer}>
               <Text style={styles.servicesText}>
                 {formatServices()}
               </Text>
             </View>
           </View>
-          
+                
           <View style={styles.cardFooter}>
             <TouchableOpacity 
               style={styles.bookButton}
@@ -266,7 +309,7 @@ const GuestLandingPage = ({ navigation }) => {
       style={styles.container}
     >
       <StatusBar barStyle="light-content" translucent={true} backgroundColor="transparent" />
-      
+        
       <ScrollView style={styles.content} stickyHeaderIndices={[0]}>
         {/* Sticky Header */}
         <View style={styles.stickyHeader}>
@@ -277,7 +320,7 @@ const GuestLandingPage = ({ navigation }) => {
           >
             <Feather name="menu" size={24} color="white" />
           </TouchableOpacity>
-          
+                
           {/* Top Right Image */}
           <View style={styles.topRightImage}>
             <Image 
@@ -286,10 +329,10 @@ const GuestLandingPage = ({ navigation }) => {
             />
           </View>
         </View>
-        
+            
         <View style={styles.searchSection}>
           <Text style={styles.sectionTitle}>Find Your Barber</Text>
-          
+                
           <View style={styles.searchTypeContainer}>
             <TouchableOpacity 
               style={[
@@ -300,7 +343,7 @@ const GuestLandingPage = ({ navigation }) => {
             >
               <Text style={styles.searchTypeText}>City & State</Text>
             </TouchableOpacity>
-            
+                    
             <TouchableOpacity 
               style={[
                 styles.searchTypeButton, 
@@ -311,7 +354,7 @@ const GuestLandingPage = ({ navigation }) => {
               <Text style={styles.searchTypeText}>ZIP Code</Text>
             </TouchableOpacity>
           </View>
-          
+                
           {searchType === 'location' ? (
             <View style={styles.locationInputs}>
               <TextInput
@@ -351,7 +394,7 @@ const GuestLandingPage = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
         </View>
-        
+            
         {/* Results Section with Title */}
         {searchResults.length > 0 && (
           <View style={styles.resultsSection}>
@@ -359,9 +402,9 @@ const GuestLandingPage = ({ navigation }) => {
               <Text style={styles.resultsTitle}>Barbershops Near You</Text>
               <Text style={styles.resultsCount}>{searchResults.length} found</Text>
             </View>
-            
+                    
             <FlatList
-              data={searchResults}
+              data={paginatedResults}
               renderItem={renderBarbershop}
               keyExtractor={(item) => item._id?.toString() || Math.random().toString()}
               style={styles.resultsList}
@@ -369,9 +412,34 @@ const GuestLandingPage = ({ navigation }) => {
               showsVerticalScrollIndicator={false}
               scrollEnabled={false} // Disable scrolling on FlatList since it's inside ScrollView
             />
+            
+                      {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <View style={styles.paginationContainer}>
+                <TouchableOpacity 
+                  style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+                  onPress={goToPreviousPage}
+                  disabled={currentPage === 1}
+                >
+                  <Feather name="chevron-left" size={20} color={currentPage === 1 ? "#666" : "white"} />
+                </TouchableOpacity>
+                
+                <Text style={styles.paginationText}>
+                  Page {currentPage} of {totalPages}
+                </Text>
+                
+                <TouchableOpacity 
+                  style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
+                  onPress={goToNextPage}
+                  disabled={currentPage === totalPages}
+                >
+                  <Feather name="chevron-right" size={20} color={currentPage === totalPages ? "#666" : "white"} />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
-         
+             
         {/* No Results Message - Only show after a search has been performed */}
         {searchResults.length === 0 && hasSearched && !loading && (
           <View style={styles.noResultsContainer}>
@@ -384,7 +452,7 @@ const GuestLandingPage = ({ navigation }) => {
             </Text>
           </View>
         )}
-        
+            
         {/* Loading Indicator */}
         {loading && (
           <View style={styles.loadingContainer}>
@@ -392,7 +460,7 @@ const GuestLandingPage = ({ navigation }) => {
             <Text style={styles.loadingText}>Searching for barbershops...</Text>
           </View>
         )}
-        
+            
         <TouchableOpacity 
           style={styles.barberSignup}
           onPress={() => navigation.navigate('Register')}
@@ -400,6 +468,7 @@ const GuestLandingPage = ({ navigation }) => {
           <Text style={styles.signupText}>Barbershop? List Your Shop</Text>
         </TouchableOpacity>
       </ScrollView>
+
 {/* Animated Sidebar - Styled like the BarbershopDashboard */}
 <Animated.View 
   style={[
@@ -407,8 +476,7 @@ const GuestLandingPage = ({ navigation }) => {
     {
       transform: [{ translateX: slideAnim }],
     },
-  ]}
->
+  ]}>
   <LinearGradient
     colors={['#000000', '#333333']}
     style={styles.sidebarGradient}
@@ -430,7 +498,7 @@ const GuestLandingPage = ({ navigation }) => {
       {/* Guest Menu Section */}
       <View>
         <Text style={styles.sidebarSection}>Menu</Text>
-        
+            
         <TouchableOpacity 
           style={styles.sidebarItem}
           onPress={() => {
@@ -445,7 +513,7 @@ const GuestLandingPage = ({ navigation }) => {
             </View>
           </View>
         </TouchableOpacity>
-        
+            
         <TouchableOpacity 
           style={styles.sidebarItem}
           onPress={() => {
@@ -465,7 +533,7 @@ const GuestLandingPage = ({ navigation }) => {
             </View>
           </View>
         </TouchableOpacity>
-        
+            
         <TouchableOpacity 
           style={styles.sidebarItem}
           onPress={() => {
@@ -480,7 +548,7 @@ const GuestLandingPage = ({ navigation }) => {
             </View>
           </View>
         </TouchableOpacity>
-        
+            
         <TouchableOpacity 
           style={styles.sidebarItem}
           onPress={() => {
@@ -510,7 +578,7 @@ const GuestLandingPage = ({ navigation }) => {
         >
           <Text style={styles.footerText}>Terms of Service</Text>
         </TouchableOpacity>
-        
+            
         <TouchableOpacity 
           style={styles.footerLink}
           onPress={() => {
@@ -521,7 +589,7 @@ const GuestLandingPage = ({ navigation }) => {
           <Text style={styles.footerText}>Privacy Policy</Text>
         </TouchableOpacity>
       </View>
-      
+        
       <TouchableOpacity 
         style={styles.sidebarItem}
         onPress={handleLogout}
@@ -537,14 +605,13 @@ const GuestLandingPage = ({ navigation }) => {
   </LinearGradient>
 </Animated.View>
 
-
       {/* Bottom Navigation Bar */}
       <View style={styles.navbar}>
         <TouchableOpacity style={styles.navItem}>
           <Feather name="home" size={24} color="white" />
           <Text style={styles.navText}>Home</Text>
         </TouchableOpacity>
-        
+            
         <TouchableOpacity 
           style={styles.navItem}
           onPress={() => navigation.navigate('AppointmentsScreen')}
@@ -552,7 +619,7 @@ const GuestLandingPage = ({ navigation }) => {
           <Feather name="calendar" size={24} color="white" />
           <Text style={styles.navText}>Appointments</Text>
         </TouchableOpacity>
-        
+            
         <TouchableOpacity onPress={() => navigation.navigate('GuestLandingPage')}>
           <LinearGradient
             colors={['#FF0000', '#FFFFFF', '#0000FF', '#FF0000', '#FFFFFF', '#0000FF']}
@@ -561,7 +628,7 @@ const GuestLandingPage = ({ navigation }) => {
             style={styles.clipperButton}
           />
         </TouchableOpacity>
-        
+            
         <TouchableOpacity 
           style={styles.navItem}
           onPress={() => navigation.navigate('MessagesScreen')}
@@ -574,7 +641,7 @@ const GuestLandingPage = ({ navigation }) => {
           </View>
           <Text style={styles.navText}>Messages</Text>
         </TouchableOpacity>
-        
+            
         <TouchableOpacity 
           style={styles.navItem}
           onPress={() => navigation.navigate('Settings')}
@@ -586,6 +653,7 @@ const GuestLandingPage = ({ navigation }) => {
     </LinearGradient>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -695,6 +763,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#444',
     paddingTop: 20,
+  },
+  footerLinksContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
   },
   footerLink: {
     padding: 8,
@@ -1047,6 +1120,31 @@ const styles = StyleSheet.create({
   },
   iconWithBadge: {
     position: 'relative',
+  },
+  // Pagination styles
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 15,
+    marginBottom: 10,
+  },
+  paginationButton: {
+    backgroundColor: 'rgba(255, 0, 0, 0.8)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 10,
+  },
+  paginationButtonDisabled: {
+    backgroundColor: 'rgba(100, 100, 100, 0.3)',
+  },
+  paginationText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 

@@ -23,23 +23,28 @@ const LoginScreen = ({ navigation }) => {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
-
     try {
       setLoading(true);
       console.log('Login attempt with:', { email });
+      
+      // Clear essential user data
+      await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('userData');
+      await AsyncStorage.removeItem('userRole');
+      await AsyncStorage.removeItem('userId');
+      await AsyncStorage.removeItem('shopData');
+      await AsyncStorage.removeItem('shopId');
       
       const credentials = {
         email: email.trim(),
         password: password.trim()
       };
-
       const response = await authService.loginBarbershop(credentials);
       console.log('Login response received:', response);
       
       if (!response || !response.token) {
         throw new Error('Invalid response from server');
       }
-
       // Store the complete token in AsyncStorage
       await AsyncStorage.setItem('userToken', response.token);
       
@@ -78,6 +83,7 @@ const LoginScreen = ({ navigation }) => {
       setLoading(false);
     }
   };
+
   return (
     <LinearGradient
       colors={['#000000', '#333333']}
@@ -104,7 +110,6 @@ const LoginScreen = ({ navigation }) => {
           secureTextEntry
         />
       </View>
-
       <TouchableOpacity 
         style={[styles.loginButton, loading && styles.disabledButton]}
         onPress={handleLogin}
@@ -114,14 +119,12 @@ const LoginScreen = ({ navigation }) => {
           {loading ? 'Logging in...' : 'Login'}
         </Text>
       </TouchableOpacity>
-
       <TouchableOpacity 
         style={styles.forgotPassword}
         onPress={() => navigation.navigate('ForgotPassword')}
       >
         <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
       </TouchableOpacity>
-
       <TouchableOpacity onPress={() => navigation.navigate('Register')}>
         <Text style={styles.registerText}>Don't have an account? Register</Text>
       </TouchableOpacity>
@@ -168,7 +171,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  forgotPassword: {
+   forgotPassword: {
     alignItems: 'center',
     marginBottom: 20,
   },

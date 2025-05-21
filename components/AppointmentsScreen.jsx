@@ -31,6 +31,25 @@ const AppointmentsScreen = ({ navigation }) => {
   const [selectedShop, setSelectedShop] = useState(null);
   const [userShops, setUserShops] = useState([]);
 
+  // Function to clear appointments cache
+  const clearAppointmentsCache = async () => {
+    logScreen("Clearing appointments cache");
+    try {
+      // Clear all possible appointment cache keys
+      await AsyncStorage.removeItem('appointments');
+      
+      // Get the current user ID to build client-specific cache key
+      const clientId = await getCurrentUserId();
+      if (clientId) {
+        await AsyncStorage.removeItem(`appointments_client_${clientId}`);
+      }
+      
+      logScreen("Appointments cache cleared successfully");
+    } catch (error) {
+      logScreen(`Error clearing appointments cache: ${error.message}`);
+    }
+  };
+
   // Function to get user data from AsyncStorage
   const getUserData = async () => {
     try {
@@ -117,8 +136,12 @@ const AppointmentsScreen = ({ navigation }) => {
     logScreen("Could not determine user ID from any source");
     return null;
   };
+
   const fetchAppointments = async () => {
     logScreen("Starting to fetch appointments");
+    
+    // Clear the appointments cache before fetching fresh data
+    await clearAppointmentsCache();
     
     try {
       setLoading(true);
@@ -222,10 +245,6 @@ const AppointmentsScreen = ({ navigation }) => {
       
       setAppointments(appointmentsData);
       
-      // Cache the appointments
-      await AsyncStorage.setItem('appointments', JSON.stringify(appointmentsData));
-      logScreen("Appointments saved to AsyncStorage");
-      
       // Log the first appointment for debugging if available
       if (appointmentsData.length > 0) {
         const firstAppointment = appointmentsData[0];
@@ -253,16 +272,21 @@ const AppointmentsScreen = ({ navigation }) => {
     }
   };
   
-  
   // Add useEffect to call fetchAppointments when component mounts
   useEffect(() => {
-    logScreen("Component mounted, fetching appointments");
-    fetchAppointments();
+    logScreen("Component mounted, clearing cache and fetching appointments");
+    
+    const loadData = async () => {
+      await clearAppointmentsCache();
+      fetchAppointments();
+    };
+    
+    loadData();
     
     // Set up a listener for when the screen comes into focus
     const unsubscribe = navigation.addListener('focus', () => {
-      logScreen("Screen focused, refreshing appointments");
-      fetchAppointments();
+      logScreen("Screen focused, clearing cache and refreshing appointments");
+      loadData();
     });
     
     // Clean up the listener when component unmounts
@@ -270,12 +294,12 @@ const AppointmentsScreen = ({ navigation }) => {
   }, [navigation]);
   
   // Add handleRefresh function to call fetchAppointments
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     logScreen("Manual refresh triggered");
     setRefreshing(true);
+    await clearAppointmentsCache();
     fetchAppointments();
   };
-
   
   const handleCancelAppointment = async (appointmentId) => {
     logScreen(`Cancel appointment requested for ID: ${appointmentId}`);
@@ -307,17 +331,6 @@ const AppointmentsScreen = ({ navigation }) => {
               setAppointments(appointments.map(app => 
                 app._id === appointmentId ? {...app, status: 'canceled'} : app
               ));
-              
-              // Update the cached appointments
-              const cachedAppointments = await AsyncStorage.getItem('appointments');
-              if (cachedAppointments) {
-                const parsedAppointments = JSON.parse(cachedAppointments);
-                const updatedAppointments = parsedAppointments.map(app =>
-                  app._id === appointmentId ? {...app, status: 'canceled'} : app
-                );
-                await AsyncStorage.setItem('appointments', JSON.stringify(updatedAppointments));
-                logScreen("Updated appointments in AsyncStorage after cancellation");
-              }
               
               Alert.alert('Success', 'Your appointment has been canceled.');
             } catch (error) {
@@ -398,7 +411,7 @@ const AppointmentsScreen = ({ navigation }) => {
     } else if (appointment.serviceId) {
       if (typeof appointment.serviceId === 'object' && appointment.serviceId.name) {
         return appointment.serviceId.name;
-      } else if (typeof appointment.serviceId === 'string') {
+         } else if (typeof appointment.serviceId === 'string') {
         // If serviceId is just a string ID, we can't get the name directly
         return 'Haircut';
       }

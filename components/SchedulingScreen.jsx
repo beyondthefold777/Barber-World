@@ -6,18 +6,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { appointmentService } from '../services/api.js';
 
 const HAIRSTYLES = [
-  { label: 'Classic Fade', value: 'fade', price: '$30' },
-  { label: 'Taper Cut', value: 'taper', price: '$25' },
-  { label: 'Lineup', value: 'lineup', price: '$20' },
-  { label: 'Wave Style', value: 'waves', price: '$35' },
-  { label: 'Textured Cut', value: 'textured', price: '$35' },
-  { label: 'Regular Cut', value: 'pompadour', price: '$40' },
-  { label: 'Crew Cut', value: 'crew', price: '$25' },
-  { label: 'Scissor Cut', value: 'scissor', price: '$30' },
-  { label: 'Designer Cut', value: 'designer', price: '$45' },
-  { label: 'Buzz Cut', value: 'buzz', price: '$20' },
-  { label: 'Undercut Style', value: 'undercut', price: '$35' },
-  { label: 'Custom Style', value: 'custom', price: '$50' }
+  { label: 'Classic Fade', value: 'fade' },
+  { label: 'Taper Cut', value: 'taper' },
+  { label: 'Lineup', value: 'lineup' },
+  { label: 'Wave Style', value: 'waves' },
+  { label: 'Textured Cut', value: 'textured' },
+  { label: 'Regular Cut', value: 'pompadour' },
+  { label: 'Crew Cut', value: 'crew' },
+  { label: 'Scissor Cut', value: 'scissor' },
+  { label: 'Designer Cut', value: 'designer' },
+  { label: 'Buzz Cut', value: 'buzz' },
+  { label: 'Undercut Style', value: 'undercut' },
+  { label: 'Custom Style', value: 'custom' }
 ];
 
 const SchedulingScreen = ({ route, navigation }) => {
@@ -26,7 +26,7 @@ const SchedulingScreen = ({ route, navigation }) => {
   const shopName = route.params?.shopName || 'Barbershop';
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
-  const [selectedStyle, setSelectedStyle] = useState({ value: '', label: '', price: '' });
+  const [selectedStyle, setSelectedStyle] = useState({ value: '', label: '' });
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedStyleLabel, setSelectedStyleLabel] = useState('Select Style');
   const [loading, setLoading] = useState(false);
@@ -70,10 +70,9 @@ const SchedulingScreen = ({ route, navigation }) => {
   const handleStyleSelect = (style) => {
     setSelectedStyle({
       value: style.value,
-      label: style.label,
-      price: style.price
+      label: style.label
     });
-    setSelectedStyleLabel(`${style.label} - ${style.price}`);
+    setSelectedStyleLabel(style.label);
     closeMenu();
   };
 
@@ -121,6 +120,7 @@ const SchedulingScreen = ({ route, navigation }) => {
       Alert.alert('Error', 'No barbershop selected for booking');
       return;
     }
+
     setLoading(true);
     try {
       const appointmentData = {
@@ -151,7 +151,7 @@ const SchedulingScreen = ({ route, navigation }) => {
       // Reset form
       setSelectedDate('');
       setSelectedTime('');
-      setSelectedStyle({ value: '', label: '', price: '' });
+      setSelectedStyle({ value: '', label: '' });
       setSelectedStyleLabel('Select Style');
     } catch (error) {
       console.error('Booking error:', error);
@@ -197,6 +197,7 @@ const SchedulingScreen = ({ route, navigation }) => {
                 arrowColor: '#ffffff',
               }}
             />
+
             <View style={styles.styleContainer}>
               <Text style={styles.subtitle}>Select Style</Text>
               <Menu
@@ -221,13 +222,14 @@ const SchedulingScreen = ({ route, navigation }) => {
                   <Menu.Item
                     key={style.value}
                     onPress={() => handleStyleSelect(style)}
-                    title={`${style.label} - ${style.price}`}
+                    title={style.label}
                     titleStyle={styles.menuItemText}
                     style={styles.menuItem}
                   />
                 ))}
               </Menu>
             </View>
+
             <View style={styles.timeContainer}>
               <Text style={styles.subtitle}>Available Times</Text>
               {fetchingSlots ? (
@@ -277,14 +279,15 @@ const SchedulingScreen = ({ route, navigation }) => {
                 </>
               )}
             </View>
+
             <Button
               mode="contained"
               style={styles.bookButton}
               onPress={handleBooking}
               loading={loading}
               disabled={loading || !selectedDate || !selectedTime || !selectedStyle.value}
-              buttonColor="#FF0000"
-               textColor="#FFFFFF"
+              buttonColor="#FF0000" 
+              textColor="#FFFFFF"
             >
               {loading ? 'Booking...' : 'Book Appointment'}
             </Button>
@@ -408,7 +411,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999999',
   },
-   bookButton: {
+  bookButton: {
     marginTop: 30,
     marginBottom: 20,
     padding: 5,
@@ -419,7 +422,7 @@ const styles = StyleSheet.create({
     marginVertical: 20,
     fontStyle: 'italic',
   },
-  noTimesText: {
+    noTimesText: {
     color: '#ffffff',
     textAlign: 'center',
     marginVertical: 20,

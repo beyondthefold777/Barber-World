@@ -39,8 +39,13 @@ const RegisterScreen = ({ navigation }) => {
     try {
       setLoading(true);
       
-      // Clear any previous user data first
-      await clearUserData();
+      // Clear essential user data
+      await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('userData');
+      await AsyncStorage.removeItem('userRole');
+      await AsyncStorage.removeItem('userId');
+      await AsyncStorage.removeItem('shopData');
+      await AsyncStorage.removeItem('shopId');
       
       console.log('Registering with data:', formData);
       const response = await authService.register(formData);
