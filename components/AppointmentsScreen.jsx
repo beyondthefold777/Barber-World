@@ -16,6 +16,9 @@ import { appointmentService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Add your API URL here - replace with your actual API URL
+const API_URL = 'https://barber-world.fly.dev'; // Update this with your actual API URL
+
 // Add logging utility
 const logScreen = (message) => {
   console.log(`[APPOINTMENTS SCREEN] ${new Date().toISOString()} - ${message}`);
@@ -30,23 +33,81 @@ const AppointmentsScreen = ({ navigation }) => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedShop, setSelectedShop] = useState(null);
   const [userShops, setUserShops] = useState([]);
+  const [shopDetails, setShopDetails] = useState({}); // Store fetched shop details
 
-  // Function to clear appointments cache
-  const clearAppointmentsCache = async () => {
-    logScreen("Clearing appointments cache");
+  // Simple function to fetch shop details by shop ID
+  const fetchShopById = async (shopId) => {
     try {
-      // Clear all possible appointment cache keys
-      await AsyncStorage.removeItem('appointments');
+      logScreen(`Fetching shop details for ID: ${shopId}`);
       
-      // Get the current user ID to build client-specific cache key
-      const clientId = await getCurrentUserId();
-      if (clientId) {
-        await AsyncStorage.removeItem(`appointments_client_${clientId}`);
+      const response = await fetch(`${API_URL}/api/shop/${shopId}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        logScreen(`Shop fetch response: ${JSON.stringify(data)}`);
+        
+        if (data.success && data.shop) {
+          return data.shop;
+        } else if (data.name || data.businessName) {
+          // Sometimes the response might be the shop object directly
+          return data;
+        }
+      } else {
+        logScreen(`Shop fetch failed with status: ${response.status}`);
       }
       
-      logScreen("Appointments cache cleared successfully");
+      return null;
     } catch (error) {
-      logScreen(`Error clearing appointments cache: ${error.message}`);
+      logScreen(`Error fetching shop ${shopId}: ${error.message}`);
+      return null;
+    }
+  };
+
+  // Function to fetch all shop details for appointments
+  const fetchAllShopDetails = async (appointments) => {
+    try {
+      logScreen("Starting to fetch shop details for all appointments");
+      
+      // Extract unique shop IDs
+      const shopIds = [...new Set(
+        appointments
+          .map(app => {
+            if (typeof app.shopId === 'string') {
+              return app.shopId;
+            } else if (typeof app.shopId === 'object' && app.shopId._id) {
+              return app.shopId._id;
+            }
+            return null;
+          })
+          .filter(id => id)
+      )];
+
+      logScreen(`Found ${shopIds.length} unique shop IDs: ${shopIds.join(', ')}`);
+
+      const shopDetailsMap = {};
+
+      // Fetch details for each shop
+      for (const shopId of shopIds) {
+        const shopData = await fetchShopById(shopId);
+        if (shopData) {
+          shopDetailsMap[shopId] = shopData;
+          logScreen(`Successfully fetched shop: ${shopData.name || shopData.businessName}`);
+        }
+      }
+
+      setShopDetails(shopDetailsMap);
+      logScreen(`Fetched details for ${Object.keys(shopDetailsMap).length} shops`);
+
+      return shopDetailsMap;
+    } catch (error) {
+      logScreen(`Error fetching shop details: ${error.message}`);
+      return {};
     }
   };
 
@@ -140,9 +201,6 @@ const AppointmentsScreen = ({ navigation }) => {
   const fetchAppointments = async () => {
     logScreen("Starting to fetch appointments");
     
-    // Clear the appointments cache before fetching fresh data
-    await clearAppointmentsCache();
-    
     try {
       setLoading(true);
       
@@ -227,12 +285,15 @@ const AppointmentsScreen = ({ navigation }) => {
           // Keep all appointments for debugging purposes
         }
       }
+
+      // Fetch shop details for all appointments
+      await fetchAllShopDetails(appointmentsData);
       
       // Extract unique shop names for filtering
       const shops = new Set();
       appointmentsData.forEach(app => {
         const shopName = getShopName(app);
-        if (shopName) shops.add(shopName);
+        if (shopName && shopName !== 'Barbershop') shops.add(shopName);
       });
       
       const userShopsList = Array.from(shops).sort();
@@ -245,6 +306,10 @@ const AppointmentsScreen = ({ navigation }) => {
       
       setAppointments(appointmentsData);
       
+      // Cache the appointments
+      await AsyncStorage.setItem('appointments', JSON.stringify(appointmentsData));
+      logScreen("Appointments saved to AsyncStorage");
+      
       // Log the first appointment for debugging if available
       if (appointmentsData.length > 0) {
         const firstAppointment = appointmentsData[0];
@@ -252,10 +317,17 @@ const AppointmentsScreen = ({ navigation }) => {
         logScreen(`- ID: ${firstAppointment._id}`);
         logScreen(`- Client ID: ${firstAppointment.clientId}`);
         logScreen(`- Shop ID: ${firstAppointment.shopId}`);
+        logScreen(`- Shop Name: ${getShopName(firstAppointment)}`);
         logScreen(`- Status: ${firstAppointment.status}`);
         logScreen(`- Date: ${firstAppointment.date}`);
         logScreen(`- Time Slot: ${firstAppointment.timeSlot}`);
         logScreen(`- Service: ${firstAppointment.service}`);
+        
+        // Log the shopId structure to understand what we're working with
+        logScreen(`- shopId type: ${typeof firstAppointment.shopId}`);
+        if (typeof firstAppointment.shopId === 'object') {
+          logScreen(`- shopId object: ${JSON.stringify(firstAppointment.shopId)}`);
+        }
       } else {
         logScreen("No appointments available to display");
       }
@@ -271,36 +343,29 @@ const AppointmentsScreen = ({ navigation }) => {
       setRefreshing(false);
     }
   };
-  
+
   // Add useEffect to call fetchAppointments when component mounts
   useEffect(() => {
-    logScreen("Component mounted, clearing cache and fetching appointments");
-    
-    const loadData = async () => {
-      await clearAppointmentsCache();
-      fetchAppointments();
-    };
-    
-    loadData();
+    logScreen("Component mounted, fetching appointments");
+    fetchAppointments();
     
     // Set up a listener for when the screen comes into focus
     const unsubscribe = navigation.addListener('focus', () => {
-      logScreen("Screen focused, clearing cache and refreshing appointments");
-      loadData();
+      logScreen("Screen focused, refreshing appointments");
+      fetchAppointments();
     });
     
     // Clean up the listener when component unmounts
     return unsubscribe;
   }, [navigation]);
-  
+
   // Add handleRefresh function to call fetchAppointments
-  const handleRefresh = async () => {
+  const handleRefresh = () => {
     logScreen("Manual refresh triggered");
     setRefreshing(true);
-    await clearAppointmentsCache();
     fetchAppointments();
   };
-  
+
   const handleCancelAppointment = async (appointmentId) => {
     logScreen(`Cancel appointment requested for ID: ${appointmentId}`);
     
@@ -328,9 +393,20 @@ const AppointmentsScreen = ({ navigation }) => {
               logScreen("Cancellation API call successful");
               
               // Update the local state after successful cancellation
-              setAppointments(appointments.map(app => 
+              setAppointments(appointments.map(app =>
                 app._id === appointmentId ? {...app, status: 'canceled'} : app
               ));
+              
+                        // Update the cached appointments
+              const cachedAppointments = await AsyncStorage.getItem('appointments');
+              if (cachedAppointments) {
+                const parsedAppointments = JSON.parse(cachedAppointments);
+                const updatedAppointments = parsedAppointments.map(app =>
+                  app._id === appointmentId ? {...app, status: 'canceled'} : app
+                );
+                await AsyncStorage.setItem('appointments', JSON.stringify(updatedAppointments));
+                logScreen("Updated appointments in AsyncStorage after cancellation");
+              }
               
               Alert.alert('Success', 'Your appointment has been canceled.');
             } catch (error) {
@@ -373,9 +449,23 @@ const AppointmentsScreen = ({ navigation }) => {
     }
   };
 
-  // Helper function to get shop name from appointment
+  // Helper function to get shop name from appointment (now using fetched shop details)
   const getShopName = (appointment) => {
-    // Try different possible locations for shop name
+    // First, try to get the shop ID
+    let shopId = null;
+    if (typeof appointment.shopId === 'string') {
+      shopId = appointment.shopId;
+    } else if (typeof appointment.shopId === 'object' && appointment.shopId._id) {
+      shopId = appointment.shopId._id;
+    }
+
+    // If we have a shop ID and fetched details, use them
+    if (shopId && shopDetails[shopId]) {
+      const shop = shopDetails[shopId];
+      return shop.name || shop.businessName || 'Barbershop';
+    }
+
+    // Fallback to existing logic
     if (appointment.shopName) {
       return appointment.shopName;
     } else if (appointment.shopId) {
@@ -408,40 +498,14 @@ const AppointmentsScreen = ({ navigation }) => {
   const getServiceName = (appointment) => {
     if (appointment.serviceName) {
       return appointment.serviceName;
-    } else if (appointment.serviceId) {
-      if (typeof appointment.serviceId === 'object' && appointment.serviceId.name) {
-        return appointment.serviceId.name;
-         } else if (typeof appointment.serviceId === 'string') {
-        // If serviceId is just a string ID, we can't get the name directly
-        return 'Haircut';
+    } else if (appointment.service) {
+      if (typeof appointment.service === 'object' && appointment.service.name) {
+        return appointment.service.name;
+      } else if (typeof appointment.service === 'string') {
+        return appointment.service;
       }
     }
-    return 'Haircut';
-  };
-
-  // Helper function to format time from appointment
-  const formatAppointmentTime = (dateString) => {
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        logScreen(`Invalid time format: ${dateString}`);
-        return 'Invalid time';
-      }
-      
-      // Format time with timezone consideration
-      // Using UTC ensures we display the exact time that was booked
-      const options = { 
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: 'UTC'  // Use UTC to prevent timezone shifts
-      };
-      
-      return date.toLocaleTimeString('en-US', options);
-    } catch (error) {
-      logScreen(`Error formatting time: ${error.message}`);
-      return 'N/A';
-    }
+    return 'Service';
   };
 
   // Filter appointments based on selected shop
@@ -451,7 +515,6 @@ const AppointmentsScreen = ({ navigation }) => {
 
   // Render each appointment item
   const renderAppointmentItem = ({ item }) => {
-    // Log each appointment as it's rendered
     const shopName = getShopName(item);
     const barberName = getBarberName(item);
     
@@ -461,7 +524,7 @@ const AppointmentsScreen = ({ navigation }) => {
       <View style={styles.appointmentCard}>
         <View style={styles.appointmentHeader}>
           <Text style={styles.shopName}>{shopName}</Text>
-          <View style={[styles.statusBadge, 
+          <View style={[styles.statusBadge,
             item.status === 'confirmed' ? styles.confirmedStatus :
             item.status === 'canceled' ? styles.canceledStatus :
             item.status === 'completed' ? styles.completedStatus : styles.pendingStatus
@@ -507,7 +570,7 @@ const AppointmentsScreen = ({ navigation }) => {
       </View>
     );
   };
-  
+
   // Filter modal component
   const FilterModal = () => (
     <Modal
@@ -526,6 +589,22 @@ const AppointmentsScreen = ({ navigation }) => {
           </View>
           
           <ScrollView style={styles.shopList}>
+            <TouchableOpacity
+              style={[
+                styles.shopItem,
+                !selectedShop && styles.selectedShopItem
+              ]}
+              onPress={() => {
+                setSelectedShop(null);
+                setFilterModalVisible(false);
+              }}
+            >
+              <Text style={styles.shopItemText}>All Barbershops</Text>
+              {!selectedShop && (
+                <Feather name="check" size={20} color="#FF0000" />
+              )}
+            </TouchableOpacity>
+            
             {userShops.map((shop, index) => (
               <TouchableOpacity 
                 key={index}
@@ -549,7 +628,7 @@ const AppointmentsScreen = ({ navigation }) => {
       </View>
     </Modal>
   );
-  
+
   return (
     <LinearGradient
       colors={['#000000', '#333333']}
@@ -574,7 +653,7 @@ const AppointmentsScreen = ({ navigation }) => {
           >
             <Feather name="map-pin" size={18} color="white" />
             <Text style={styles.filterButtonText}>
-              {selectedShop || 'Select a barbershop'}
+              {selectedShop || 'All Barbershops'}
             </Text>
             <Feather name="chevron-down" size={18} color="white" style={styles.dropdownIcon} />
           </TouchableOpacity>
@@ -600,7 +679,9 @@ const AppointmentsScreen = ({ navigation }) => {
               <Text style={styles.emptyText}>
                 {userShops.length === 0
                   ? "You don't have any appointments yet"
-                  : `No appointments found for ${selectedShop}`}
+                  : selectedShop 
+                    ? `No appointments found for ${selectedShop}`
+                    : "No appointments found"}
               </Text>
               <TouchableOpacity 
                 style={styles.bookButton}

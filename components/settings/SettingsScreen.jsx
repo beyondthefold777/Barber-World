@@ -27,16 +27,11 @@ const SettingsScreen = ({ navigation }) => {
   const { userToken, userId, logout } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [settings, setSettings] = useState({
-    pushNotifications: true,
-    emailNotifications: true,
-    smsNotifications: false,
     darkMode: true,
     locationServices: true,
-    dataCollection: true,
     appointmentReminders: true,
     marketingEmails: false,
     autoCheckIn: false,
-    biometricLogin: false,
     language: 'English',
     currency: 'USD',
   });
@@ -45,7 +40,7 @@ const SettingsScreen = ({ navigation }) => {
     logScreen("Settings screen mounted");
     logScreen(`Auth context values - userToken: ${userToken ? 'exists' : 'null'}, userId: ${userId || 'null'}`);
     
-    // You could load user settings from API or AsyncStorage here
+    // Load user settings from AsyncStorage
     const loadSettings = async () => {
       try {
         const savedSettings = await AsyncStorage.getItem('userSettings');
@@ -78,97 +73,97 @@ const SettingsScreen = ({ navigation }) => {
     }
   };
 
-const handleDeleteAccount = async () => {
-  Alert.alert(
-    'Delete Account',
-    'Are you sure you want to delete your account? This action cannot be undone.',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            setIsLoading(true);
-            logScreen('Starting account deletion process');
-            
-            // Get token from context or AsyncStorage
-            let token = userToken;
-            if (!token) {
-              token = await AsyncStorage.getItem('userToken');
-              logScreen(`Token from AsyncStorage: ${token ? 'Found' : 'Not found'}`);
-            }
-            
-            // Check if token exists
-            if (!token) {
-              logScreen('No token found for account deletion');
-              Alert.alert('Error', 'You need to be logged in to delete your account');
-              setIsLoading(false);
-              return;
-            }
-            
-            // Get user ID from context or AsyncStorage
-            let id = userId;
-            if (!id) {
-              const userData = await AsyncStorage.getItem('userData');
-              if (userData) {
-                const parsed = JSON.parse(userData);
-                id = parsed.id || parsed._id || parsed.userId;
-                logScreen(`User ID from AsyncStorage: ${id}`);
+  const handleDeleteAccount = async () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              logScreen('Starting account deletion process');
+              
+              // Get token from context or AsyncStorage
+              let token = userToken;
+              if (!token) {
+                token = await AsyncStorage.getItem('userToken');
+                logScreen(`Token from AsyncStorage: ${token ? 'Found' : 'Not found'}`);
               }
-            }
-            
-            if (!id) {
-              logScreen('No user ID found for account deletion');
-              Alert.alert('Error', 'User ID not found. Please log in again.');
-              setIsLoading(false);
-              return;
-            }
-            
-            logScreen(`Using token for deletion: ${token ? 'YES' : 'NO'}`);
-            logScreen(`Using user ID for deletion: ${id}`);
-            
-            // Log token details (first few characters for security)
-            const tokenPreview = token.substring(0, 10) + '...';
-            logScreen(`Token preview: ${tokenPreview}`);
-            
-            // Make the API call to the correct endpoint
-            logScreen(`Attempting to delete account with ID: ${id}`);
-            
-            const response = await axios({
-              method: 'delete',
-              url: `${API_URL}/api/account`, // Updated to match the server endpoint
-              headers: { 
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
+              
+              // Check if token exists
+              if (!token) {
+                logScreen('No token found for account deletion');
+                Alert.alert('Error', 'You need to be logged in to delete your account');
+                setIsLoading(false);
+                return;
               }
-            });
-            
-            logScreen(`Delete account response: ${response.status}`);
-            
-            if (response.status === 200 || response.status === 204) {
-              // Success - proceed with logout
-              await handleSuccessfulDeletion();
-            } else {
-              logScreen(`Unexpected response status: ${response.status}`);
-              throw new Error(`Unexpected response status: ${response.status}`);
-            }
-          } catch (error) {
-            logScreen(`Delete account error: ${error.message}`);
-            console.error('Delete account error:', error);
-            Alert.alert(
-              'Error',
-              'Unable to delete account. Please try again later.'
-            );
-          } finally {
-            setIsLoading(false);
+              
+              // Get user ID from context or AsyncStorage
+              let id = userId;
+              if (!id) {
+                const userData = await AsyncStorage.getItem('userData');
+                if (userData) {
+                  const parsed = JSON.parse(userData);
+                  id = parsed.id || parsed._id || parsed.userId;
+                  logScreen(`User ID from AsyncStorage: ${id}`);
+                }
+              }
+              
+              if (!id) {
+                logScreen('No user ID found for account deletion');
+                Alert.alert('Error', 'User ID not found. Please log in again.');
+                setIsLoading(false);
+                return;
+              }
+              
+              logScreen(`Using token for deletion: ${token ? 'YES' : 'NO'}`);
+              logScreen(`Using user ID for deletion: ${id}`);
+              
+              // Log token details (first few characters for security)
+              const tokenPreview = token.substring(0, 10) + '...';
+              logScreen(`Token preview: ${tokenPreview}`);
+              
+              // Make the API call to the correct endpoint
+              logScreen(`Attempting to delete account with ID: ${id}`);
+              
+              const response = await axios({
+                method: 'delete',
+                url: `${API_URL}/api/account`,
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              logScreen(`Delete account response: ${response.status}`);
+              
+              if (response.status === 200 || response.status === 204) {
+                // Success - proceed with logout
+                await handleSuccessfulDeletion();
+              } else {
+                logScreen(`Unexpected response status: ${response.status}`);
+                throw new Error(`Unexpected response status: ${response.status}`);
+              }
+            } catch (error) {
+              logScreen(`Delete account error: ${error.message}`);
+              console.error('Delete account error:', error);
+              Alert.alert(
+                'Error',
+                'Unable to delete account. Please try again later.'
+              );
+            } finally {
+              setIsLoading(false);
             }
           }
         }
       ]
     );
   };
-  
+
   const handleSuccessfulDeletion = async () => {
     // Clear all storage
     await AsyncStorage.clear();
@@ -183,8 +178,8 @@ const handleDeleteAccount = async () => {
     Alert.alert(
       'Account Deleted',
       'Your account has been successfully deleted.',
-      [{ 
-        text: 'OK', 
+      [{
+        text: 'OK',
         onPress: () => {
           logScreen('Navigating to Login screen');
           navigation.reset({
@@ -289,70 +284,82 @@ const handleDeleteAccount = async () => {
           </TouchableOpacity>
         </View>
         
-        {/* Notifications Section */}
+        {/* App Preferences Section */}
         <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
+          <Text style={styles.sectionTitle}>App Preferences</Text>
           
           {renderSettingToggle(
-            'Push Notifications',
-            'Receive push notifications for important updates',
-            'pushNotifications',
-            <Ionicons name="notifications" size={22} color="#FF0000" />
-          )}
-          
-          {renderSettingToggle(
-            'Email Notifications',
-            'Receive email notifications for important updates',
-            'emailNotifications',
-            <MaterialIcons name="email" size={22} color="#FF0000" />
-          )}
-          
-          {renderSettingToggle(
-            'SMS Notifications',
-            'Receive text messages for important updates',
-            'smsNotifications',
-            <MaterialIcons name="sms" size={22} color="#FF0000" />
+            'Dark Mode',
+            'Use dark theme throughout the app',
+            'darkMode',
+            <Feather name="moon" size={22} color="#FF0000" />
           )}
           
           {renderSettingToggle(
             'Appointment Reminders',
-            'Receive reminders before your appointments',
+            'Get reminded before your appointments',
             'appointmentReminders',
             <MaterialIcons name="event" size={22} color="#FF0000" />
+          )}
+          
+          {renderSettingToggle(
+            'Auto Check-in',
+            'Automatically check in when you arrive',
+            'autoCheckIn',
+            <MaterialIcons name="check-circle" size={22} color="#FF0000" />
           )}
         </View>
         
         {/* Privacy Section */}
         <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Privacy & Security</Text>
+          <Text style={styles.sectionTitle}>Privacy</Text>
           
           {renderSettingToggle(
             'Location Services',
-            'Allow app to access your location',
+            'Allow app to access your location for nearby shops',
             'locationServices',
             <MaterialIcons name="location-on" size={22} color="#FF0000" />
           )}
           
           {renderSettingToggle(
-            'Data Collection',
-            'Allow app to collect usage data',
-            'dataCollection',
-            <MaterialIcons name="data-usage" size={22} color="#FF0000" />
-          )}
-          
-          {renderSettingToggle(
             'Marketing Emails',
-            'Receive promotional emails',
+            'Receive promotional emails and offers',
             'marketingEmails',
             <MaterialIcons name="campaign" size={22} color="#FF0000" />
           )}
+        </View>
+        
+        {/* Account Actions */}
+        <View style={styles.settingsSection}>
+          <Text style={styles.sectionTitle}>Account</Text>
           
-          {renderSettingToggle(
-            'Biometric Login',
-            'Use fingerprint or face ID to login',
-            'biometricLogin',
-            <MaterialIcons name="fingerprint" size={22} color="#FF0000" />
-          )}
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('AccountDetails')}
+          >
+            <View style={styles.settingIconContainer}>
+              <Feather name="user" size={22} color="#FF0000" />
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingTitle}>Account Details</Text>
+              <Text style={styles.settingDescription}>View and edit your profile</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="#888" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => Alert.alert('Help & Support', 'Contact support at support@barberapp.com')}
+          >
+            <View style={styles.settingIconContainer}>
+              <Feather name="help-circle" size={22} color="#FF0000" />
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingTitle}>Help & Support</Text>
+              <Text style={styles.settingDescription}>Get help or contact support</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="#888" />
+          </TouchableOpacity>
         </View>
         
         {/* Danger Zone */}
@@ -410,7 +417,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-   accountSection: {
+  accountSection: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 10,
     padding: 15,
@@ -472,7 +479,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
-  optionItem: {
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
