@@ -388,9 +388,6 @@ const GuestLandingPage = ({ navigation }) => {
       <Text style={styles.benefitText}>• Be part of building this together</Text>
       <Text style={styles.benefitText}>• Early adopter benefits coming soon</Text>
     </View>
-    <TouchableOpacity style={styles.inviteButton}>
-      <Text style={styles.inviteButtonText}>Invite Your Barber</Text>
-    </TouchableOpacity>
   </View>
 )}
 
