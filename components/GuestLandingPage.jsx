@@ -372,18 +372,28 @@ const GuestLandingPage = ({ navigation }) => {
           </View>
         )}
          
-        {/* No Results Message - Only show after a search has been performed */}
-        {searchResults.length === 0 && hasSearched && !loading && (
-          <View style={styles.noResultsContainer}>
-            <FontAwesome name="search" size={50} color="#444" />
-            <Text style={styles.noResults}>
-              No barbershops found
-            </Text>
-            <Text style={styles.noResultsSubtext}>
-              Try a different location or ZIP code
-            </Text>
-          </View>
-        )}
+       {/* No Results Message - Only show after a search has been performed */}
+{searchResults.length === 0 && hasSearched && !loading && (
+  <View style={styles.noResultsContainer}>
+    <Text style={styles.growingCommunityEmoji}>🌱</Text>
+    <Text style={styles.growingCommunityTitle}>Growing Community</Text>
+    <Text style={styles.noResults}>
+      No results in your area yet?
+    </Text>
+    <Text style={styles.noResultsSubtext}>
+      You're part of our founding members helping build BarberWorld!
+    </Text>
+    <View style={styles.communityBenefits}>
+      <Text style={styles.benefitText}>• New barbers joining daily</Text>
+      <Text style={styles.benefitText}>• Be part of building this together</Text>
+      <Text style={styles.benefitText}>• Early adopter benefits coming soon</Text>
+    </View>
+    <TouchableOpacity style={styles.inviteButton}>
+      <Text style={styles.inviteButtonText}>Invite Your Barber</Text>
+    </TouchableOpacity>
+  </View>
+)}
+
         
         {/* Loading Indicator */}
         {loading && (
@@ -991,6 +1001,39 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 14,
   },
+  // New growing community styles
+  growingCommunityEmoji: {
+    fontSize: 40,
+    marginBottom: 10,
+  },
+  growingCommunityTitle: {
+    color: '#FF0000',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  communityBenefits: {
+    marginTop: 15,
+    marginBottom: 20,
+  },
+  benefitText: {
+    color: '#BBBBBB',
+    fontSize: 14,
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  inviteButton: {
+    backgroundColor: '#FF0000',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  inviteButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1042,12 +1085,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: -15,
     borderWidth: 3,
-    borderColor: '#FFFFFF', 
+    borderColor: '#FFFFFF',
     overflow: 'hidden',
   },
   iconWithBadge: {
     position: 'relative',
   },
 });
+
 
 export default GuestLandingPage;
