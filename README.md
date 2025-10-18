@@ -75,7 +75,7 @@ Built using **Socket.io**, messages are delivered instantly with typing indicato
 
 **Anthony Bell**  
 📧 [support@barberworld.com](mailto:support@barberworld.com)  
-GitHub: [anthonybell](https://github.com/anthonybell)
+
 
 ---
 
