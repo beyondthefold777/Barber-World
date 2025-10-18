@@ -22,7 +22,7 @@ The app empowers barbershop owners with tools to manage their business while pro
 - **Client Communication** – Real-time in-app messaging for direct client interaction.  
 - **Marketing Tools** – Run promotions and connect via integrated social features.  
 - **Analytics** – Access business insights and performance metrics.  
-- **Subscription Model** – 14-day free trial, then $25/month.
+
 
 ### 💇 For Clients
 - **Barbershop Discovery** – Search nearby shops by location or ZIP code.  
